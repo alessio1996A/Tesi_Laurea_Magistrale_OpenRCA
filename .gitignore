@@ -1,0 +1,23 @@
+# Ambiente Python locale
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Segreti e configurazioni locali
+.env
+.env.*
+!.env.example
+
+# Dataset: non versionare i dati grezzi o derivati
+data/raw/*
+data/processed/*
+
+# Output generati dagli esperimenti
+results/
+.ipynb_checkpoints/
+
+# File temporanei
+*.log
+.DS_Store
+Thumbs.db
