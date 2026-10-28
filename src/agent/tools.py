@@ -65,46 +65,251 @@ def tool_get_service_metrics(
     except Exception as e:
         return f"Errore del tool: {str(e)}"
 
-
 def tool_get_container_metrics(
-        start_unix: int, end_unix: int, cmdb_id: Optional[str] = None, kpi_name: Optional[str] = None,
-        max_rows: int = 30
+    start_unix: int,
+    end_unix: int,
+    cmdb_id: Optional[str] = None,
+    kpi_name: Optional[str] = None,
+    max_rows: int = 100
 ) -> str:
-    """[TOOL AGENTE A0] Estrae i KPI infrastrutturali (CPU, Memoria, I/O, Network) dei container."""
-    target_csv = 'Market/cloudbed-1/telemetry/2022_03_20/metric/metric_container.csv'
+    """
+    [TOOL AGENTE A0]
+    Analizza le metriche dei container a blocchi e restituisce
+    statistiche descrittive per ogni coppia componente/KPI.
+
+    Le statistiche permettono di osservare minimo, massimo,
+    media e relativa collocazione temporale senza restituire
+    soltanto le prime righe del CSV.
+    """
+
+    target_csv = (
+        "Market/cloudbed-1/telemetry/2022_03_20/"
+        "metric/metric_container.csv"
+    )
+
     try:
-        if start_unix > end_unix: return "Errore: l'inizio supera la fine."
-        if max_rows < 1: return "Errore: max_rows almeno 1."
+        if start_unix > end_unix:
+            return "Errore: l'inizio supera la fine dell'intervallo."
 
-        numero_righe = 0
-        risultati = []
+        if max_rows < 1:
+            return "Errore: max_rows deve essere almeno 1."
 
-        with zipfile.ZipFile(DATASET_ZIP_PATH, 'r') as z:
-            with z.open(target_csv) as f:
-                for chunk in pd.read_csv(f, chunksize=100_000):
-                    timestamp = pd.to_numeric(chunk['timestamp'], errors='coerce')
-                    mask = timestamp.between(start_unix, end_unix)
+        # Una ricerca senza componente e senza KPI sarebbe
+        # troppo ampia per restituire un riepilogo utile.
+        if not cmdb_id and not kpi_name:
+            return (
+                "Query troppo ampia. Specificare almeno "
+                "cmdb_id oppure kpi_name."
+            )
 
+        # Verifichiamo che il filtro regex sia valido.
+        pattern = None
+
+        if kpi_name:
+            try:
+                pattern = re.compile(kpi_name, re.IGNORECASE)
+            except re.error as exc:
+                return f"Errore: espressione regex non valida: {exc}"
+
+        # Statistiche mantenute in memoria per ogni coppia
+        # (componente, KPI), senza conservare tutto il CSV.
+        statistiche = {}
+        numero_record = 0
+
+        with zipfile.ZipFile(DATASET_ZIP_PATH, "r") as archivio:
+            with archivio.open(target_csv) as file_csv:
+
+                for chunk in pd.read_csv(
+                    file_csv,
+                    chunksize=100_000
+                ):
+                    timestamp = pd.to_numeric(
+                        chunk["timestamp"],
+                        errors="coerce"
+                    )
+
+                    valori = pd.to_numeric(
+                        chunk["value"],
+                        errors="coerce"
+                    )
+
+                    mask = (
+                        timestamp.between(start_unix, end_unix)
+                        & valori.notna()
+                        & timestamp.notna()
+                    )
+
+                    # Filtro del componente.
+                    # Supporta sia l'ID semplice sia quello
+                    # preceduto dal nodo, ad esempio node-6.
                     if cmdb_id:
-                        cmdb = chunk['cmdb_id'].astype(str)
-                        mask &= (cmdb.eq(cmdb_id) | cmdb.str.endswith(f".{cmdb_id}", na=False))
-                    if kpi_name:
-                        mask &= chunk['kpi_name'].str.contains(kpi_name, case=False, na=False, regex=True)
+                        cmdb = (
+                            chunk["cmdb_id"]
+                            .astype(str)
+                            .str.lower()
+                        )
 
-                    df_filtered = chunk.loc[mask].copy()
-                    numero_righe += len(df_filtered)
-                    righe_disponibili = max_rows - sum(len(df) for df in risultati)
+                        cercato = cmdb_id.strip().lower()
 
-                    if righe_disponibili > 0 and not df_filtered.empty:
-                        risultati.append(df_filtered.head(righe_disponibili))
+                        mask &= (
+                            cmdb.eq(cercato)
+                            | cmdb.str.endswith(
+                                f".{cercato}",
+                                na=False
+                            )
+                        )
 
-        if numero_righe == 0: return f"Nessun dato per cmdb_id={cmdb_id} e kpi_name={kpi_name}."
-        df_risultato = pd.concat(risultati, ignore_index=True)
-        return (f"Intervallo Unix: {start_unix} - {end_unix}\nContainer: {cmdb_id or 'Tutti'}\n"
-                f"Filtro KPI: {kpi_name or 'Nessuno'}\nRecord trovati: {numero_righe}\n"
-                f"Record mostrati: {len(df_risultato)}\n\n{df_risultato.to_string(index=False)}")
-    except Exception as e:
-        return f"Errore del tool: {str(e)}"
+                    # Filtro per nome KPI.
+                    if pattern is not None:
+                        mask &= chunk["kpi_name"].astype(
+                            str
+                        ).str.contains(
+                            pattern,
+                            na=False
+                        )
+
+                    filtrati = chunk.loc[mask].copy()
+
+                    if filtrati.empty:
+                        continue
+
+                    filtrati["timestamp"] = timestamp.loc[mask]
+                    filtrati["value"] = valori.loc[mask]
+
+                    numero_record += len(filtrati)
+
+                    colonne = [
+                        "timestamp",
+                        "cmdb_id",
+                        "kpi_name",
+                        "value"
+                    ]
+
+                    for timestamp_riga, componente, kpi, valore in (
+                        filtrati[colonne].itertuples(
+                            index=False,
+                            name=None
+                        )
+                    ):
+                        timestamp_riga = float(timestamp_riga)
+                        valore = float(valore)
+
+                        chiave = (
+                            str(componente),
+                            str(kpi)
+                        )
+
+                        if chiave not in statistiche:
+                            statistiche[chiave] = {
+                                "campioni": 0,
+                                "somma": 0.0,
+                                "minimo": valore,
+                                "timestamp_minimo": timestamp_riga,
+                                "massimo": valore,
+                                "timestamp_massimo": timestamp_riga,
+                                "primo_timestamp": timestamp_riga,
+                                "primo_valore": valore,
+                                "ultimo_timestamp": timestamp_riga,
+                                "ultimo_valore": valore,
+                            }
+
+                        s = statistiche[chiave]
+                        s["campioni"] += 1
+                        s["somma"] += valore
+
+                        if valore < s["minimo"]:
+                            s["minimo"] = valore
+                            s["timestamp_minimo"] = timestamp_riga
+
+                        if valore > s["massimo"]:
+                            s["massimo"] = valore
+                            s["timestamp_massimo"] = timestamp_riga
+
+                        if timestamp_riga < s["primo_timestamp"]:
+                            s["primo_timestamp"] = timestamp_riga
+                            s["primo_valore"] = valore
+
+                        if timestamp_riga >= s["ultimo_timestamp"]:
+                            s["ultimo_timestamp"] = timestamp_riga
+                            s["ultimo_valore"] = valore
+
+        if not statistiche:
+            return (
+                f"Nessun dato per cmdb_id={cmdb_id} "
+                f"e kpi_name={kpi_name}."
+            )
+
+        righe = []
+
+        for (componente, kpi), s in statistiche.items():
+            righe.append({
+                "cmdb_id": componente,
+                "kpi_name": kpi,
+                "campioni": s["campioni"],
+                "media": s["somma"] / s["campioni"],
+                "minimo": s["minimo"],
+                "timestamp_minimo": s["timestamp_minimo"],
+                "massimo": s["massimo"],
+                "timestamp_massimo": s["timestamp_massimo"],
+                "primo_valore": s["primo_valore"],
+                "primo_timestamp": s["primo_timestamp"],
+                "ultimo_valore": s["ultimo_valore"],
+                "ultimo_timestamp": s["ultimo_timestamp"],
+            })
+
+        riepilogo = pd.DataFrame(righe).sort_values(
+            ["cmdb_id", "kpi_name"]
+        )
+
+        gruppi_totali = len(riepilogo)
+
+        # Evita risposte eccessivamente lunghe se la query
+        # produce moltissime combinazioni componente/KPI.
+        if gruppi_totali > max_rows:
+            riepilogo = riepilogo.head(max_rows)
+
+        colonne_numeriche = [
+            "media",
+            "minimo",
+            "massimo",
+            "primo_valore",
+            "ultimo_valore",
+        ]
+
+        riepilogo[colonne_numeriche] = (
+            riepilogo[colonne_numeriche].round(6)
+        )
+
+        riepilogo[
+            [
+                "timestamp_minimo",
+                "timestamp_massimo",
+                "primo_timestamp",
+                "ultimo_timestamp",
+            ]
+        ] = riepilogo[
+            [
+                "timestamp_minimo",
+                "timestamp_massimo",
+                "primo_timestamp",
+                "ultimo_timestamp",
+            ]
+        ].astype("int64")
+
+        return (
+            f"Intervallo Unix (secondi): "
+            f"{start_unix} - {end_unix}\n"
+            f"Filtro componente: {cmdb_id or 'Tutti'}\n"
+            f"Filtro KPI: {kpi_name or 'Nessuno'}\n"
+            f"Record analizzati: {numero_record}\n"
+            f"Gruppi componente/KPI trovati: {gruppi_totali}\n"
+            f"Gruppi mostrati: {len(riepilogo)}\n\n"
+            f"{riepilogo.to_string(index=False)}"
+        )
+
+    except Exception as exc:
+        return f"Errore del tool: {type(exc).__name__}: {exc}"
+
 
 
 def tool_get_logs(
