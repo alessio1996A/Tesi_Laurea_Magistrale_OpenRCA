@@ -95,13 +95,29 @@ def _get_telemetry_csv_paths(
 
 
 def tool_get_service_metrics(
-        start_unix: int, end_unix: int, service_name: Optional[str] = None, max_rows: int = 30
+    start_unix: int,
+    end_unix: int,
+    service_name: Optional[str] = None,
+    max_rows: int = 30,
+    market_system: Literal["cloudbed-1", "cloudbed-2"] = "cloudbed-1",
 ) -> str:
-    """[TOOL AGENTE A0] Estrae le metriche rr (Request Rate), sr (Success Rate) e mrt (Mean Response Time)."""
-    target_csv = 'Market/cloudbed-1/telemetry/2022_03_20/metric/metric_service.csv'
+    """[TOOL AGENTE A0] Estrae le metriche rr, sr e mrt dei servizi.
+
+    market_system seleziona il cloudbed; per compatibilita' il default e' cloudbed-1.
+    La finestra temporale e' [start_unix, end_unix), con estremo finale escluso.
+    """
     try:
-        if start_unix > end_unix: return "Errore: l'inizio supera la fine dell'intervallo."
-        if max_rows < 1: return "Errore: max_rows deve essere almeno 1."
+        if start_unix >= end_unix:
+            return "Errore: l'inizio deve precedere la fine dell'intervallo."
+        if max_rows < 1:
+            return "Errore: max_rows deve essere almeno 1."
+
+        percorsi_csv = _get_telemetry_csv_paths(
+            start_unix=start_unix,
+            end_unix=end_unix,
+            market_system=market_system,
+            data_kind="service_metrics",
+        )
 
         numero_righe = 0
         righe_restituite = 0
@@ -109,44 +125,61 @@ def tool_get_service_metrics(
         frammenti_esplorativi = []
 
         with zipfile.ZipFile(DATASET_ZIP_PATH, 'r') as z:
-            with z.open(target_csv) as f:
-                for chunk in pd.read_csv(f, chunksize=100_000):
-                    timestamp = pd.to_numeric(chunk['timestamp'], errors='coerce')
-                    mask = timestamp.between(start_unix, end_unix)
-                    df_time_filtered = chunk.loc[mask]
+            for percorso_csv in percorsi_csv:
+                with z.open(percorso_csv) as f:
+                    for chunk in pd.read_csv(f, chunksize=100_000):
+                        timestamp = pd.to_numeric(chunk['timestamp'], errors='coerce')
+                        mask = (timestamp >= start_unix) & (timestamp < end_unix)
+                        df_time_filtered = chunk.loc[mask]
 
-                    if df_time_filtered.empty: continue
+                        if df_time_filtered.empty:
+                            continue
 
-                    if service_name:
-                        df_filtered = df_time_filtered[df_time_filtered['service'] == service_name]
-                        numero_righe += len(df_filtered)
-                        righe_disponibili = max_rows - righe_restituite
-                        if righe_disponibili > 0 and not df_filtered.empty:
-                            campione = df_filtered.head(righe_disponibili)
-                            risultati_grezzi.append(campione)
-                            righe_restituite += len(campione)
-                    else:
-                        frammenti_esplorativi.append(df_time_filtered)
+                        if service_name:
+                            df_filtered = df_time_filtered[
+                                df_time_filtered['service'] == service_name
+                            ]
+                            numero_righe += len(df_filtered)
+                            righe_disponibili = max_rows - righe_restituite
+                            if righe_disponibili > 0 and not df_filtered.empty:
+                                campione = df_filtered.head(righe_disponibili)
+                                risultati_grezzi.append(campione)
+                                righe_restituite += len(campione)
+                        else:
+                            frammenti_esplorativi.append(df_time_filtered)
 
         if service_name:
-            if numero_righe == 0: return f"Nessuna metrica trovata per il servizio {service_name}."
+            if numero_righe == 0:
+                return f"Nessuna metrica trovata per il servizio {service_name}."
             df_risultato = pd.concat(risultati_grezzi, ignore_index=True)
-            return (f"Intervallo Unix: {start_unix} - {end_unix}\nServizio: {service_name}\n"
-                    f"Campioni trovati: {numero_righe}\nCampioni restituiti: {len(df_risultato)}\n\n"
-                    f"{df_risultato.to_string(index=False)}")
+            return (
+                f"Intervallo Unix: {start_unix} - {end_unix}\n"
+                f"Servizio: {service_name}\n"
+                f"Campioni trovati: {numero_righe}\n"
+                f"Campioni restituiti: {len(df_risultato)}\n\n"
+                f"{df_risultato.to_string(index=False)}"
+            )
 
-        if not frammenti_esplorativi: return "Nessuna metrica trovata in questo intervallo."
+        if not frammenti_esplorativi:
+            return "Nessuna metrica trovata in questo intervallo."
 
         df_completo = pd.concat(frammenti_esplorativi, ignore_index=True)
         riepilogo = df_completo.groupby('service').agg(
-            campioni=('timestamp', 'size'), rr_media=('rr', 'mean'),
-            sr_media=('sr', 'mean'), mrt_media=('mrt', 'mean'), mrt_max=('mrt', 'max')
+            campioni=('timestamp', 'size'),
+            rr_media=('rr', 'mean'),
+            sr_media=('sr', 'mean'),
+            mrt_media=('mrt', 'mean'),
+            mrt_max=('mrt', 'max'),
         ).reset_index()
 
         totale_servizi = len(riepilogo)
         risultato = riepilogo.head(max_rows)
-        return (f"Intervallo Unix: {start_unix} - {end_unix}\nServizi trovati: {totale_servizi}\n"
-                f"Servizi mostrati: {len(risultato)}\n\n{risultato.to_string(index=False)}")
+        return (
+            f"Intervallo Unix: {start_unix} - {end_unix}\n"
+            f"Servizi trovati: {totale_servizi}\n"
+            f"Servizi mostrati: {len(risultato)}\n\n"
+            f"{risultato.to_string(index=False)}"
+        )
     except Exception as e:
         return f"Errore del tool: {str(e)}"
 
