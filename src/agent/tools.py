@@ -1,6 +1,7 @@
 import zipfile
 import pandas as pd
 import re
+from typing import Literal
 from typing import Optional
 
 # Costante per il percorso del dataset.
@@ -107,7 +108,7 @@ def tool_get_container_metrics(
 
 
 def tool_get_logs(
-        start_unix: int, end_unix: int, log_type: str = 'service', cmdb_id: Optional[str] = None,
+        start_unix: int, end_unix: int, log_type: Literal["service", "proxy"] = "service", cmdb_id: Optional[str] = None,
         keyword: Optional[str] = None, max_rows: int = 30
 ) -> str:
     """[TOOL AGENTE A0] Estrae e analizza i log di sistema con Rolling Top-K per l'ordinamento cronologico."""
