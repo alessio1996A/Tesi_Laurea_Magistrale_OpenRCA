@@ -438,49 +438,89 @@ def tool_get_container_metrics(
 
 
 def tool_get_logs(
-        start_unix: int, end_unix: int, log_type: Literal["service", "proxy"] = "service", cmdb_id: Optional[str] = None,
-        keyword: Optional[str] = None, max_rows: int = 30
+    start_unix: int,
+    end_unix: int,
+    log_type: Literal["service", "proxy"] = "service",
+    cmdb_id: Optional[str] = None,
+    keyword: Optional[str] = None,
+    max_rows: int = 30,
+    market_system: Literal["cloudbed-1", "cloudbed-2"] = "cloudbed-1",
 ) -> str:
-    """[TOOL AGENTE A0] Estrae e analizza i log di sistema con Rolling Top-K per l'ordinamento cronologico."""
-    target_csv = f'Market/cloudbed-1/telemetry/2022_03_20/log/log_{log_type}.csv'
-    if start_unix > end_unix: return "Errore: l'inizio supera la fine."
-    if max_rows < 1: return "Errore: max_rows almeno 1."
-    if log_type not in ('service', 'proxy'): return "Errore: log_type deve essere 'service' o 'proxy'."
+    """[TOOL AGENTE A0] Estrae log ordinati cronologicamente (Rolling Top-K).
+
+    La finestra temporale e' [start_unix, end_unix), con fine esclusa.
+    Il cloudbed predefinito resta cloudbed-1 per compatibilita' con A0.
+    """
+    if start_unix >= end_unix:
+        return "Errore: l'inizio deve precedere la fine."
+    if max_rows < 1:
+        return "Errore: max_rows almeno 1."
+    if log_type not in ("service", "proxy"):
+        return "Errore: log_type deve essere 'service' o 'proxy'."
 
     numero_righe = 0
     risultati = pd.DataFrame()
 
     try:
-        with zipfile.ZipFile(DATASET_ZIP_PATH, 'r') as z:
-            with z.open(target_csv) as f:
-                for chunk in pd.read_csv(f, chunksize=100_000):
-                    timestamp = pd.to_numeric(chunk['timestamp'], errors='coerce')
-                    mask = timestamp.between(start_unix, end_unix)
+        percorsi_csv = _get_telemetry_csv_paths(
+            start_unix=start_unix,
+            end_unix=end_unix,
+            market_system=market_system,
+            data_kind="logs",
+            log_type=log_type,
+        )
 
-                    if cmdb_id:
-                        cmdb = chunk['cmdb_id'].astype(str).str.lower()
-                        cercato = cmdb_id.strip().lower()
-                        mask &= (cmdb.eq(cercato) | cmdb.str.startswith(f"{cercato}-", na=False))
-                    if keyword:
-                        mask &= chunk['value'].astype(str).str.contains(keyword, case=False, na=False, regex=False)
+        with zipfile.ZipFile(DATASET_ZIP_PATH, "r") as archivio:
+            for percorso_csv in percorsi_csv:
+                with archivio.open(percorso_csv) as file_csv:
+                    for chunk in pd.read_csv(file_csv, chunksize=100_000):
+                        timestamp = pd.to_numeric(chunk["timestamp"], errors="coerce")
+                        mask = (timestamp >= start_unix) & (timestamp < end_unix)
 
-                    df_filtered = chunk.loc[mask].copy()
-                    df_filtered['timestamp'] = timestamp.loc[mask]
-                    numero_righe += len(df_filtered)
+                        if cmdb_id:
+                            cmdb = chunk["cmdb_id"].astype(str).str.lower()
+                            cercato = cmdb_id.strip().lower()
+                            mask &= (
+                                cmdb.eq(cercato)
+                                | cmdb.str.startswith(f"{cercato}-", na=False)
+                            )
+                        if keyword:
+                            mask &= chunk["value"].astype(str).str.contains(
+                                keyword, case=False, na=False, regex=False
+                            )
 
-                    if not df_filtered.empty:
-                        campione = df_filtered.sort_values(['timestamp', 'log_id'], kind='stable').head(max_rows)
-                        if risultati.empty:
-                            risultati = campione.copy()
-                        else:
-                            risultati = pd.concat([risultati, campione], ignore_index=True)
-                        risultati = risultati.sort_values(['timestamp', 'log_id'], kind='stable').head(
-                            max_rows).reset_index(drop=True)
+                        df_filtered = chunk.loc[mask].copy()
+                        df_filtered["timestamp"] = timestamp.loc[mask]
+                        numero_righe += len(df_filtered)
 
-        if numero_righe == 0: return f"Nessun log '{log_type}' per cmdb_id={cmdb_id} e keyword='{keyword}'."
-        return (f"Intervallo Unix: {start_unix} - {end_unix}\nTipo Log: {log_type}\n"
-                f"Componente: {cmdb_id or 'Tutti'}\nFiltro: {keyword or 'Nessuna'}\n"
-                f"Record trovati: {numero_righe}\nRecord mostrati: {len(risultati)}\n\n{risultati.to_string(index=False)}")
+                        if not df_filtered.empty:
+                            campione = df_filtered.sort_values(
+                                ["timestamp", "log_id"], kind="stable"
+                            ).head(max_rows)
+                            if risultati.empty:
+                                risultati = campione.copy()
+                            else:
+                                risultati = pd.concat(
+                                    [risultati, campione], ignore_index=True
+                                )
+                            risultati = risultati.sort_values(
+                                ["timestamp", "log_id"], kind="stable"
+                            ).head(max_rows).reset_index(drop=True)
+
+        if numero_righe == 0:
+            return (
+                f"Nessun log '{log_type}' per cmdb_id={cmdb_id} "
+                f"e keyword='{keyword}'."
+            )
+        return (
+            f"Intervallo Unix: {start_unix} - {end_unix}\n"
+            f"Tipo Log: {log_type}\n"
+            f"Componente: {cmdb_id or 'Tutti'}\n"
+            f"Filtro: {keyword or 'Nessuna'}\n"
+            f"Record trovati: {numero_righe}\n"
+            f"Record mostrati: {len(risultati)}\n\n"
+            f"{risultati.to_string(index=False)}"
+        )
     except Exception as e:
         return f"Errore del tool: {str(e)}"
 
