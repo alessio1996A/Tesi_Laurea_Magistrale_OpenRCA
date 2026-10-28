@@ -188,7 +188,8 @@ def tool_get_container_metrics(
     end_unix: int,
     cmdb_id: Optional[str] = None,
     kpi_name: Optional[str] = None,
-    max_rows: int = 100
+    max_rows: int = 100,
+    market_system: Literal["cloudbed-1", "cloudbed-2"] = "cloudbed-1",
 ) -> str:
     """
     [TOOL AGENTE A0]
@@ -198,16 +199,14 @@ def tool_get_container_metrics(
     Le statistiche permettono di osservare minimo, massimo,
     media e relativa collocazione temporale senza restituire
     soltanto le prime righe del CSV.
+
+    market_system seleziona il cloudbed, per default cloudbed-1.
+    La finestra temporale e' [start_unix, end_unix).
     """
 
-    target_csv = (
-        "Market/cloudbed-1/telemetry/2022_03_20/"
-        "metric/metric_container.csv"
-    )
-
     try:
-        if start_unix > end_unix:
-            return "Errore: l'inizio supera la fine dell'intervallo."
+        if start_unix >= end_unix:
+            return "Errore: l'inizio deve precedere la fine dell'intervallo."
 
         if max_rows < 1:
             return "Errore: max_rows deve essere almeno 1."
@@ -234,122 +233,130 @@ def tool_get_container_metrics(
         statistiche = {}
         numero_record = 0
 
+        percorsi_csv = _get_telemetry_csv_paths(
+            start_unix=start_unix,
+            end_unix=end_unix,
+            market_system=market_system,
+            data_kind="container_metrics",
+        )
+
         with zipfile.ZipFile(DATASET_ZIP_PATH, "r") as archivio:
-            with archivio.open(target_csv) as file_csv:
+            for percorso_csv in percorsi_csv:
+                with archivio.open(percorso_csv) as file_csv:
 
-                for chunk in pd.read_csv(
-                    file_csv,
-                    chunksize=100_000
-                ):
-                    timestamp = pd.to_numeric(
-                        chunk["timestamp"],
-                        errors="coerce"
-                    )
-
-                    valori = pd.to_numeric(
-                        chunk["value"],
-                        errors="coerce"
-                    )
-
-                    mask = (
-                        timestamp.between(start_unix, end_unix)
-                        & valori.notna()
-                        & timestamp.notna()
-                    )
-
-                    # Filtro del componente.
-                    # Supporta sia l'ID semplice sia quello
-                    # preceduto dal nodo, ad esempio node-6.
-                    if cmdb_id:
-                        cmdb = (
-                            chunk["cmdb_id"]
-                            .astype(str)
-                            .str.lower()
+                    for chunk in pd.read_csv(
+                        file_csv,
+                        chunksize=100_000
+                    ):
+                        timestamp = pd.to_numeric(
+                            chunk["timestamp"],
+                            errors="coerce"
                         )
 
-                        cercato = cmdb_id.strip().lower()
+                        valori = pd.to_numeric(
+                            chunk["value"],
+                            errors="coerce"
+                        )
 
-                        mask &= (
-                            cmdb.eq(cercato)
-                            | cmdb.str.endswith(
-                                f".{cercato}",
+                        mask = (
+                            ((timestamp >= start_unix) & (timestamp < end_unix))
+                            & valori.notna()
+                            & timestamp.notna()
+                        )
+
+                        # Filtro del componente.
+                        # Supporta sia l'ID semplice sia quello
+                        # preceduto dal nodo, ad esempio node-6.
+                        if cmdb_id:
+                            cmdb = (
+                                chunk["cmdb_id"]
+                                .astype(str)
+                                .str.lower()
+                            )
+
+                            cercato = cmdb_id.strip().lower()
+
+                            mask &= (
+                                cmdb.eq(cercato)
+                                | cmdb.str.endswith(
+                                    f".{cercato}",
+                                    na=False
+                                )
+                            )
+
+                        # Filtro per nome KPI.
+                        if pattern is not None:
+                            mask &= chunk["kpi_name"].astype(
+                                str
+                            ).str.contains(
+                                pattern,
                                 na=False
                             )
-                        )
 
-                    # Filtro per nome KPI.
-                    if pattern is not None:
-                        mask &= chunk["kpi_name"].astype(
-                            str
-                        ).str.contains(
-                            pattern,
-                            na=False
-                        )
+                        filtrati = chunk.loc[mask].copy()
 
-                    filtrati = chunk.loc[mask].copy()
+                        if filtrati.empty:
+                            continue
 
-                    if filtrati.empty:
-                        continue
+                        filtrati["timestamp"] = timestamp.loc[mask]
+                        filtrati["value"] = valori.loc[mask]
 
-                    filtrati["timestamp"] = timestamp.loc[mask]
-                    filtrati["value"] = valori.loc[mask]
+                        numero_record += len(filtrati)
 
-                    numero_record += len(filtrati)
+                        colonne = [
+                            "timestamp",
+                            "cmdb_id",
+                            "kpi_name",
+                            "value"
+                        ]
 
-                    colonne = [
-                        "timestamp",
-                        "cmdb_id",
-                        "kpi_name",
-                        "value"
-                    ]
+                        for timestamp_riga, componente, kpi, valore in (
+                            filtrati[colonne].itertuples(
+                                index=False,
+                                name=None
+                            )
+                        ):
+                            timestamp_riga = float(timestamp_riga)
+                            valore = float(valore)
 
-                    for timestamp_riga, componente, kpi, valore in (
-                        filtrati[colonne].itertuples(
-                            index=False,
-                            name=None
-                        )
-                    ):
-                        timestamp_riga = float(timestamp_riga)
-                        valore = float(valore)
+                            chiave = (
+                                str(componente),
+                                str(kpi)
+                            )
 
-                        chiave = (
-                            str(componente),
-                            str(kpi)
-                        )
+                            if chiave not in statistiche:
+                                statistiche[chiave] = {
+                                    "campioni": 0,
+                                    "somma": 0.0,
+                                    "minimo": valore,
+                                    "timestamp_minimo": timestamp_riga,
+                                    "massimo": valore,
+                                    "timestamp_massimo": timestamp_riga,
+                                    "primo_timestamp": timestamp_riga,
+                                    "primo_valore": valore,
+                                    "ultimo_timestamp": timestamp_riga,
+                                    "ultimo_valore": valore,
+                                }
 
-                        if chiave not in statistiche:
-                            statistiche[chiave] = {
-                                "campioni": 0,
-                                "somma": 0.0,
-                                "minimo": valore,
-                                "timestamp_minimo": timestamp_riga,
-                                "massimo": valore,
-                                "timestamp_massimo": timestamp_riga,
-                                "primo_timestamp": timestamp_riga,
-                                "primo_valore": valore,
-                                "ultimo_timestamp": timestamp_riga,
-                                "ultimo_valore": valore,
-                            }
+                            s = statistiche[chiave]
+                            s["campioni"] += 1
+                            s["somma"] += valore
 
-                        s = statistiche[chiave]
-                        s["campioni"] += 1
-                        s["somma"] += valore
+                            if valore < s["minimo"]:
+                                s["minimo"] = valore
+                                s["timestamp_minimo"] = timestamp_riga
 
-                        if valore < s["minimo"]:
-                            s["minimo"] = valore
-                            s["timestamp_minimo"] = timestamp_riga
+                            if valore > s["massimo"]:
+                                s["massimo"] = valore
+                                s["timestamp_massimo"] = timestamp_riga
 
-                        if valore > s["massimo"]:
-                            s["massimo"] = valore
-                            s["timestamp_massimo"] = timestamp_riga
+                            if timestamp_riga < s["primo_timestamp"]:
+                                s["primo_timestamp"] = timestamp_riga
+                                s["primo_valore"] = valore
 
-                        if timestamp_riga < s["primo_timestamp"]:
-                            s["primo_timestamp"] = timestamp_riga
-                            s["primo_valore"] = valore
-
-                        if timestamp_riga >= s["ultimo_timestamp"]:
-                            s["ultimo_timestamp"] = timestamp_riga
-                            s["ultimo_valore"] = valore
+                            if timestamp_riga >= s["ultimo_timestamp"]:
+                                s["ultimo_timestamp"] = timestamp_riga
+                                s["ultimo_valore"] = valore
 
         if not statistiche:
             return (
