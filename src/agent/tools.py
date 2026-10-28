@@ -34,9 +34,9 @@ def _get_telemetry_csv_paths(
     La funzione restituisce i percorsi; non legge né modifica i CSV.
     """
 
-    if start_unix > end_unix:
+    if start_unix >= end_unix:
         raise ValueError(
-            "L'inizio dell'intervallo supera la fine."
+            "L'inizio dell'intervallo deve precedere la fine."
         )
 
     if market_system not in ("cloudbed-1", "cloudbed-2"):
@@ -67,8 +67,11 @@ def _get_telemetry_csv_paths(
         .date()
     )
 
+    # L'intervallo e' [start_unix, end_unix): il limite finale e' escluso.
+    # Sottrarre un secondo evita di includere il giorno successivo
+    # quando end_unix coincide esattamente con la mezzanotte locale.
     data_fine = (
-        datetime.fromtimestamp(end_unix, tz=timezone.utc)
+        datetime.fromtimestamp(end_unix - 1, tz=timezone.utc)
         .astimezone(TELEMETRY_TIMEZONE)
         .date()
     )
