@@ -531,16 +531,19 @@ def tool_get_traces(
         cmdb_id: Optional[str] = None,
         trace_id: Optional[str] = None,
         min_duration_ms: Optional[int] = None,
-        max_rows: int = 30
+        max_rows: int = 30,
+        market_system: Literal["cloudbed-1", "cloudbed-2"] = "cloudbed-1",
 ) -> str:
-    """[TOOL AGENTE A0] Estrae i trace span filtrandoli e ordinandoli per quelli più lenti (Rolling Top-K decrescente)."""
+    """[TOOL AGENTE A0] Estrae i trace span piu' lenti (Rolling Top-K).
 
-    # Percorso del file delle trace all'interno di Market.zip.
-    target_csv = 'Market/cloudbed-1/telemetry/2022_03_20/trace/trace_span.csv'
+    market_system sceglie cloudbed-1 o cloudbed-2 (default cloudbed-1).
+    Intervallo [start_unix, end_unix); gli input sono secondi Unix,
+    il timestamp CSV e' in millisecondi e duration e' in microsecondi.
+    """
 
     # Validazione dei parametri ricevuti dal tool.
-    if start_unix > end_unix:
-        return "Errore: l'inizio supera la fine."
+    if start_unix >= end_unix:
+        return "Errore: l'inizio deve precedere la fine."
 
     if max_rows < 1:
         return "Errore: max_rows almeno 1."
@@ -560,104 +563,113 @@ def tool_get_traces(
     risultati = pd.DataFrame()
 
     try:
-        # Apriamo il dataset ZIP senza estrarlo interamente su disco.
+        percorsi_csv = _get_telemetry_csv_paths(
+            start_unix=start_unix,
+            end_unix=end_unix,
+            market_system=market_system,
+            data_kind="traces",
+        )
+
+        # Apriamo lo ZIP senza estrarlo e leggiamo i giorni necessari.
         with zipfile.ZipFile(DATASET_ZIP_PATH, 'r') as z:
-            with z.open(target_csv) as f:
+            for percorso_csv in percorsi_csv:
+                with z.open(percorso_csv) as f:
 
-                # Leggiamo il file a blocchi per contenere l'utilizzo
-                # della memoria, dato che il dataset è molto grande.
-                for chunk in pd.read_csv(f, chunksize=100_000):
+                    # Leggiamo il file a blocchi per contenere l'utilizzo
+                    # della memoria, dato che il dataset è molto grande.
+                    for chunk in pd.read_csv(f, chunksize=100_000):
 
-                    # Convertiamo i timestamp in valori numerici.
-                    timestamp_ms = pd.to_numeric(
-                        chunk['timestamp'],
-                        errors='coerce'
-                    )
-
-                    # La durata grezza è trattata come microsecondi.
-                    duration_us = pd.to_numeric(
-                        chunk['duration'],
-                        errors='coerce'
-                    )
-
-                    # Selezioniamo gli span nella finestra temporale
-                    # ed escludiamo le durate mancanti o non numeriche.
-                    mask = (
-                        timestamp_ms.between(start_ms, end_ms)
-                        & duration_us.notna()
-                    )
-
-                    # Filtro opzionale per componente.
-                    if cmdb_id:
-                        cercato = re.escape(cmdb_id.strip().lower())
-
-                        cmdb = chunk['cmdb_id'].astype(str).str.lower()
-
-                        mask &= cmdb.str.contains(
-                            rf"(?:^|\.){cercato}(?:-\d+)?$",
-                            regex=True,
-                            na=False
+                        # Convertiamo i timestamp in valori numerici.
+                        timestamp_ms = pd.to_numeric(
+                            chunk['timestamp'],
+                            errors='coerce'
                         )
 
-                    # Filtro opzionale per identificativo della trace.
-                    if trace_id:
-                        mask &= chunk['trace_id'].astype(str).eq(trace_id)
+                        # La durata grezza è trattata come microsecondi.
+                        duration_us = pd.to_numeric(
+                            chunk['duration'],
+                            errors='coerce'
+                        )
 
-                    # Convertiamo la soglia da millisecondi a microsecondi
-                    # prima di confrontarla con la durata grezza.
-                    if min_duration_ms is not None:
-                        min_duration_us = min_duration_ms * 1000
+                        # Selezioniamo gli span nella finestra temporale
+                        # ed escludiamo le durate mancanti o non numeriche.
+                        mask = (
+                            (timestamp_ms >= start_ms)
+                            & (timestamp_ms < end_ms)
+                            & duration_us.notna()
+                        )
 
-                        mask &= duration_us >= min_duration_us
+                        # Filtro opzionale per componente.
+                        if cmdb_id:
+                            cercato = re.escape(cmdb_id.strip().lower())
 
-                    # Conserviamo soltanto le righe che soddisfano
-                    # tutti i filtri applicati.
-                    df_filtered = chunk.loc[mask].copy()
+                            cmdb = chunk['cmdb_id'].astype(str).str.lower()
 
-                    # Manteniamo timestamp in millisecondi Unix.
-                    df_filtered['timestamp'] = timestamp_ms.loc[mask]
-
-                    # Manteniamo duration in microsecondi durante
-                    # i filtri e l'ordinamento.
-                    df_filtered['duration'] = duration_us.loc[mask]
-
-                    # Contiamo tutti gli span corrispondenti,
-                    # non soltanto quelli che verranno mostrati.
-                    numero_righe += len(df_filtered)
-
-                    if not df_filtered.empty:
-
-                        # Selezioniamo i max_rows span più lenti
-                        # del blocco corrente.
-                        # In caso di parità, preferiamo il timestamp
-                        # più vecchio.
-                        campione = df_filtered.sort_values(
-                            ['duration', 'timestamp'],
-                            ascending=[False, True]
-                        ).head(max_rows)
-
-                        # Inizializziamo i risultati oppure li uniamo
-                        # ai migliori span già trovati.
-                        if risultati.empty:
-                            risultati = campione.copy()
-                        else:
-                            risultati = pd.concat(
-                                [risultati, campione],
-                                ignore_index=True
+                            mask &= cmdb.str.contains(
+                                rf"(?:^|\.){cercato}(?:-\d+)?$",
+                                regex=True,
+                                na=False
                             )
 
-                        # Rolling Top-K: dopo ogni blocco conserviamo
-                        # soltanto i max_rows span più lenti trovati
-                        # fino a quel momento.
-                        risultati = (
-                            risultati
-                            .sort_values(
+                        # Filtro opzionale per identificativo della trace.
+                        if trace_id:
+                            mask &= chunk['trace_id'].astype(str).eq(trace_id)
+
+                        # Convertiamo la soglia da millisecondi a microsecondi
+                        # prima di confrontarla con la durata grezza.
+                        if min_duration_ms is not None:
+                            min_duration_us = min_duration_ms * 1000
+
+                            mask &= duration_us >= min_duration_us
+
+                        # Conserviamo soltanto le righe che soddisfano
+                        # tutti i filtri applicati.
+                        df_filtered = chunk.loc[mask].copy()
+
+                        # Manteniamo timestamp in millisecondi Unix.
+                        df_filtered['timestamp'] = timestamp_ms.loc[mask]
+
+                        # Manteniamo duration in microsecondi durante
+                        # i filtri e l'ordinamento.
+                        df_filtered['duration'] = duration_us.loc[mask]
+
+                        # Contiamo tutti gli span corrispondenti,
+                        # non soltanto quelli che verranno mostrati.
+                        numero_righe += len(df_filtered)
+
+                        if not df_filtered.empty:
+
+                            # Selezioniamo i max_rows span più lenti
+                            # del blocco corrente.
+                            # In caso di parità, preferiamo il timestamp
+                            # più vecchio.
+                            campione = df_filtered.sort_values(
                                 ['duration', 'timestamp'],
                                 ascending=[False, True]
+                            ).head(max_rows)
+
+                            # Inizializziamo i risultati oppure li uniamo
+                            # ai migliori span già trovati.
+                            if risultati.empty:
+                                risultati = campione.copy()
+                            else:
+                                risultati = pd.concat(
+                                    [risultati, campione],
+                                    ignore_index=True
+                                )
+
+                            # Rolling Top-K: dopo ogni blocco conserviamo
+                            # soltanto i max_rows span più lenti trovati
+                            # fino a quel momento.
+                            risultati = (
+                                risultati
+                                .sort_values(
+                                    ['duration', 'timestamp'],
+                                    ascending=[False, True]
+                                )
+                                .head(max_rows)
+                                .reset_index(drop=True)
                             )
-                            .head(max_rows)
-                            .reset_index(drop=True)
-                        )
 
         # Se nessuno span soddisfa i filtri, restituiamo un messaggio.
         if numero_righe == 0:
