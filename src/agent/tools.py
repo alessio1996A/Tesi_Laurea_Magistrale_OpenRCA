@@ -3,10 +3,92 @@ import pandas as pd
 import re
 from typing import Literal
 from typing import Optional
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 # Costante per il percorso del dataset.
 # Quando sei su Colab, lascia questo. Se testi in locale su PyCharm, metti il path del tuo PC.
 DATASET_ZIP_PATH = '/content/drive/MyDrive/Tesi_OpenRCA/Market.zip'
+
+TELEMETRY_TIMEZONE = ZoneInfo("Asia/Shanghai")
+
+
+def _get_telemetry_csv_paths(
+    start_unix: int,
+    end_unix: int,
+    market_system: Literal["cloudbed-1", "cloudbed-2"],
+    data_kind: Literal[
+        "service_metrics",
+        "container_metrics",
+        "logs",
+        "traces",
+    ],
+    log_type: Optional[Literal["service", "proxy"]] = None,
+) -> list[str]:
+    """
+    Individua i percorsi dei CSV necessari per un intervallo temporale.
+
+    I timestamp in ingresso sono Unix seconds.
+    Le directory giornaliere seguono il calendario Asia/Shanghai.
+
+    La funzione restituisce i percorsi; non legge né modifica i CSV.
+    """
+
+    if start_unix > end_unix:
+        raise ValueError(
+            "L'inizio dell'intervallo supera la fine."
+        )
+
+    if market_system not in ("cloudbed-1", "cloudbed-2"):
+        raise ValueError(
+            "market_system deve essere 'cloudbed-1' oppure 'cloudbed-2'."
+        )
+
+    percorsi_relativi = {
+        "service_metrics": "metric/metric_service.csv",
+        "container_metrics": "metric/metric_container.csv",
+        "logs": f"log/log_{log_type}.csv",
+        "traces": "trace/trace_span.csv",
+    }
+
+    if data_kind not in percorsi_relativi:
+        raise ValueError(
+            f"Tipo di telemetria non supportato: {data_kind}"
+        )
+
+    if data_kind == "logs" and log_type not in ("service", "proxy"):
+        raise ValueError(
+            "Per i log, log_type deve essere 'service' oppure 'proxy'."
+        )
+
+    data_inizio = (
+        datetime.fromtimestamp(start_unix, tz=timezone.utc)
+        .astimezone(TELEMETRY_TIMEZONE)
+        .date()
+    )
+
+    data_fine = (
+        datetime.fromtimestamp(end_unix, tz=timezone.utc)
+        .astimezone(TELEMETRY_TIMEZONE)
+        .date()
+    )
+
+    percorsi = []
+    giorno = data_inizio
+
+    while giorno <= data_fine:
+        data_cartella = giorno.strftime("%Y_%m_%d")
+
+        percorso = (
+            f"Market/{market_system}/telemetry/"
+            f"{data_cartella}/{percorsi_relativi[data_kind]}"
+        )
+
+        percorsi.append(percorso)
+        giorno += timedelta(days=1)
+
+    return percorsi
+
 
 
 def tool_get_service_metrics(
