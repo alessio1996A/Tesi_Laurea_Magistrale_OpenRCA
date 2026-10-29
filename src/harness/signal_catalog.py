@@ -223,3 +223,300 @@ def profila_segnali(
         ).reset_index(drop=True)
 
     return risultato
+def descrivi_kpi_mesh_runtime(
+    sorgente: str,
+    kpi_name: str
+) -> dict | None:
+    """
+    Catalogo semantico preliminare per Mesh e Runtime.
+
+    Non classifica automaticamente tutti i KPI.
+    Riconosce soltanto famiglie studiate sui dati.
+
+    Restituisce None per KPI non riconosciuti.
+    """
+
+    if not isinstance(kpi_name, str):
+        return None
+
+    # =====================================================
+    # 1. METRICHE MESH
+    # =====================================================
+
+    if sorgente == "mesh":
+
+        famiglie = {
+            "istio_requests.": (
+                "traffico_richieste",
+                "livello_osservato",
+                None
+            ),
+
+            "istio_request_duration_milliseconds.": (
+                "durata_richieste",
+                "livello_osservato",
+                "alto"
+            ),
+
+            "istio_request_bytes.": (
+                "volume_richieste",
+                "livello_osservato",
+                None
+            ),
+
+            "istio_response_bytes.": (
+                "volume_risposte",
+                "livello_osservato",
+                None
+            )
+        }
+
+        for prefisso, dati in famiglie.items():
+
+            if (
+                kpi_name.startswith(prefisso)
+                and len(kpi_name) > len(prefisso)
+            ):
+
+                famiglia, trasformazione, direzione = dati
+
+                return {
+                    "sorgente": "mesh",
+                    "kpi": kpi_name,
+                    "famiglia": famiglia,
+                    "tipo": "livello_non_cumulativo_candidato",
+                    "trasformazione": trasformazione,
+                    "direzione": direzione,
+                    "semantica_verificata": False,
+                    "nota": (
+                        "La serie osservata non va "
+                        "interpretata automaticamente "
+                        "come contatore, tasso o media."
+                    )
+                }
+
+    # =====================================================
+    # 2. CONTATORI CANDIDATI RUNTIME
+    # =====================================================
+
+    if sorgente == "runtime":
+
+        contatori = {
+            "java_lang_GarbageCollector_CollectionCount.Copy":
+                "frequenza_gc",
+
+            "java_lang_GarbageCollector_CollectionTime.Copy":
+                "tempo_gc"
+        }
+
+        if kpi_name in contatori:
+
+            return {
+                "sorgente": "runtime",
+                "kpi": kpi_name,
+                "famiglia": contatori[kpi_name],
+                "tipo": "contatore_cumulativo_candidato",
+                "trasformazione": "incremento_per_minuto",
+                "direzione": None,
+                "semantica_verificata": False,
+                "nota": (
+                    "Controllare incrementi negativi, "
+                    "reset e unita di misura. "
+                    "I valori possono essere aggregati."
+                )
+            }
+
+        # =================================================
+        # 3. GAUGE CANDIDATE RUNTIME
+        # =================================================
+
+        gauge = {
+            "java_lang_Memory_HeapMemoryUsage_used":
+                ("memoria_heap", "alto"),
+
+            "jvm_threads_current":
+                ("thread", None)
+        }
+
+        if kpi_name in gauge:
+
+            famiglia, direzione = gauge[kpi_name]
+
+            return {
+                "sorgente": "runtime",
+                "kpi": kpi_name,
+                "famiglia": famiglia,
+                "tipo": "gauge_candidata",
+                "trasformazione": "livello_osservato",
+                "direzione": direzione,
+                "semantica_verificata": False,
+                "nota": (
+                    "Interpretare i valori nel contesto "
+                    "del runtime e della copertura."
+                )
+            }
+
+    return None
+
+
+def calcola_incrementi_runtime(
+    df,
+    componente: str,
+    kpi_name: str,
+    start_unix: int,
+    end_unix: int
+):
+    """
+    Calcola incrementi normalizzati a 60 secondi
+    per un contatore candidato Runtime.
+
+    - Filtra la finestra temporale.
+    - Ordina i campioni.
+    - Gestisce timestamp duplicati.
+    - Riconosce incrementi negativi sospetti.
+    - Non interpreta incrementi negativi come
+      un'attivita normale del contatore.
+    - Non stabilisce se il GC sia anomalo.
+
+    L'unita dell'incremento rimane quella originale
+    del KPI per minuto, ancora da verificare.
+    """
+
+    import numpy as np
+    import pandas as pd
+
+    # =====================================================
+    # 1. VALIDAZIONE
+    # =====================================================
+
+    if start_unix >= end_unix:
+        raise ValueError("Finestra temporale non valida.")
+
+    descrizione = descrivi_kpi_mesh_runtime(
+        "runtime",
+        kpi_name
+    )
+
+    if (
+        descrizione is None
+        or descrizione["trasformazione"]
+        != "incremento_per_minuto"
+    ):
+        raise ValueError(
+            "Il KPI non è un contatore Runtime "
+            "candidato supportato."
+        )
+
+    colonne = {
+        "timestamp",
+        "cmdb_id",
+        "kpi_name",
+        "value"
+    }
+
+    if not colonne.issubset(df.columns):
+        raise ValueError("Colonne telemetria mancanti.")
+
+    # =====================================================
+    # 2. FILTRO DELLA SERIE
+    # =====================================================
+
+    serie = df.loc[
+        (df["cmdb_id"] == componente)
+        & (df["kpi_name"] == kpi_name)
+    ].copy()
+
+    serie["timestamp"] = pd.to_numeric(
+        serie["timestamp"],
+        errors="coerce"
+    )
+
+    serie["value"] = pd.to_numeric(
+        serie["value"],
+        errors="coerce"
+    )
+
+    serie = serie.replace(
+        [np.inf, -np.inf],
+        np.nan
+    )
+
+    serie = serie.dropna(
+        subset=["timestamp", "value"]
+    )
+
+    serie = serie.loc[
+        serie["timestamp"].ge(start_unix)
+        & serie["timestamp"].lt(end_unix)
+    ]
+
+    # =====================================================
+    # 3. ORDINAMENTO E DEDUPLICAZIONE
+    # =====================================================
+
+    serie = (
+        serie.groupby(
+            "timestamp",
+            as_index=False
+        )["value"]
+        .median()
+        .sort_values("timestamp")
+        .reset_index(drop=True)
+    )
+
+    colonne_output = [
+        "timestamp",
+        "value",
+        "intervallo_secondi",
+        "incremento",
+        "incremento_per_minuto",
+        "reset_sospetto"
+    ]
+
+    if len(serie) < 2:
+        return pd.DataFrame(
+            columns=colonne_output
+        )
+
+    # =====================================================
+    # 4. DIFFERENZE TEMPORALI
+    # =====================================================
+
+    serie["intervallo_secondi"] = (
+        serie["timestamp"].diff()
+    )
+
+    serie["incremento"] = (
+        serie["value"].diff()
+    )
+
+    # La prima osservazione non ha un campione
+    # precedente nella finestra.
+    serie = serie.iloc[1:].copy()
+
+    serie = serie.loc[
+        serie["intervallo_secondi"] > 0
+    ].copy()
+
+    # Un decremento può indicare reset,
+    # discontinuità o semantica diversa.
+    serie["reset_sospetto"] = (
+        serie["incremento"] < 0
+    )
+
+    serie["incremento_per_minuto"] = (
+        serie["incremento"]
+        / serie["intervallo_secondi"]
+        * 60.0
+    )
+
+    # Non utilizziamo gli incrementi negativi
+    # come normali valori del tasso.
+    serie.loc[
+        serie["reset_sospetto"],
+        "incremento_per_minuto"
+    ] = np.nan
+
+    return serie[colonne_output].reset_index(
+        drop=True
+    )
