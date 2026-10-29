@@ -586,3 +586,387 @@ def rileva_evidenze_mesh_runtime(
             "La baseline usa la finestra analizzata."
         ]
     }
+# ============================================================
+# 8. AGGREGAZIONE DELLE EVIDENZE MESH MULTI-REPLICA
+# ============================================================
+
+def aggrega_evidenze_mesh(
+    report: dict,
+    tolleranza_secondi: int = 180
+) -> dict:
+    """
+    Aggrega anomalie Mesh temporalmente vicine
+    su repliche dello stesso servizio.
+
+    Vincoli:
+    - stesso servizio;
+    - stessa comunicazione (destinazione);
+    - stesso KPI;
+    - inizio degli episodi entro la tolleranza;
+    - almeno due repliche distinte per aggregare.
+
+    Riceve tutte le evidenze Mesh rilevate,
+    NON un report già troncato dal budget.
+
+    Non modifica il report originale.
+    Non utilizza ground truth.
+    Non attribuisce cause.
+    """
+
+    import re
+
+    # =====================================================
+    # 1. VALIDAZIONE
+    # =====================================================
+
+    if report.get("versione") != "mesh_runtime_evidence_v1":
+        raise ValueError(
+            "Versione del report Mesh/Runtime non valida."
+        )
+
+    if tolleranza_secondi < 0:
+        raise ValueError(
+            "La tolleranza temporale non può essere negativa."
+        )
+
+    conteggi = report["conteggi"]
+
+    # L'aggregazione deve vedere anche le anomalie
+    # che normalmente sarebbero escluse dal budget.
+    if (
+        conteggi["mesh_rilevate"]
+        != conteggi["mesh_selezionate"]
+    ):
+        raise ValueError(
+            "Il report Mesh è già troncato dal budget. "
+            "Generare un report diagnostico con "
+            "max_evidenze_mesh sufficientemente elevato."
+        )
+
+    # =====================================================
+    # 2. ESTRAZIONE DELLE EVIDENZE MESH
+    # =====================================================
+
+    elementi = []
+
+    for indice, evidenza in enumerate(report["evidenze"]):
+
+        if evidenza["sorgente"] != "mesh":
+            continue
+
+        componente = evidenza["componente"]
+
+        # Esempio:
+        # emailservice-2.destination.checkoutservice.emailservice
+        #
+        # servizio = emailservice
+        # replica = 2
+        # comunicazione = checkoutservice.emailservice
+        match = re.fullmatch(
+            r"(.+)-(\d+)\.destination\.(.+)",
+            componente
+        )
+
+        if match is None:
+
+            # Non inventiamo il nome di un servizio.
+            # L'evidenza rimane singola.
+            servizio = None
+            replica = None
+            comunicazione = None
+
+        else:
+
+            servizio = match.group(1)
+            replica = match.group(2)
+            comunicazione = match.group(3)
+
+        episodio = evidenza["evidenza"]
+
+        elementi.append({
+            "indice_origine": indice,
+            "servizio": servizio,
+            "replica": replica,
+            "comunicazione": comunicazione,
+            "componente": componente,
+            "kpi": evidenza["kpi"],
+            "inizio": int(
+                episodio["timestamp_inizio"]
+            ),
+            "fine": int(
+                episodio["timestamp_fine"]
+            ),
+            "mediana": float(
+                episodio["mediana_riferimento"]
+            ),
+            "massimo": float(
+                episodio["valore_massimo"]
+            ),
+            "aumento_pct": episodio["aumento_pct"],
+            "campioni": int(
+                episodio["campioni_consecutivi"]
+            ),
+            "richieste_durante": evidenza.get(
+                "contesto_richieste", {}
+            ).get(
+                "mediana_durante_episodio"
+            )
+        })
+
+    # =====================================================
+    # 3. RAGGRUPPAMENTO PER SERVIZIO, ROTTA E KPI
+    # =====================================================
+
+    raggruppabili = {}
+    singole_non_identificabili = []
+
+    for elemento in elementi:
+
+        if elemento["servizio"] is None:
+
+            singole_non_identificabili.append(
+                [elemento]
+            )
+            continue
+
+        chiave = (
+            elemento["servizio"],
+            elemento["comunicazione"],
+            elemento["kpi"]
+        )
+
+        raggruppabili.setdefault(
+            chiave, []
+        ).append(elemento)
+
+    gruppi = list(singole_non_identificabili)
+
+    # =====================================================
+    # 4. AGGREGAZIONE TEMPORALE
+    # =====================================================
+
+    for chiave in sorted(raggruppabili):
+
+        candidati = sorted(
+            raggruppabili[chiave],
+            key=lambda x: (
+                x["inizio"],
+                x["componente"],
+                x["indice_origine"]
+            )
+        )
+
+        gruppo_corrente = []
+
+        for elemento in candidati:
+
+            if not gruppo_corrente:
+
+                gruppo_corrente = [elemento]
+                continue
+
+            # Confrontiamo con il PRIMO evento:
+            # così la distanza complessiva del gruppo
+            # non può superare la tolleranza.
+            primo_inizio = gruppo_corrente[0]["inizio"]
+
+            distanza = (
+                elemento["inizio"] - primo_inizio
+            )
+
+            repliche_presenti = {
+                e["componente"]
+                for e in gruppo_corrente
+            }
+
+            if (
+                distanza <= tolleranza_secondi
+                and elemento["componente"]
+                not in repliche_presenti
+            ):
+
+                gruppo_corrente.append(elemento)
+
+            else:
+
+                gruppi.append(gruppo_corrente)
+                gruppo_corrente = [elemento]
+
+        if gruppo_corrente:
+            gruppi.append(gruppo_corrente)
+
+    # =====================================================
+    # 5. COSTRUZIONE DELLE UNITÀ AGGREGATE
+    # =====================================================
+
+    unita = []
+
+    for gruppo in gruppi:
+
+        gruppo = sorted(
+            gruppo,
+            key=lambda x: (
+                x["inizio"],
+                x["componente"]
+            )
+        )
+
+        primo = gruppo[0]
+
+        componenti = sorted({
+            e["componente"]
+            for e in gruppo
+        })
+
+        repliche = sorted({
+            e["replica"]
+            for e in gruppo
+            if e["replica"] is not None
+        })
+
+        # Un gruppo è multi-replica soltanto
+        # quando coinvolge almeno due repliche.
+        multi_replica = (
+            primo["servizio"] is not None
+            and len(repliche) >= 2
+            and len(componenti) >= 2
+        )
+
+        dettagli = []
+
+        for elemento in gruppo:
+
+            dettagli.append({
+                "indice_origine": elemento[
+                    "indice_origine"
+                ],
+                "componente": elemento["componente"],
+                "timestamp_inizio": elemento["inizio"],
+                "timestamp_fine": elemento["fine"],
+                "mediana": elemento["mediana"],
+                "massimo": elemento["massimo"],
+                "aumento_pct": elemento["aumento_pct"],
+                "campioni_consecutivi": elemento[
+                    "campioni"
+                ],
+                "richieste_durante_episodio": elemento[
+                    "richieste_durante"
+                ]
+            })
+
+        incrementi_assoluti = [
+            max(
+                0.0,
+                e["massimo"] - e["mediana"]
+            )
+            for e in gruppo
+        ]
+
+        unita.append({
+            "tipo": (
+                "mesh_multi_replica"
+                if multi_replica
+                else "mesh_singola"
+            ),
+            "famiglia": "durata_richieste",
+            "servizio": primo["servizio"],
+            "comunicazione": primo["comunicazione"],
+            "kpi": primo["kpi"],
+            "componenti": componenti,
+            "numero_repliche": (
+                len(repliche)
+                if multi_replica
+                else 1
+            ),
+            "timestamp_inizio": min(
+                e["inizio"] for e in gruppo
+            ),
+            "timestamp_fine": max(
+                e["fine"] for e in gruppo
+            ),
+            "incremento_massimo_assoluto": max(
+                incrementi_assoluti
+            ),
+            "indici_origine": sorted(
+                e["indice_origine"]
+                for e in gruppo
+            ),
+            "dettagli_repliche": dettagli,
+            "causa_verificata": False
+        })
+
+    # =====================================================
+    # 6. ORDINAMENTO INVESTIGATIVO
+    # =====================================================
+
+    # Prima le correlazioni tra più repliche.
+    # A parità di repliche, maggior incremento
+    # assoluto osservato nella stessa famiglia KPI.
+    #
+    # Non è una probabilità di causalità.
+
+    unita.sort(
+        key=lambda u: (
+            -u["numero_repliche"],
+            -u["incremento_massimo_assoluto"],
+            u["timestamp_inizio"],
+            str(u["servizio"]),
+            str(u["comunicazione"]),
+            u["kpi"]
+        )
+    )
+
+    # =====================================================
+    # 7. CONTROLLO DELLA PROVENIENZA
+    # =====================================================
+
+    indici_originali = sorted(
+        e["indice_origine"]
+        for e in elementi
+    )
+
+    indici_aggregati = sorted(
+        indice
+        for u in unita
+        for indice in u["indici_origine"]
+    )
+
+    if indici_originali != indici_aggregati:
+        raise AssertionError(
+            "Le evidenze Mesh sono state perse "
+            "o duplicate durante l'aggregazione."
+        )
+
+    # =====================================================
+    # 8. REPORT
+    # =====================================================
+
+    multi = sum(
+        u["tipo"] == "mesh_multi_replica"
+        for u in unita
+    )
+
+    return {
+        "versione": "mesh_aggregation_v1",
+
+        "tolleranza_secondi": tolleranza_secondi,
+
+        "conteggi": {
+            "evidenze_mesh_originali": len(elementi),
+            "unita_dopo_aggregazione": len(unita),
+            "gruppi_multi_replica": multi,
+            "unita_singole": len(unita) - multi,
+            "evidenze_perse": 0
+        },
+
+        "unita": unita,
+
+        "limitazioni": [
+            "La simultaneita non prova causalita.",
+            "Gli aumenti descrivono durate osservate.",
+            "L'aggregazione richiede stessa rotta e KPI.",
+            "La tolleranza temporale e euristica.",
+            "Le metriche con baseline zero sono escluse "
+            "dal rilevatore precedente."
+        ]
+    }
