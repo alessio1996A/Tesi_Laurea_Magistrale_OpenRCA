@@ -20,6 +20,7 @@ def _get_telemetry_csv_paths(
     data_kind: Literal[
         "service_metrics",
         "container_metrics",
+        "node_metrics",
         "logs",
         "traces",
     ],
@@ -47,6 +48,7 @@ def _get_telemetry_csv_paths(
     percorsi_relativi = {
         "service_metrics": "metric/metric_service.csv",
         "container_metrics": "metric/metric_container.csv",
+        "node_metrics": "metric/metric_node.csv",
         "logs": f"log/log_{log_type}.csv",
         "traces": "trace/trace_span.csv",
     }

@@ -38,6 +38,8 @@ if SRC_DIR not in sys.path:
 
 import agent.tools
 importlib.reload(agent.tools)
+import agent.node_metrics
+importlib.reload(agent.node_metrics)
 
 # La chiave resta nei Secrets Colab e non viene salvata nei risultati.
 api_key = userdata.get("GEMINI_API_KEY")
@@ -141,7 +143,34 @@ def traces(
     )
 
 
-A0_TOOLS = [service_metrics, container_metrics, logs, traces]
+
+@tool("tool_get_node_metrics")
+def node_metrics(
+    start_unix: int,
+    end_unix: int,
+    cmdb_id: Optional[str] = None,
+    kpi_name: Optional[str] = None,
+    max_rows: int = 100,
+) -> str:
+    """Restituisce statistiche delle metriche dei nodi per componente e KPI."""
+
+    # L'agente non può uscire dalla finestra del caso.
+    errore = controlla_intervallo(start_unix, end_unix)
+    if errore:
+        return errore
+
+    # Il cloudbed è imposto dal runner, non da Gemini.
+    return agent.node_metrics.tool_get_node_metrics(
+        start_unix=start_unix,
+        end_unix=end_unix,
+        cmdb_id=cmdb_id,
+        kpi_name=kpi_name,
+        max_rows=max_rows,
+        market_system=cloudbed,
+    )
+
+
+A0_TOOLS = [service_metrics, container_metrics, node_metrics, logs, traces]
 llm = ChatGoogleGenerativeAI(model=MODEL_NAME)
 llm_with_tools = llm.bind_tools(A0_TOOLS)
 
@@ -162,6 +191,7 @@ AVAILABLE TOOLS
 - tool_get_container_metrics
 - tool_get_logs
 - tool_get_traces
+- tool_get_node_metrics
 
 1. TIME HANDLING
 
@@ -210,6 +240,10 @@ Never use "application" as a log_type.
 
 For tool_get_container_metrics, kpi_name is a case-insensitive
 regular expression applied to the KPI name.
+
+For tool_get_node_metrics, kpi_name is also a case-insensitive regular expression.
+Examples of observed node KPIs include system.cpu.iowait, system.mem.used,
+system.disk.pct_usage and system.load.5.
 
 The following KPI name patterns have been observed in the
 cloudbed-1 Market dataset. They are examples of valid names,
