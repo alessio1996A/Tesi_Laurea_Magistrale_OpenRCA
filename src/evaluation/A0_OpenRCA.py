@@ -38,8 +38,6 @@ if SRC_DIR not in sys.path:
 
 import agent.tools
 importlib.reload(agent.tools)
-import agent.node_metrics
-importlib.reload(agent.node_metrics)
 
 # La chiave resta nei Secrets Colab e non viene salvata nei risultati.
 api_key = userdata.get("GEMINI_API_KEY")
@@ -160,7 +158,7 @@ def node_metrics(
         return errore
 
     # Il cloudbed è imposto dal runner, non da Gemini.
-    return agent.node_metrics.tool_get_node_metrics(
+    return agent.tools.tool_get_node_metrics(
         start_unix=start_unix,
         end_unix=end_unix,
         cmdb_id=cmdb_id,
