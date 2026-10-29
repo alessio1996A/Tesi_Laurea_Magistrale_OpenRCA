@@ -229,6 +229,11 @@ def _analizza_mesh(df):
     segnalazioni = []
     coppie_esaminate = 0
 
+    # Numero di serie Mesh con mediana della durata
+    # nulla: non sono adatte a questo rilevatore
+    # basato sullo scostamento relativo.
+    baseline_zero_escluse = 0
+
     richieste = df.loc[
         df["kpi_name"].str.startswith(
             PREFISSO_RICHIESTE
@@ -292,6 +297,30 @@ def _analizza_mesh(df):
 
         coppie_esaminate += 1
 
+        # =====================================================
+        # CONTROLLO DELLA BASELINE MESH
+        # =====================================================
+
+        # Utilizziamo esattamente i campioni accoppiati
+        # tra richieste e durate.
+        mediana_durata = float(
+            coppia["durata"].median()
+        )
+
+        # Una mediana nulla crea un rapporto relativo
+        # instabile e può produrre priorità enormi
+        # per variazioni assolute molto piccole.
+        #
+        # La serie viene esclusa soltanto dal rilevatore
+        # attuale, non cancellata dalla telemetria.
+        if mediana_durata <= 1e-9:
+            baseline_zero_escluse += 1
+            continue
+
+        # =====================================================
+        # RILEVAMENTO SULLE SERIE AMMISSIBILI
+        # =====================================================
+
         episodio = _rileva_aumento(
             coppia[["timestamp", "durata"]]
             .rename(columns={"durata": "value"})
@@ -327,7 +356,11 @@ def _analizza_mesh(df):
             "causa_verificata": False
         })
 
-    return segnalazioni, coppie_esaminate
+    return (
+    segnalazioni,
+    coppie_esaminate,
+    baseline_zero_escluse
+)
 
 
 # ============================================================
@@ -485,9 +518,11 @@ def rileva_evidenze_mesh_runtime(
         df_runtime, start_unix, end_unix
     )
 
-    evidenze_mesh, coppie_mesh = (
-        _analizza_mesh(mesh)
-    )
+    (
+        evidenze_mesh,
+        coppie_mesh,
+        baseline_zero_mesh
+    ) = _analizza_mesh(mesh)
 
     (
         evidenze_runtime,
@@ -519,6 +554,11 @@ def rileva_evidenze_mesh_runtime(
         },
         "copertura": {
             "coppie_mesh_esaminate": coppie_mesh,
+
+            # Serie Mesh escluse dal rilevamento
+            # a causa della mediana della durata nulla.
+            "baseline_zero_mesh_escluse": baseline_zero_mesh,
+
             "serie_runtime_esaminate": serie_runtime,
             "reset_runtime_sospetti": reset_runtime
         },
