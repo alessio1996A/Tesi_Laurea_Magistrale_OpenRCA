@@ -258,3 +258,249 @@ def prepara_esperimento(
         "evidence_sha256": evidence_sha256,
         "preprocessing_seconds": preprocessing_seconds
     }
+def run_experiment(
+    config: ExperimentConfig,
+    system_prompt: str,
+    llm=None,
+    verbose: bool = True,
+    salva: bool = False
+) -> dict:
+    """
+    Esegue un esperimento OpenRCA completo.
+
+    Utilizza lo stesso motore LangGraph per A0 e A1.
+
+    Se llm è None, crea il modello Gemini indicato nella
+    configurazione. Nei test possiamo passare un Fake LLM.
+
+    Non utilizza ground truth.
+    """
+
+    # Importiamo qui il motore condiviso.
+    from agent.graph_engine import (
+        crea_grafo_rca,
+        esegui_grafo_rca
+    )
+
+    import hashlib
+    import json
+    import time
+
+    from datetime import datetime
+
+    if not system_prompt.strip():
+        raise ValueError("Prompt di sistema vuoto.")
+
+    # =====================================================
+    # 1. INIZIO MISURAZIONE COMPLETA
+    # =====================================================
+
+    inizio_totale = time.perf_counter()
+
+    # =====================================================
+    # 2. PREPARAZIONE DEL CASO
+    # =====================================================
+
+    esperimento = prepara_esperimento(config)
+
+    caso = esperimento["caso"]
+    tools = esperimento["tools"]
+    richiesta = esperimento["richiesta"]
+
+    # La preparazione di A1 genera automaticamente
+    # le evidenze e misura il tempo del preprocessing.
+    preprocessing_seconds = esperimento[
+        "preprocessing_seconds"
+    ]
+
+    # =====================================================
+    # 3. CREAZIONE DEL MODELLO
+    # =====================================================
+
+    if llm is None:
+
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        llm = ChatGoogleGenerativeAI(
+            model=config.model_name
+        )
+
+    # =====================================================
+    # 4. COSTRUZIONE DEL GRAFO CONDIVISO
+    # =====================================================
+
+    grafo = crea_grafo_rca(
+        llm=llm,
+        tools=tools,
+        system_prompt=system_prompt,
+        max_tool_rounds=config.max_tool_rounds
+    )
+
+    # =====================================================
+    # 5. ESECUZIONE DELL'AGENTE
+    # =====================================================
+
+    esecuzione = esegui_grafo_rca(
+        grafo=grafo,
+        richiesta=richiesta,
+        recursion_limit=config.recursion_limit,
+        verbose=verbose
+    )
+
+    risposta = esecuzione["raw_response"]
+
+    # =====================================================
+    # 6. VALIDAZIONE DEL FORMATO OPENRCA
+    # =====================================================
+
+    predizione = None
+    json_status = None
+
+    if risposta is not None:
+
+        try:
+
+            predizione = json.loads(risposta)
+
+            if not isinstance(predizione, dict) or not predizione:
+                raise ValueError(
+                    "La predizione deve essere un dizionario non vuoto."
+                )
+
+            campi_richiesti = {
+                "root cause occurrence datetime",
+                "root cause component",
+                "root cause reason"
+            }
+
+            for indice, guasto in predizione.items():
+
+                if not str(indice).isdigit():
+                    raise ValueError(
+                        "Indice del guasto non numerico."
+                    )
+
+                if not isinstance(guasto, dict):
+                    raise ValueError(
+                        "Struttura del guasto non valida."
+                    )
+
+                if not campi_richiesti.issubset(guasto):
+                    raise ValueError(
+                        "Campi OpenRCA mancanti."
+                    )
+
+                datetime.strptime(
+                    guasto["root cause occurrence datetime"],
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                for campo in (
+                    "root cause component",
+                    "root cause reason"
+                ):
+                    if not isinstance(guasto[campo], str):
+                        raise ValueError(
+                            f"Campo {campo} non testuale."
+                        )
+
+            json_status = "valid_json"
+
+        except (ValueError, TypeError) as exc:
+
+            predizione = None
+
+            json_status = (
+                f"invalid_json: {type(exc).__name__}: {exc}"
+            )
+
+    # =====================================================
+    # 7. MISURAZIONE DEI TEMPI
+    # =====================================================
+
+    tempo_totale = round(
+        time.perf_counter() - inizio_totale,
+        3
+    )
+
+    metriche = dict(esecuzione["metrics"])
+
+    # Tempo misurato durante la preparazione A1.
+    metriche["preprocessing_seconds"] = round(
+        preprocessing_seconds,
+        3
+    )
+
+    # Tempo completo: preparazione, creazione del modello
+    # ed esecuzione del grafo.
+    metriche["end_to_end_seconds"] = tempo_totale
+
+    # =====================================================
+    # 8. COSTRUZIONE DEL RISULTATO
+    # =====================================================
+
+    prompt_sha256 = hashlib.sha256(
+        system_prompt.encode("utf-8")
+    ).hexdigest()
+
+    risultato = {
+        "variant": config.variant,
+        "case_id": config.case_id,
+        "cloudbed": caso["cloudbed"],
+        "task_index": caso["task_index"],
+        "query_index": caso["query_index"],
+        "model": config.model_name,
+        "max_tool_rounds": config.max_tool_rounds,
+        "system_prompt_sha256": prompt_sha256,
+        "evidence_sha256": esperimento["evidence_sha256"],
+        "prediction": (
+            json.dumps(predizione, ensure_ascii=False)
+            if predizione is not None
+            else None
+        ),
+        "raw_response": risposta,
+        "json_status": json_status,
+        "error": esecuzione["error"],
+        "metrics": metriche,
+        "tool_trajectory": esecuzione["tool_trajectory"]
+    }
+
+    # =====================================================
+    # 9. SALVATAGGIO OPZIONALE
+    # =====================================================
+
+    if salva:
+
+        # Usiamo un nome diverso dai vecchi piloti:
+        # non dobbiamo sovrascrivere i risultati A0/A1
+        # già valutati ufficialmente.
+
+        destinazione = (
+            config.results_dir
+            / f"{config.variant.lower()}_unified_"
+              f"{config.case_id}.json"
+        )
+
+        destinazione.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        # Modalità "x": se il file esiste già,
+        # Python solleva un errore anziché sovrascriverlo.
+        with destinazione.open(
+            "x",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                risultato,
+                file,
+                indent=2,
+                ensure_ascii=False
+            )
+
+        if verbose:
+            print("Risultato salvato:", destinazione)
+
+    return risultato
