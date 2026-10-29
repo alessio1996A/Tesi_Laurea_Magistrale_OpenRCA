@@ -2,7 +2,7 @@ import json
 import time
 import hashlib
 import zipfile
-
+from agent.prompts import get_system_prompt
 from pathlib import Path
 
 import pandas as pd
@@ -260,7 +260,6 @@ def prepara_esperimento(
     }
 def run_experiment(
     config: ExperimentConfig,
-    system_prompt: str,
     llm=None,
     verbose: bool = True,
     salva: bool = False
@@ -287,6 +286,10 @@ def run_experiment(
     import time
 
     from datetime import datetime
+
+    # Il prompt viene recuperato automaticamente
+    # in base alla variante sperimentale.
+    system_prompt = get_system_prompt(config.variant)
 
     if not system_prompt.strip():
         raise ValueError("Prompt di sistema vuoto.")
