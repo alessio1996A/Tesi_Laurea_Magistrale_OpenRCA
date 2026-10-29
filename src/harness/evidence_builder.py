@@ -548,3 +548,256 @@ def compatta_anomalie_direzionali(
         "gruppi_totali": len(gruppi),
         "gruppi": gruppi
     }
+
+def costruisci_report_evidenze_v2(
+    df_nodi,
+    df_container,
+    cloudbed: str,
+    start_unix: int,
+    end_unix: int
+) -> dict:
+    """
+    Costruisce il report A1-v2.
+
+    A1-v2 combina:
+      1. Le evidenze originali di A1-v1;
+      2. Il rilevamento direzionale multi-risorsa;
+      3. La compattazione degli episodi correlati.
+
+    I gruppi CPU del nuovo rilevatore non vengono
+    aggiunti una seconda volta: l'analisi CPU/load
+    rimane rappresentata dal report A1-v1.
+
+    IMPORTANTE:
+    - Non legge ground truth.
+    - Non stabilisce la root cause.
+    - Non chiama Gemini.
+    - Non modifica A1-v1.
+    """
+
+    from harness.anomaly_detector import (
+        rileva_anomalie_direzionali
+    )
+
+    # =====================================================
+    # 1. VALIDAZIONE
+    # =====================================================
+
+    if cloudbed not in ("cloudbed-1", "cloudbed-2"):
+        raise ValueError("Cloudbed non valido.")
+
+    if start_unix >= end_unix:
+        raise ValueError("Finestra temporale non valida.")
+
+    # =====================================================
+    # 2. REPORT ORIGINALE A1-v1
+    # =====================================================
+
+    # Riutilizziamo esattamente l'Evidence Builder
+    # precedente, senza modificarne il comportamento.
+
+    report_v1 = costruisci_report_evidenze(
+        df_nodi=df_nodi,
+        df_container=df_container,
+        cloudbed=cloudbed,
+        start_unix=start_unix,
+        end_unix=end_unix
+    )
+
+    # =====================================================
+    # 3. RILEVAMENTO DIREZIONALE DEI NODI
+    # =====================================================
+
+    anomalie_nodi = rileva_anomalie_direzionali(
+        df=df_nodi,
+        sorgente="node_metrics",
+        start_unix=start_unix,
+        end_unix=end_unix
+    )
+
+    # =====================================================
+    # 4. RILEVAMENTO DIREZIONALE DEI CONTAINER
+    # =====================================================
+
+    anomalie_container = rileva_anomalie_direzionali(
+        df=df_container,
+        sorgente="container_metrics",
+        start_unix=start_unix,
+        end_unix=end_unix
+    )
+
+    # Uniamo i risultati delle due sorgenti.
+    anomalie_direzionali = (
+        anomalie_nodi + anomalie_container
+    )
+
+    # =====================================================
+    # 5. COMPATTAZIONE DEGLI EPISODI
+    # =====================================================
+
+    report_compattazione = compatta_anomalie_direzionali(
+        anomalie=anomalie_direzionali,
+        start_unix=start_unix,
+        end_unix=end_unix,
+        max_distanza_secondi=60
+    )
+
+    gruppi_compatti = report_compattazione["gruppi"]
+
+    # =====================================================
+    # 6. SEPARAZIONE DELLA CPU
+    # =====================================================
+
+    # A1-v1 contiene già una rappresentazione
+    # delle anomalie CPU/load.
+    #
+    # Non replichiamo quindi i nuovi gruppi CPU.
+    #
+    # Questa è una deduplicazione a livello di
+    # famiglia, non una verifica che i singoli
+    # episodi siano perfettamente equivalenti.
+
+    gruppi_cpu = [
+        gruppo
+        for gruppo in gruppi_compatti
+        if gruppo["famiglia"] == "cpu"
+    ]
+
+    gruppi_aggiuntivi = [
+        gruppo
+        for gruppo in gruppi_compatti
+        if gruppo["famiglia"] != "cpu"
+    ]
+
+    # =====================================================
+    # 7. ORDINAMENTO DETERMINISTICO
+    # =====================================================
+
+    # Manteniamo tutti i gruppi aggiuntivi.
+    # Non introduciamo ancora un ranking o un limite
+    # arbitrario che potrebbe nascondere evidenze.
+
+    gruppi_aggiuntivi.sort(
+        key=lambda g: (
+            g["inizio_osservato_unix"],
+            g["sorgente"],
+            g["componente"],
+            g["famiglia"],
+            g["direzione"]
+        )
+    )
+
+    # =====================================================
+    # 8. CONTROLLO DEI BORDI TEMPORALI
+    # =====================================================
+
+    # Un episodio osservato all'inizio della finestra
+    # potrebbe essere iniziato prima.
+    #
+    # Analogamente, un episodio vicino alla fine
+    # potrebbe continuare oltre il periodo disponibile.
+
+    gruppi_finali = []
+
+    for gruppo in gruppi_aggiuntivi:
+
+        copia = dict(gruppo)
+
+        copia["vicino_fine_finestra"] = (
+            copia["fine_osservata_unix"]
+            >= end_unix - 60
+        )
+
+        gruppi_finali.append(copia)
+
+    # =====================================================
+    # 9. RIEPILOGO PER FAMIGLIA
+    # =====================================================
+
+    riepilogo_famiglie = {}
+
+    for gruppo in gruppi_finali:
+
+        famiglia = gruppo["famiglia"]
+
+        riepilogo_famiglie[famiglia] = (
+            riepilogo_famiglie.get(famiglia, 0) + 1
+        )
+
+    # =====================================================
+    # 10. COSTRUZIONE DEL REPORT A1-v2
+    # =====================================================
+
+    report_v2 = {
+        "versione": "A1-v2",
+
+        "cloudbed": cloudbed,
+
+        "finestra": {
+            "start_unix": start_unix,
+            "end_unix": end_unix
+        },
+
+        # Report originale conservato integralmente.
+        "evidenze_v1": report_v1,
+
+        # Nuova estensione multi-risorsa.
+        "estensione_multi_risorsa": {
+
+            "metodo": "directional_median_mad_v1",
+
+            "episodi_nodi": len(anomalie_nodi),
+
+            "episodi_container": len(
+                anomalie_container
+            ),
+
+            "episodi_direzionali_totali": len(
+                anomalie_direzionali
+            ),
+
+            "gruppi_direzionali_totali": len(
+                gruppi_compatti
+            ),
+
+            # Gruppi CPU non aggiunti al report.
+            "gruppi_cpu_non_duplicati": len(
+                gruppi_cpu
+            ),
+
+            "gruppi_aggiuntivi_totali": len(
+                gruppi_finali
+            ),
+
+            "gruppi_per_famiglia": riepilogo_famiglie,
+
+            "gruppi": gruppi_finali
+        },
+
+        "limiti_interpretativi": [
+            (
+                "Le anomalie sono deviazioni statistiche "
+                "e non costituiscono prove causali."
+            ),
+            (
+                "KPI correlati non rappresentano "
+                "necessariamente evidenze indipendenti."
+            ),
+            (
+                "Il primo timestamp osservato non "
+                "coincide necessariamente con l'inizio "
+                "del guasto."
+            ),
+            (
+                "L'assenza di anomalie rilevate non "
+                "dimostra che un componente sia sano."
+            ),
+            (
+                "I gruppi CPU del detector direzionale "
+                "non sono riportati due volte; l'analisi "
+                "CPU/load originale resta in evidenze_v1."
+            )
+        ]
+    }
+
+    return report_v2
