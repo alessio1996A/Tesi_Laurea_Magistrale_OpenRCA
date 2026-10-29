@@ -196,9 +196,19 @@ def sintetizza_evidenze(
         destinazione["variazione_massima_pct"] = (
             max(valori) if valori else None
         )
-
     # =====================================================
-    # 4. ORDINAMENTO INVESTIGATIVO
+    # 4. SELEZIONE DELLE EVIDENZE
+    # =====================================================
+    #
+    # Obiettivi:
+    # - mantenere le correlazioni multi-replica;
+    # - cercare conferme sul nodo ospitante;
+    # - rappresentare famiglie diverse;
+    # - evitare molte piccole variazioni ridondanti.
+    #
+    # Nessuna evidenza viene cancellata dal report
+    # originale. Le unità non selezionate rimangono
+    # tracciabili tramite gruppi_origine.
     # =====================================================
 
     unita.sort(
@@ -210,34 +220,223 @@ def sintetizza_evidenze(
         )
     )
 
-    # Manteniamo almeno un esempio di ogni categoria
-    # presente, quando il budget lo permette.
     selezionate = []
-    categorie_incluse = set()
 
-    for evidenza in unita:
+    # Massimo due unità di variazione relativa modesta
+    # nel riepilogo. È una regola sperimentale.
+    max_modeste = min(2, max_evidenze)
 
-        categoria = evidenza["priorita_indagine"]
-
-        if categoria not in categorie_incluse:
-            selezionate.append(evidenza)
-            categorie_incluse.add(categoria)
-
-        if len(selezionate) >= max_evidenze:
-            break
-
-    # Completiamo il budget secondo l'ordine
-    # investigativo, senza ripetere le unità.
-    for evidenza in unita:
-
-        if len(selezionate) >= max_evidenze:
-            break
-
-        if not any(
+    def gia_selezionata(evidenza):
+        return any(
             evidenza is scelta
             for scelta in selezionate
+        )
+
+    def aggiungi(evidenza):
+        """
+        Aggiunge una unità se il budget e i vincoli
+        di selezione lo permettono.
+        """
+
+        if len(selezionate) >= max_evidenze:
+            return False
+
+        if gia_selezionata(evidenza):
+            return False
+
+        if (
+            evidenza["priorita_indagine"]
+            == "variazione_relativa_modesta"
         ):
-            selezionate.append(evidenza)
+            modeste_attuali = sum(
+                e["priorita_indagine"]
+                == "variazione_relativa_modesta"
+                for e in selezionate
+            )
+
+            if modeste_attuali >= max_modeste:
+                return False
+
+        selezionate.append(evidenza)
+        return True
+
+    # =====================================================
+    # 4A. CORRELAZIONI MULTI-REPLICA
+    # =====================================================
+
+    # Queste evidenze sono particolarmente utili
+    # perché rappresentano più componenti che
+    # mostrano un comportamento temporalmente simile.
+
+    multi_replica = [
+        e for e in unita
+        if e["tipo"] == "anomalia_multi_replica"
+    ]
+
+    for evidenza in multi_replica:
+        aggiungi(evidenza)
+
+    # =====================================================
+    # 4B. CORROBORAZIONE SUL NODO OSPITANTE
+    # =====================================================
+
+    # Se un'anomalia multi-replica coinvolge container
+    # sullo stesso nodo, cerchiamo una evidenza della
+    # stessa famiglia sul nodo, in un intervallo vicino.
+    #
+    # Non assumiamo causalità: si tratta soltanto
+    # di una corroborazione temporale.
+
+    for evidenza in multi_replica:
+
+        if not gia_selezionata(evidenza):
+            continue
+
+        nodi_coinvolti = {
+            componente.split(".", 1)[0]
+            for componente in evidenza["componenti"]
+            if "." in componente
+        }
+
+        candidati_nodo = []
+
+        for candidata in unita:
+
+            if candidata["sorgente"] != "node_metrics":
+                continue
+
+            if candidata["famiglia"] != evidenza["famiglia"]:
+                continue
+
+            if not any(
+                componente in nodi_coinvolti
+                for componente in candidata["componenti"]
+            ):
+                continue
+
+            distanza = abs(
+                candidata["inizio_osservato_unix"]
+                - evidenza["inizio_osservato_unix"]
+            )
+
+            if distanza > tolleranza_secondi:
+                continue
+
+            candidati_nodo.append(
+                (distanza, candidata)
+            )
+
+        candidati_nodo.sort(
+            key=lambda elemento: (
+                elemento[0],
+                PRIORITA[
+                    elemento[1]["priorita_indagine"]
+                ],
+                elemento[1]["componenti"][0]
+            )
+        )
+
+        if candidati_nodo:
+            aggiungi(candidati_nodo[0][1])
+
+    # =====================================================
+    # 4C. DIVERSITÀ TRA FAMIGLIE DI METRICHE
+    # =====================================================
+
+    # Se esistono anomalie di memoria, disco e I/O,
+    # cerchiamo di includere almeno una unità per
+    # ciascuna famiglia, rispettando il budget.
+
+    famiglie_presenti = sorted({
+        e["famiglia"] for e in unita
+    })
+
+    for famiglia in famiglie_presenti:
+
+        gia_rappresentata = any(
+            e["famiglia"] == famiglia
+            for e in selezionate
+        )
+
+        if gia_rappresentata:
+            continue
+
+        candidati = [
+            e for e in unita
+            if e["famiglia"] == famiglia
+            and not gia_selezionata(e)
+        ]
+
+        if candidati:
+            aggiungi(candidati[0])
+
+    # =====================================================
+    # 4D. PRIORITÀ E DIVERSITÀ DEI COMPONENTI
+    # =====================================================
+
+    # Prima selezioniamo altre evidenze non modeste,
+    # preferendo combinazioni componente/famiglia
+    # che non sono ancora rappresentate.
+
+    def firma_componente(evidenza):
+        return (
+            evidenza["famiglia"],
+            tuple(evidenza["componenti"])
+        )
+
+    for evidenza in unita:
+
+        if len(selezionate) >= max_evidenze:
+            break
+
+        if gia_selezionata(evidenza):
+            continue
+
+        if (
+            evidenza["priorita_indagine"]
+            == "variazione_relativa_modesta"
+        ):
+            continue
+
+        firma = firma_componente(evidenza)
+
+        gia_rappresentata = any(
+            firma_componente(e) == firma
+            for e in selezionate
+        )
+
+        if not gia_rappresentata:
+            aggiungi(evidenza)
+
+    # =====================================================
+    # 4E. COMPLETAMENTO CON ALTRE EVIDENZE
+    # =====================================================
+
+    # Completiamo prima con eventuali altre evidenze
+    # non modeste, poi con poche variazioni modeste.
+    #
+    # max_evidenze è un tetto massimo:
+    # non è obbligatorio raggiungerlo.
+
+    for evidenza in unita:
+
+        if (
+            evidenza["priorita_indagine"]
+            != "variazione_relativa_modesta"
+        ):
+            aggiungi(evidenza)
+
+    for evidenza in unita:
+
+        if (
+            evidenza["priorita_indagine"]
+            == "variazione_relativa_modesta"
+        ):
+            aggiungi(evidenza)
+
+    # =====================================================
+    # 4F. ORDINAMENTO FINALE
+    # =====================================================
 
     selezionate.sort(
         key=lambda e: (
