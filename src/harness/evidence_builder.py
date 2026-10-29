@@ -338,3 +338,213 @@ def costruisci_report_evidenze(
     }
 
     return _valori_json(report)
+def compatta_anomalie_direzionali(
+    anomalie: list[dict],
+    start_unix: int,
+    end_unix: int,
+    max_distanza_secondi: int = 60
+) -> dict:
+    """
+    Raggruppa gli episodi anomali rilevati dal
+    detector direzionale.
+
+    Due episodi vengono aggregati soltanto se:
+      1. appartengono alla stessa sorgente;
+      2. riguardano lo stesso componente;
+      3. appartengono alla stessa famiglia;
+      4. hanno la stessa direzione;
+      5. sono temporalmente sovrapposti o vicini.
+
+    Un gruppo è un'evidenza correlata, NON una root cause.
+
+    Non usa ground truth e non assegna diagnosi.
+    """
+
+    from collections import defaultdict
+
+    if start_unix >= end_unix:
+        raise ValueError("Finestra temporale non valida.")
+
+    if max_distanza_secondi < 0:
+        raise ValueError("Distanza massima non valida.")
+
+    # =====================================================
+    # 1. VALIDAZIONE E ORGANIZZAZIONE
+    # =====================================================
+
+    richiesti = {
+        "sorgente", "componente", "famiglia",
+        "direzione", "kpi",
+        "inizio_unix", "fine_unix",
+        "score_picco"
+    }
+
+    per_componente = defaultdict(list)
+
+    for evento in anomalie:
+
+        if not richiesti.issubset(evento):
+            raise ValueError(
+                "Evento privo dei campi richiesti."
+            )
+
+        inizio = int(evento["inizio_unix"])
+        fine = int(evento["fine_unix"])
+
+        if not (start_unix <= inizio <= fine < end_unix):
+            raise ValueError(
+                "Evento esterno alla finestra ufficiale."
+            )
+
+        # Non mescoliamo sorgenti, componenti,
+        # famiglie o direzioni differenti.
+        chiave = (
+            evento["sorgente"],
+            evento["componente"],
+            evento["famiglia"],
+            evento["direzione"]
+        )
+
+        per_componente[chiave].append(evento)
+
+    gruppi = []
+
+    # =====================================================
+    # 2. RAGGRUPPAMENTO TEMPORALE
+    # =====================================================
+
+    for chiave, eventi in sorted(
+        per_componente.items()
+    ):
+
+        eventi = sorted(
+            eventi,
+            key=lambda e: (
+                e["inizio_unix"],
+                e["fine_unix"],
+                e["kpi"]
+            )
+        )
+
+        gruppo_corrente = []
+        fine_corrente = None
+
+        def registra_gruppo(episodi):
+            """
+            Trasforma un insieme di episodi correlati
+            in una singola evidenza compatta.
+            """
+
+            if not episodi:
+                return
+
+            inizio = min(
+                int(e["inizio_unix"])
+                for e in episodi
+            )
+
+            fine = max(
+                int(e["fine_unix"])
+                for e in episodi
+            )
+
+            # Manteniamo i KPI distinti: più osservazioni
+            # della stessa metrica non devono moltiplicare
+            # il numero dei segnali indipendenti.
+            nomi_kpi = sorted({
+                str(e["kpi"])
+                for e in episodi
+            })
+
+            sorgente, componente, famiglia, direzione = chiave
+
+            gruppi.append({
+                "sorgente": sorgente,
+                "componente": componente,
+                "famiglia": famiglia,
+                "direzione": direzione,
+                "inizio_osservato_unix": inizio,
+                "fine_osservata_unix": fine,
+                "kpi": nomi_kpi,
+                "numero_kpi_distinti": len(nomi_kpi),
+                "episodi_aggregati": len(episodi),
+
+                # Se l'evento è vicino all'inizio della
+                # finestra, il suo vero inizio potrebbe
+                # precedere il periodo osservato.
+                "vicino_inizio_finestra": (
+                    inizio <= start_unix + 60
+                ),
+
+                "interpretazione": (
+                    "Evidenza statistica correlata; "
+                    "causalita non verificata."
+                )
+            })
+
+        for evento in eventi:
+
+            inizio_evento = int(
+                evento["inizio_unix"]
+            )
+
+            fine_evento = int(
+                evento["fine_unix"]
+            )
+
+            if not gruppo_corrente:
+
+                gruppo_corrente = [evento]
+                fine_corrente = fine_evento
+                continue
+
+            # Aggregazione solo con intervalli
+            # sufficientemente vicini.
+            if (
+                inizio_evento
+                <= fine_corrente + max_distanza_secondi
+            ):
+
+                gruppo_corrente.append(evento)
+
+                fine_corrente = max(
+                    fine_corrente,
+                    fine_evento
+                )
+
+            else:
+
+                registra_gruppo(gruppo_corrente)
+
+                gruppo_corrente = [evento]
+                fine_corrente = fine_evento
+
+        registra_gruppo(gruppo_corrente)
+
+    # =====================================================
+    # 3. ORDINAMENTO DETERMINISTICO
+    # =====================================================
+
+    gruppi.sort(
+        key=lambda g: (
+            g["inizio_osservato_unix"],
+            g["sorgente"],
+            g["componente"],
+            g["famiglia"]
+        )
+    )
+
+    # =====================================================
+    # 4. REPORT FINALE
+    # =====================================================
+
+    return {
+        "versione": "directional_groups_v1",
+        "finestra": {
+            "start_unix": start_unix,
+            "end_unix": end_unix
+        },
+        "episodi_originali": len(anomalie),
+        "gruppi_totali": len(gruppi),
+        "gruppi": gruppi
+    }
