@@ -362,6 +362,32 @@ def prepara_esperimento(
         "Respond only in the official OpenRCA JSON format."
     )
 
+    # =====================================================
+    # 3 BIS. COMPLETEZZA DELLA DIAGNOSI (A0 E A1)
+    # =====================================================
+    # Questo vincolo dipende solo dall'istruzione ufficiale
+    # visibile all'agente. Non usa record.csv o scoring_points.
+    richiesta += (
+        "\n\n"
+        "DIAGNOSTIC COMPLETENESS REQUIREMENTS:\n"
+        "Read the official incident instruction carefully.\n"
+        "If it specifies multiple failures, investigate "
+        "and report EACH requested failure separately.\n"
+        "The number of numbered root-cause entries in the "
+        "final JSON must match the number of failures "
+        "explicitly stated in the official instruction.\n"
+        "Use consecutive JSON keys starting from \"1\".\n"
+        "For every requested failure, identify its own "
+        "root cause occurrence datetime and root cause component.\n"
+        "Do not combine distinct failures into one diagnosis.\n"
+        "Do not assume that all failures share the same "
+        "root cause or affected component.\n"
+        "Only report conclusions supported by available telemetry; "
+        "do not invent evidence or fabricate root causes.\n"
+        "Before responding, check that every requested failure "
+        "has been addressed and that the JSON is valid.\n"
+    )
+
     evidence_report = None
     evidence_sha256 = None
     preprocessing_seconds = 0.0
