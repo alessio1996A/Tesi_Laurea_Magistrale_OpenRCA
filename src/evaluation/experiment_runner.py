@@ -125,6 +125,188 @@ def carica_metriche(
 
     return pd.concat(blocchi, ignore_index=True)
 
+def carica_telemetria_mesh_runtime(
+    config: ExperimentConfig,
+    caso: dict,
+    sorgente: str
+):
+    """
+    Carica dal Market.zip le metriche Mesh o Runtime
+    nella finestra temporale del caso OpenRCA.
+
+    Legge soltanto i KPI utilizzati dal detector.
+
+    Non legge la ground truth.
+    Non modifica file.
+    Non chiama Gemini.
+    """
+
+    import zipfile
+    import pandas as pd
+
+    from harness.mesh_runtime_detector import (
+        PREFISSO_DURATA,
+        PREFISSO_RICHIESTE,
+        KPI_RUNTIME
+    )
+
+    if sorgente not in ("mesh", "runtime"):
+        raise ValueError(
+            f"Sorgente non supportata: {sorgente}"
+        )
+
+    start = int(caso["start_unix"])
+    end = int(caso["end_unix"])
+
+    if start >= end:
+        raise ValueError(
+            "Finestra temporale non valida."
+        )
+
+    colonne = [
+        "timestamp",
+        "cmdb_id",
+        "kpi_name",
+        "value"
+    ]
+
+    # =====================================================
+    # 1. GIORNI COPERTI DALLA FINESTRA
+    # =====================================================
+
+    # OpenRCA utilizza file organizzati per giorno.
+    # Gestiamo anche finestre che attraversano
+    # la mezzanotte locale del dataset.
+
+    inizio_locale = pd.to_datetime(
+        start,
+        unit="s",
+        utc=True
+    ).tz_convert("Asia/Shanghai")
+
+    fine_locale = pd.to_datetime(
+        end - 1,
+        unit="s",
+        utc=True
+    ).tz_convert("Asia/Shanghai")
+
+    giorni = pd.date_range(
+        start=inizio_locale.normalize(),
+        end=fine_locale.normalize(),
+        freq="D"
+    )
+
+    # =====================================================
+    # 2. SELEZIONE DEI FILE ZIP
+    # =====================================================
+
+    blocchi = []
+
+    with zipfile.ZipFile(
+        config.market_zip_path
+    ) as archivio:
+
+        nomi = archivio.namelist()
+
+        for giorno in giorni:
+
+            data = giorno.strftime("%Y_%m_%d")
+
+            suffisso = (
+                f"{caso['cloudbed']}/telemetry/"
+                f"{data}/metric/"
+                f"metric_{sorgente}.csv"
+            )
+
+            percorsi = [
+                nome
+                for nome in nomi
+                if nome.endswith(suffisso)
+            ]
+
+            if len(percorsi) != 1:
+                raise FileNotFoundError(
+                    "File di telemetria non trovato "
+                    "univocamente: "
+                    f"{suffisso}"
+                )
+
+            # =================================================
+            # 3. LETTURA A BLOCCHI
+            # =================================================
+
+            with archivio.open(percorsi[0]) as file:
+
+                for blocco in pd.read_csv(
+                    file,
+                    usecols=colonne,
+                    chunksize=250_000
+                ):
+
+                    blocco["timestamp"] = (
+                        pd.to_numeric(
+                            blocco["timestamp"],
+                            errors="coerce"
+                        )
+                    )
+
+                    # La finestra è [start, end).
+                    filtro_temporale = (
+                        blocco["timestamp"].ge(start)
+                        & blocco["timestamp"].lt(end)
+                    )
+
+                    if sorgente == "mesh":
+
+                        filtro_kpi = (
+                            blocco["kpi_name"]
+                            .str.startswith(
+                                (
+                                    PREFISSO_DURATA,
+                                    PREFISSO_RICHIESTE
+                                ),
+                                na=False
+                            )
+                        )
+
+                    else:
+
+                        filtro_kpi = (
+                            blocco["kpi_name"].isin(
+                                KPI_RUNTIME
+                            )
+                        )
+
+                    filtrato = blocco.loc[
+                        filtro_temporale
+                        & filtro_kpi,
+                        colonne
+                    ]
+
+                    if not filtrato.empty:
+
+                        blocchi.append(
+                            filtrato.copy()
+                        )
+
+    # =====================================================
+    # 4. RESTITUZIONE
+    # =====================================================
+
+    if not blocchi:
+
+        return pd.DataFrame(
+            columns=colonne
+        )
+
+    return pd.concat(
+        blocchi,
+        ignore_index=True
+    )
+
+
+
+
 
 def prepara_esperimento(
     config: ExperimentConfig
@@ -190,31 +372,182 @@ def prepara_esperimento(
 
     if config.variant == "A1":
 
+        # =====================================================
+        # 1. IMPORT DELL'HARNESS UNIFICATO
+        # =====================================================
+
+        from harness.evidence_builder import (
+            costruisci_report_evidenze_v2
+        )
+
+        from harness.evidence_selector import (
+            annota_qualita_evidenze
+        )
+
+        from harness.evidence_summarizer import (
+            sintetizza_evidenze
+        )
+
+        from harness.mesh_runtime_detector import (
+            rileva_evidenze_mesh_runtime,
+            aggrega_evidenze_mesh
+        )
+
+        from harness.unified_report import (
+            costruisci_report_unificato_v2
+        )
+
         inizio_preprocessing = time.perf_counter()
 
-        # Carichiamo esclusivamente le metriche
-        # della finestra ufficiale.
+        # =====================================================
+        # 2. CARICAMENTO NODE E CONTAINER
+        # =====================================================
+
         df_nodi = carica_metriche(
-            config, caso, "node_metrics"
+            config=config,
+            caso=caso,
+            tipo="node_metrics"
         )
 
         df_container = carica_metriche(
-            config, caso, "container_metrics"
+            config=config,
+            caso=caso,
+            tipo="container_metrics"
         )
 
-        # Generiamo il report da zero:
-        # non utilizziamo report precomputati.
-        evidence_report = costruisci_report_evidenze(
-            df_nodi=df_nodi,
-            df_container=df_container,
-            cloudbed=cloudbed,
-            start_unix=inizio,
-            end_unix=fine
+        # =====================================================
+        # 3. EVIDENCE BUILDER A1-v2
+        # =====================================================
+
+        report_v2 = (
+            costruisci_report_evidenze_v2(
+                df_nodi=df_nodi,
+                df_container=df_container,
+                cloudbed=cloudbed,
+                start_unix=inizio,
+                end_unix=fine
+            )
         )
+
+        # =====================================================
+        # 4. QUALITÀ DELLE EVIDENZE
+        # =====================================================
+
+        annotazioni = (
+            annota_qualita_evidenze(
+                report_v2=report_v2,
+                df_nodi=df_nodi,
+                df_container=df_container
+            )
+        )
+
+        # =====================================================
+        # 5. SINTESI NODE / CONTAINER
+        # =====================================================
+
+        sintesi = sintetizza_evidenze(
+            annotazioni=annotazioni,
+            max_evidenze=8,
+            tolleranza_secondi=60
+        )
+
+        # =====================================================
+        # 6. CARICAMENTO MESH E RUNTIME
+        # =====================================================
+
+        df_mesh = carica_telemetria_mesh_runtime(
+            config=config,
+            caso=caso,
+            sorgente="mesh"
+        )
+
+        df_runtime = carica_telemetria_mesh_runtime(
+            config=config,
+            caso=caso,
+            sorgente="runtime"
+        )
+
+        # =====================================================
+        # 7. DETECTOR MESH / RUNTIME
+        # =====================================================
+
+        # Budget locale elevato:
+        # tutte le anomalie devono poter partecipare
+        # all'aggregazione e alla selezione globale.
+
+        report_mr = rileva_evidenze_mesh_runtime(
+            df_mesh=df_mesh,
+            df_runtime=df_runtime,
+            start_unix=int(inizio),
+            end_unix=int(fine),
+            max_evidenze_mesh=1000,
+            max_evidenze_runtime=1000
+        )
+
+        # Non accettiamo evidenze troncate
+        # prima dell'aggregazione.
+
+        for sorgente in ("mesh", "runtime"):
+
+            rilevate = (
+                report_mr["conteggi"][
+                    f"{sorgente}_rilevate"
+                ]
+            )
+
+            selezionate = (
+                report_mr["conteggi"][
+                    f"{sorgente}_selezionate"
+                ]
+            )
+
+            if rilevate != selezionate:
+
+                raise ValueError(
+                    f"Evidenze {sorgente} "
+                    "troncate prima del budget globale."
+                )
+
+        # =====================================================
+        # 8. AGGREGAZIONE MESH MULTI-REPLICA
+        # =====================================================
+
+        aggregazione_mesh = aggrega_evidenze_mesh(
+            report=report_mr,
+            tolleranza_secondi=180
+        )
+
+        # =====================================================
+        # 9. REPORT UNIFICATO A1-v2
+        # =====================================================
+
+        evidence_report = (
+            costruisci_report_unificato_v2(
+                report_v2=report_v2,
+                sintesi=sintesi,
+                aggregazione_mesh=aggregazione_mesh,
+                report_mesh_runtime=report_mr,
+                max_evidenze_totali=10
+            )
+        )
+
+        if (
+            evidence_report["versione"]
+            != "unified_evidence_v2"
+        ):
+
+            raise ValueError(
+                "Versione del report A1 non valida."
+            )
+
+        # =====================================================
+        # 10. SERIALIZZAZIONE DETERMINISTICA
+        # =====================================================
 
         evidence_text = json.dumps(
             evidence_report,
             ensure_ascii=False,
+            sort_keys=True,
             separators=(",", ":"),
             allow_nan=False
         )
@@ -223,31 +556,53 @@ def prepara_esperimento(
             evidence_text.encode("utf-8")
         ).hexdigest()
 
-        # Aggiungiamo le evidenze all'istruzione.
+        # =====================================================
+        # 11. AGGIUNTA AL PROMPT A1
+        # =====================================================
+
         richiesta += (
-            "\n\nDETERMINISTIC A1-v1 EVIDENCE REPORT\n"
-            "The following observations were derived "
-            "automatically from telemetry in the requested "
-            "interval.\n"
-            "They are NOT ground truth and do NOT establish "
-            "the root cause.\n"
-            "Correlated KPIs are not independent causal proofs.\n"
+            "\n\n"
+            "DETERMINISTIC A1 UNIFIED EVIDENCE REPORT v2\n"
+            "\n"
+            "The following observations were generated "
+            "automatically from telemetry in the "
+            "requested time interval.\n"
+            "\n"
+            "The report may contain evidence from:\n"
+            "- Node metrics\n"
+            "- Container metrics\n"
+            "- Service Mesh metrics\n"
+            "- Runtime metrics\n"
+            "\n"
+            "These observations are NOT ground truth.\n"
+            "They do NOT establish the root cause.\n"
+            "Temporal correlation does NOT prove causality.\n"
+            "Correlated replicas and KPIs are not "
+            "independent causal proofs.\n"
             "The absence of detected anomalies does not "
             "prove that a component is healthy.\n"
+            "Some evidence may have been excluded "
+            "by deterministic selection budgets.\n"
+            "\n"
+            "Treat the report as investigative context, "
+            "not as a verified diagnosis.\n"
             "Use the available tools to investigate "
             "and verify hypotheses.\n"
-            "Do not assume that the earliest detected anomaly "
-            "is necessarily the cause.\n\n"
+            "Do not automatically assume that the "
+            "earliest anomaly is the root cause.\n"
+            "\n"
+            "UNIFIED EVIDENCE JSON:\n"
             f"{evidence_text}\n"
         )
 
-        preprocessing_seconds = (
-            time.perf_counter() - inizio_preprocessing
-        )
+        # =====================================================
+        # 12. TEMPO DI PREPROCESSING
+        # =====================================================
 
-    # =====================================================
-    # 5. RESTITUZIONE DELL'ESPERIMENTO PREPARATO
-    # =====================================================
+        preprocessing_seconds = (
+            time.perf_counter()
+            - inizio_preprocessing
+        )
 
     return {
         "config": config,
