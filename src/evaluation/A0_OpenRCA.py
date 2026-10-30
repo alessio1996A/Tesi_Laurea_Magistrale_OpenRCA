@@ -1,553 +1,890 @@
-# AGENTE A0 — ESECUTORE PILOTA OPENRCA
-# Derivato dal prototipo LangGraph inviato dall'utente.
-# Un solo caso ufficiale; nessuna lettura di scoring_points o record.csv.
-
 import json
-import os
-import sys
 import time
-import importlib
-from datetime import datetime
+import hashlib
+import zipfile
+from agent.prompts import get_system_prompt
 from pathlib import Path
-from typing import Annotated, Literal, Optional
-from typing_extensions import TypedDict
 
 import pandas as pd
-from google.colab import userdata
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_core.tools import tool
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Percorsi utilizzati dal nostro progetto Colab.
-REPO_DIR = "/content/Tesi_OpenRCA"
-SRC_DIR = f"{REPO_DIR}/src"
-MANIFEST = "/content/drive/MyDrive/Tesi_OpenRCA/data/processed/benchmark_inputs_market.csv"
-OUTPUT_DIR = Path("/content/drive/MyDrive/Tesi_OpenRCA/data/results")
+from evaluation.experiment_config import ExperimentConfig
+from agent.tool_factory import crea_tools_openrca
+from agent.tools import _get_telemetry_csv_paths
+from harness.evidence_builder import costruisci_report_evidenze
 
-# Primo test di integrazione su un caso ufficiale, NON valutazione finale.
-TEST_CASE_ID = "cloudbed-2_q000"
-MODEL_NAME = "gemini-3.5-flash-lite"
-MAX_TOOL_ROUNDS = 6
-RECURSION_LIMIT = 30
 
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
+def carica_caso(config: ExperimentConfig) -> dict:
+    """
+    Recupera dal manifest il caso OpenRCA richiesto.
 
-import agent.tools
-importlib.reload(agent.tools)
+    Il manifest non contiene le etichette dei guasti.
+    """
 
-# La chiave resta nei Secrets Colab e non viene salvata nei risultati.
-api_key = userdata.get("GEMINI_API_KEY")
-if not api_key:
-    raise RuntimeError("GEMINI_API_KEY assente nei Secrets Colab.")
-os.environ["GOOGLE_API_KEY"] = api_key
+    manifest = pd.read_csv(config.manifest_path)
 
-# Carichiamo soltanto il manifest senza etichette.
-benchmark = pd.read_csv(MANIFEST)
-assert len(benchmark) == 148, "Manifest incompleto."
-assert "scoring_points" not in benchmark.columns
-assert "reason" not in benchmark.columns
-selezione = benchmark.loc[benchmark["case_id"] == TEST_CASE_ID]
-if len(selezione) != 1:
-    raise ValueError(f"case_id non univoco o mancante: {TEST_CASE_ID}")
-caso = selezione.iloc[0]
-cloudbed = str(caso["cloudbed"])
-start_unix = int(caso["start_unix"])
-end_unix = int(caso["end_unix"])
-if cloudbed not in ("cloudbed-1", "cloudbed-2") or start_unix >= end_unix:
-    raise ValueError("Cloudbed o intervallo non validi nel manifest.")
-
-print("CASO PILOTA:", TEST_CASE_ID)
-print("Cloudbed:", cloudbed, "| task:", caso["task_index"])
-print("Intervallo Unix:", start_unix, end_unix)
-print("Modello:", MODEL_NAME, "| budget round:", MAX_TOOL_ROUNDS)
-
-
-def controlla_intervallo(inizio: int, fine: int) -> Optional[str]:
-    """Impedisce letture al di fuori della finestra ufficiale del caso."""
-    if inizio < start_unix or fine > end_unix or inizio >= fine:
-        return (f"Errore: intervallo non consentito. Usa timestamp Unix "
-                f"all'interno di [{start_unix}, {end_unix}).")
-    return None
-
-
-# I wrapper NON espongono market_system al modello: lo impone il runner.
-# Non calcolano anomalie, diagnosi o evidenze per l'agente.
-@tool("tool_get_service_metrics")
-def service_metrics(
-    start_unix: int, end_unix: int, service_name: Optional[str] = None,
-    max_rows: int = 30,
-) -> str:
-    """Legge rr, sr e mrt delle metriche dei servizi nella finestra Unix (secondi)."""
-    errore = controlla_intervallo(start_unix, end_unix)
-    if errore:
-        return errore
-    return agent.tools.tool_get_service_metrics(
-        start_unix=start_unix, end_unix=end_unix,
-        service_name=service_name, max_rows=max_rows, market_system=cloudbed,
-    )
-
-
-@tool("tool_get_container_metrics")
-def container_metrics(
-    start_unix: int, end_unix: int, cmdb_id: Optional[str] = None,
-    kpi_name: Optional[str] = None, max_rows: int = 100,
-) -> str:
-    """Restituisce statistiche descrittive delle metriche container per KPI e componente."""
-    errore = controlla_intervallo(start_unix, end_unix)
-    if errore:
-        return errore
-    return agent.tools.tool_get_container_metrics(
-        start_unix=start_unix, end_unix=end_unix, cmdb_id=cmdb_id,
-        kpi_name=kpi_name, max_rows=max_rows, market_system=cloudbed,
-    )
-
-
-@tool("tool_get_logs")
-def logs(
-    start_unix: int, end_unix: int,
-    log_type: Literal["service", "proxy"] = "service",
-    cmdb_id: Optional[str] = None, keyword: Optional[str] = None,
-    max_rows: int = 30,
-) -> str:
-    """Estrae log di servizio o proxy, filtrabili per componente e parola chiave."""
-    errore = controlla_intervallo(start_unix, end_unix)
-    if errore:
-        return errore
-    return agent.tools.tool_get_logs(
-        start_unix=start_unix, end_unix=end_unix, log_type=log_type,
-        cmdb_id=cmdb_id, keyword=keyword, max_rows=max_rows,
-        market_system=cloudbed,
-    )
-
-
-@tool("tool_get_traces")
-def traces(
-    start_unix: int, end_unix: int, cmdb_id: Optional[str] = None,
-    trace_id: Optional[str] = None, min_duration_ms: Optional[int] = None,
-    max_rows: int = 30,
-) -> str:
-    """Estrae span di trace distribuite, ordinati per durata decrescente (ms)."""
-    errore = controlla_intervallo(start_unix, end_unix)
-    if errore:
-        return errore
-    return agent.tools.tool_get_traces(
-        start_unix=start_unix, end_unix=end_unix, cmdb_id=cmdb_id,
-        trace_id=trace_id, min_duration_ms=min_duration_ms,
-        max_rows=max_rows, market_system=cloudbed,
-    )
-
-
-
-@tool("tool_get_node_metrics")
-def node_metrics(
-    start_unix: int,
-    end_unix: int,
-    cmdb_id: Optional[str] = None,
-    kpi_name: Optional[str] = None,
-    max_rows: int = 100,
-) -> str:
-    """Restituisce statistiche delle metriche dei nodi per componente e KPI."""
-
-    # L'agente non può uscire dalla finestra del caso.
-    errore = controlla_intervallo(start_unix, end_unix)
-    if errore:
-        return errore
-
-    # Il cloudbed è imposto dal runner, non da Gemini.
-    return agent.tools.tool_get_node_metrics(
-        start_unix=start_unix,
-        end_unix=end_unix,
-        cmdb_id=cmdb_id,
-        kpi_name=kpi_name,
-        max_rows=max_rows,
-        market_system=cloudbed,
-    )
-
-
-A0_TOOLS = [service_metrics, container_metrics, node_metrics, logs, traces]
-llm = ChatGoogleGenerativeAI(model=MODEL_NAME)
-llm_with_tools = llm.bind_tools(A0_TOOLS)
-
-
-class State(TypedDict):
-    messages: Annotated[list[BaseMessage], add_messages]
-    tool_rounds: int
-
-SYSTEM_PROMPT = """
-You are Agent A0, an autonomous baseline Root Cause Analysis (RCA)
-agent specialized in distributed microservices systems.
-
-Your objective is to investigate telemetry and identify the most
-likely root cause of the incident reported by the user.
-
-AVAILABLE TOOLS
-- tool_get_service_metrics
-- tool_get_container_metrics
-- tool_get_logs
-- tool_get_traces
-- tool_get_node_metrics
-
-1. TIME HANDLING
-
-Use the exact Unix timestamps in SECONDS supplied by the user.
-Do not extend or modify the requested time interval.
-Do not confuse Unix seconds with Unix milliseconds.
-
-2. AUTONOMOUS EXPLORATION
-
-Choose which tools to call and in which order based on the evidence
-already collected.
-
-Service metrics can provide an overview. Logs, distributed traces
-and container metrics can help investigate the hypotheses that
-emerge from the evidence.
-
-Do not follow a rigid sequence when another investigation is
-more relevant.
-
-3. SYMPTOMS VERSUS ROOT CAUSE
-
-A service with unusually high latency may be experiencing the
-effects of a problem originating in another service or in the
-infrastructure.
-
-Do not identify the slowest service as the root cause solely
-because its latency is high.
-
-4. EVIDENCE-BASED INVESTIGATION
-
-Investigate relevant evidence from:
-- Service response times and success rates.
-- Container CPU, memory and filesystem metrics.
-- Application and proxy logs.
-- Distributed traces and parent-child span relationships.
-
-Refine the filters when the returned information is too broad.
-
-Do not invent measurements, metric names, log messages or
-component identifiers.
-
-5. VALID TOOL PARAMETERS AND DATASET KPI SCHEMA
-
-For tool_get_logs, log_type accepts only "service" or "proxy".
-Never use "application" as a log_type.
-
-For tool_get_container_metrics, kpi_name is a case-insensitive
-regular expression applied to the KPI name.
-
-For tool_get_node_metrics, kpi_name is also a case-insensitive regular expression.
-Examples of observed node KPIs include system.cpu.iowait, system.mem.used,
-system.disk.pct_usage and system.load.5.
-
-The following KPI name patterns have been observed in the
-cloudbed-1 Market dataset. They are examples of valid names,
-not a guarantee that this list is exhaustive:
-
-CPU:
-- container_cpu_usage_seconds
-- container_cpu_user_seconds
-- container_cpu_system_seconds
-- container_cpu_cfs_throttled_seconds
-- container_cpu_cfs_throttled_periods
-- container_cpu_load_average_10s
-
-Memory:
-- container_memory_working_set_MB
-- container_memory_failcnt
-
-Filesystem:
-- container_fs_reads
-- container_fs_reads_MB
-- container_fs_writes
-- container_fs_writes_MB
-- container_fs_read_seconds
-- container_fs_io_time_seconds
-- container_fs_io_time_weighted_seconds
-
-Network:
-- container_network_receive_errors
-- container_network_transmit_errors
-- container_network_receive_packets_dropped
-- container_network_transmit_packets_dropped
-
-Some KPI names include device or interface suffixes, such as
-/dev/vda, /dev/vda1 or eth0.
-
-Prefer distinctive KPI name fragments from this inventory.
-Do not invent KPI names or repeatedly try alternative names
-that differ only slightly.
-
-A KPI name containing "seconds" must not automatically be
-interpreted as a percentage or utilization rate.
-For example, container_cpu_usage_seconds is not itself a
-CPU percentage.
-
-A returned sample may contain only max_rows records. Do not
-assume those records describe the complete time series.
-If the sample is insufficient, refine the query meaningfully.
-
-6. TRACE INTERPRETATION
-
-The timestamps supplied to the telemetry tools are Unix
-timestamps in seconds.
-
-The trace CSV stores timestamps in Unix milliseconds.
-The tool returns trace timestamps in milliseconds, while
-its duration values are displayed in milliseconds.
-
-When interpreting a trace timestamp, divide it by 1000
-to obtain Unix seconds before comparing it with the
-requested Unix-second interval.
-
-Use trace_id, span_id and parent_span to investigate
-call relationships.
-
-A slow parent span does not automatically prove that its
-own component originated the fault.
-
-Compare parent and child spans, considering their durations
-and temporal relationships. Do not attribute a fault to a
-component solely because it appears in a trace.
-
-7. NO REPEATED INVESTIGATIONS
-
-Avoid repeating identical tool calls unless a concrete reason
-justifies doing so.
-
-If a tool returns a parameter error, correct the parameter.
-If a query returns no data, change the investigation only when
-there is a meaningful alternative query.
-
-8. STOPPING CONDITION
-
-Stop exploring when sufficient evidence supports a diagnosis.
-When the evidence is insufficient, explain the uncertainty
-instead of presenting an unverified hypothesis as fact.
-
-Use at most six rounds of tool exploration. When the budget is
-exhausted, synthesize the available evidence without requesting
-additional tools.
-
-9. OFFICIAL OPENRCA FINAL FORMAT
-
-Return ONLY a valid JSON object. Do not include Markdown fences, prose
-outside JSON, explanations outside JSON, or additional comments.
-
-Example of the required JSON shape (PLACEHOLDERS, NOT A DIAGNOSIS):
-{
-  "1": {
-    "root cause occurrence datetime": "YYYY-MM-DD HH:MM:SS",
-    "root cause component": "component_identifier",
-    "root cause reason": "specific_fault_reason"
-  }
-}
-
-When the user query reports two failures, output keys "1" and "2"
-in chronological order, with one object for each failure.
-Include all three fields for each predicted failure, even when the
-query evaluates only one or two of them.
-Do not invent measurements or certainty. If evidence is insufficient,
-use your best supported hypothesis and reflect its uncertainty by
-not pretending that unsupported evidence was observed.
-Use Asia/Shanghai local datetime format YYYY-MM-DD HH:MM:SS.
-Do NOT use ground-truth labels or archived predictions.
-"""
-
-
-# Identica logica LangGraph del prototipo A0: sei round al massimo.
-def agente(state: State):
-    rounds = state.get("tool_rounds", 0)
-    if rounds >= MAX_TOOL_ROUNDS:
-        stop_prompt = SYSTEM_PROMPT + (
-            "\nTool exploration budget exhausted. Do not request tools. "
-            "Return the final diagnosis as ONLY valid OpenRCA JSON."
+    # Le etichette non devono essere disponibili al runner.
+    if {"reason", "scoring_points"} & set(manifest.columns):
+        raise ValueError(
+            "Il manifest contiene colonne di ground truth."
         )
-        risposta = llm.invoke([SystemMessage(content=stop_prompt)] + state["messages"])
-    else:
-        risposta = llm_with_tools.invoke(
-            [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+
+    selezione = manifest.loc[
+        manifest["case_id"] == config.case_id
+    ]
+
+    if len(selezione) != 1:
+        raise ValueError(
+            f"Case ID assente o duplicato: {config.case_id}"
         )
-        if getattr(risposta, "tool_calls", None):
-            rounds += 1
-    return {"messages": [risposta], "tool_rounds": rounds}
+
+    riga = selezione.iloc[0]
+
+    cloudbed = str(riga["cloudbed"])
+    inizio = int(riga["start_unix"])
+    fine = int(riga["end_unix"])
+
+    if cloudbed not in ("cloudbed-1", "cloudbed-2"):
+        raise ValueError("Cloudbed non valido nel manifest.")
+
+    if inizio >= fine:
+        raise ValueError("Intervallo non valido nel manifest.")
+
+    return {
+        "case_id": config.case_id,
+        "cloudbed": cloudbed,
+        "start_unix": inizio,
+        "end_unix": fine,
+        "instruction": str(riga["instruction"]),
+        "task_index": str(riga["task_index"]),
+        "query_index": int(riga["query_index"])
+    }
 
 
-def route_tools(state: State):
-    ultimo = state["messages"][-1]
-    return "tools" if getattr(ultimo, "tool_calls", None) else END
+def carica_metriche(
+    config: ExperimentConfig,
+    caso: dict,
+    tipo: str
+) -> pd.DataFrame:
+    """
+    Legge dal Market.zip le metriche appartenenti
+    alla finestra ufficiale del caso.
 
+    Non legge record.csv, query.csv o scoring_points.
+    """
 
-graph_builder = StateGraph(State)
-graph_builder.add_node("agente", agente)
-graph_builder.add_node("tools", ToolNode(A0_TOOLS))
-graph_builder.add_conditional_edges(
-    "agente", route_tools, {"tools": "tools", END: END}
-)
-graph_builder.add_edge("tools", "agente")
-graph_builder.add_edge(START, "agente")
-graph_rca = graph_builder.compile()
+    if tipo not in ("node_metrics", "container_metrics"):
+        raise ValueError("Tipo di metriche non supportato.")
 
+    inizio = caso["start_unix"]
+    fine = caso["end_unix"]
 
-def testo_messaggio(contenuto) -> str:
-    """Converte i blocchi di risposta Gemini in testo da salvare."""
-    if isinstance(contenuto, str):
-        return contenuto
-    if isinstance(contenuto, list):
-        return "\n".join(
-            str(parte.get("text", "")) if isinstance(parte, dict) else str(parte)
-            for parte in contenuto
-        )
-    return str(contenuto)
+    colonne = ["timestamp", "cmdb_id", "kpi_name", "value"]
 
-
-def interpreta_json(testo: str) -> dict:
-    """Valida il formato senza fabbricare predizioni mancanti."""
-    pulito = testo.strip()
-    if pulito.startswith("```"):
-        pulito = pulito.split("\n", 1)[-1]
-        if pulito.endswith("```"):
-            pulito = pulito[:-3].strip()
-    risultato = json.loads(pulito)
-    if not isinstance(risultato, dict) or not risultato:
-        raise ValueError("La diagnosi non è un oggetto JSON non vuoto.")
-    campi = (
-        "root cause occurrence datetime",
-        "root cause component",
-        "root cause reason",
+    percorsi = _get_telemetry_csv_paths(
+        start_unix=inizio,
+        end_unix=fine,
+        market_system=caso["cloudbed"],
+        data_kind=tipo
     )
-    for indice, item in risultato.items():
-        if not str(indice).isdigit() or not isinstance(item, dict):
-            raise ValueError("La diagnosi deve avere chiavi numeriche e oggetti.")
-        if not all(campo in item for campo in campi):
-            raise ValueError(f"Campi OpenRCA mancanti per il guasto {indice}.")
-        tempo = item["root cause occurrence datetime"]
-        if not isinstance(tempo, str):
-            raise ValueError("Datetime non testuale.")
-        datetime.strptime(tempo, "%Y-%m-%d %H:%M:%S")
-    return risultato
 
+    blocchi = []
 
-# L'istruzione originale è inclusa integralmente; la data serve ai tool.
-richiesta = (
-    f"Official OpenRCA instruction:\n{caso['instruction']}\n\n"
-    f"Telemetry system: {cloudbed}.\n"
-    f"Use EXACT Unix seconds start_unix={start_unix}, end_unix={end_unix}.\n"
-    "Tool calls must remain inside this interval. "
-    "Respond only in the official OpenRCA JSON format."
-)
+    with zipfile.ZipFile(
+        config.market_zip_path, "r"
+    ) as archivio:
 
-# =====================================================
-# VINCOLI DI COMPLETEZZA DELLA DIAGNOSI
-# COMUNI AD A0 E A1
-# =====================================================
+        for percorso in percorsi:
 
-richiesta += (
-    "\n\n"
-    "DIAGNOSTIC COMPLETENESS REQUIREMENTS:\n"
-    "Read the official incident instruction carefully.\n"
-    "If it specifies multiple failures, investigate "
-    "and report EACH requested failure separately.\n"
-    "The number of numbered root-cause entries in the "
-    "final JSON must match the number of failures "
-    "explicitly stated in the official instruction.\n"
-    "Use consecutive JSON keys starting from \"1\".\n"
-    "For every requested failure, identify its own "
-    "root cause occurrence datetime and root cause component.\n"
-    "Do not combine distinct failures into one diagnosis.\n"
-    "Do not assume that all failures share the same "
-    "root cause or affected component.\n"
-    "Only report conclusions supported by available telemetry; "
-    "do not invent evidence or fabricate root causes.\n"
-    "Before responding, check that every requested failure "
-    "has been addressed and that the JSON is valid.\n"
-)
+            with archivio.open(percorso) as file:
 
+                for chunk in pd.read_csv(
+                    file,
+                    usecols=colonne,
+                    chunksize=100_000
+                ):
 
-stato_iniziale = {
-    "messages": [HumanMessage(content=richiesta)], "tool_rounds": 0,
-}
+                    timestamps = pd.to_numeric(
+                        chunk["timestamp"],
+                        errors="coerce"
+                    )
 
-metriche = {
-    "llm_calls": 0, "tool_calls": 0, "tool_rounds": 0,
-    "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-}
-risposta_finale = None
-traiettoria = []  # Decisioni e risultati dei tool per verifiche successive.
-errore_esecuzione = None
-inizio = time.perf_counter()
+                    # Intervallo semiaperto [inizio, fine).
+                    mask = (
+                        timestamps.ge(inizio)
+                        & timestamps.lt(fine)
+                    )
 
-print("\nINIZIO ESECUZIONE A0 (test pilota; non è il benchmark finale)")
-try:
-    for evento in graph_rca.stream(
-        stato_iniziale, config={"recursion_limit": RECURSION_LIMIT},
-        stream_mode="updates",
-    ):
-        for nodo, aggiornamento in evento.items():
-            if nodo == "agente":
-                metriche["tool_rounds"] = max(
-                    metriche["tool_rounds"], aggiornamento.get("tool_rounds", 0)
+                    if mask.any():
+                        blocchi.append(
+                            chunk.loc[mask, colonne].copy()
+                        )
+
+    # Restituiamo un DataFrame valido anche se vuoto.
+    if not blocchi:
+        return pd.DataFrame(columns=colonne)
+
+    return pd.concat(blocchi, ignore_index=True)
+
+def carica_telemetria_mesh_runtime(
+    config: ExperimentConfig,
+    caso: dict,
+    sorgente: str
+):
+    """
+    Carica dal Market.zip le metriche Mesh o Runtime
+    nella finestra temporale del caso OpenRCA.
+
+    Legge soltanto i KPI utilizzati dal detector.
+
+    Non legge la ground truth.
+    Non modifica file.
+    Non chiama Gemini.
+    """
+
+    import zipfile
+    import pandas as pd
+
+    from harness.mesh_runtime_detector import (
+        PREFISSO_DURATA,
+        PREFISSO_RICHIESTE,
+        KPI_RUNTIME
+    )
+
+    if sorgente not in ("mesh", "runtime"):
+        raise ValueError(
+            f"Sorgente non supportata: {sorgente}"
+        )
+
+    start = int(caso["start_unix"])
+    end = int(caso["end_unix"])
+
+    if start >= end:
+        raise ValueError(
+            "Finestra temporale non valida."
+        )
+
+    colonne = [
+        "timestamp",
+        "cmdb_id",
+        "kpi_name",
+        "value"
+    ]
+
+    # =====================================================
+    # 1. GIORNI COPERTI DALLA FINESTRA
+    # =====================================================
+
+    # OpenRCA utilizza file organizzati per giorno.
+    # Gestiamo anche finestre che attraversano
+    # la mezzanotte locale del dataset.
+
+    inizio_locale = pd.to_datetime(
+        start,
+        unit="s",
+        utc=True
+    ).tz_convert("Asia/Shanghai")
+
+    fine_locale = pd.to_datetime(
+        end - 1,
+        unit="s",
+        utc=True
+    ).tz_convert("Asia/Shanghai")
+
+    giorni = pd.date_range(
+        start=inizio_locale.normalize(),
+        end=fine_locale.normalize(),
+        freq="D"
+    )
+
+    # =====================================================
+    # 2. SELEZIONE DEI FILE ZIP
+    # =====================================================
+
+    blocchi = []
+
+    with zipfile.ZipFile(
+        config.market_zip_path
+    ) as archivio:
+
+        nomi = archivio.namelist()
+
+        for giorno in giorni:
+
+            data = giorno.strftime("%Y_%m_%d")
+
+            suffisso = (
+                f"{caso['cloudbed']}/telemetry/"
+                f"{data}/metric/"
+                f"metric_{sorgente}.csv"
+            )
+
+            percorsi = [
+                nome
+                for nome in nomi
+                if nome.endswith(suffisso)
+            ]
+
+            if len(percorsi) != 1:
+                raise FileNotFoundError(
+                    "File di telemetria non trovato "
+                    "univocamente: "
+                    f"{suffisso}"
                 )
-                for messaggio in aggiornamento.get("messages", []):
-                    metriche["llm_calls"] += 1
-                    usage = getattr(messaggio, "usage_metadata", None) or {}
-                    for chiave in ("input_tokens", "output_tokens", "total_tokens"):
-                        metriche[chiave] += int(usage.get(chiave, 0) or 0)
-                    calls = getattr(messaggio, "tool_calls", []) or []
-                    metriche["tool_calls"] += len(calls)
-                    for chiamata in calls:
-                        traiettoria.append({"tipo": "tool_call", "nome": chiamata.get("name"), "parametri": chiamata.get("args", {})})
-                    if calls:
-                        print("Round", metriche["tool_rounds"], "- tool:",
-                              ", ".join(c.get("name", "?") for c in calls))
+
+            # =================================================
+            # 3. LETTURA A BLOCCHI
+            # =================================================
+
+            with archivio.open(percorsi[0]) as file:
+
+                for blocco in pd.read_csv(
+                    file,
+                    usecols=colonne,
+                    chunksize=250_000
+                ):
+
+                    blocco["timestamp"] = (
+                        pd.to_numeric(
+                            blocco["timestamp"],
+                            errors="coerce"
+                        )
+                    )
+
+                    # La finestra è [start, end).
+                    filtro_temporale = (
+                        blocco["timestamp"].ge(start)
+                        & blocco["timestamp"].lt(end)
+                    )
+
+                    if sorgente == "mesh":
+
+                        filtro_kpi = (
+                            blocco["kpi_name"]
+                            .str.startswith(
+                                (
+                                    PREFISSO_DURATA,
+                                    PREFISSO_RICHIESTE
+                                ),
+                                na=False
+                            )
+                        )
+
                     else:
-                        risposta_finale = testo_messaggio(messaggio.content)
-            elif nodo == "tools":
-                for msg in aggiornamento.get("messages", []):
-                    estratto = testo_messaggio(msg.content)
-                    traiettoria.append({"tipo": "tool_result", "nome": msg.name, "risposta": estratto})
-                    print("Risultato", msg.name, "-", len(estratto), "caratteri",
-                          "|", estratto[:140].replace("\n", " "))
-except Exception as exc:
-    errore_esecuzione = f"{type(exc).__name__}: {exc}"
-    print("ERRORE ESECUZIONE:", errore_esecuzione)
 
-metriche["duration_seconds"] = round(time.perf_counter() - inizio, 3)
-validazione = None
-predizione = None
-if risposta_finale is not None:
-    try:
-        predizione = interpreta_json(risposta_finale)
-        validazione = "valid_json"
-    except Exception as exc:
-        validazione = f"invalid_json: {type(exc).__name__}: {exc}"
+                        filtro_kpi = (
+                            blocco["kpi_name"].isin(
+                                KPI_RUNTIME
+                            )
+                        )
 
-# Salviamo esattamente la risposta, anche se non è JSON valido.
-# Nessun contenuto di record.csv o scoring_points è utilizzato qui.
-risultato = {
-    "case_id": TEST_CASE_ID,
-    "cloudbed": cloudbed,
-    "task_index": str(caso["task_index"]),
-    "query_index": int(caso["query_index"]),
-    "model": MODEL_NAME,
-    "max_tool_rounds": MAX_TOOL_ROUNDS,
-    "prediction": json.dumps(predizione, ensure_ascii=False) if predizione else None,
-    "raw_response": risposta_finale,
-    "json_status": validazione,
-    "error": errore_esecuzione,
-    "metrics": metriche,
-    "tool_trajectory": traiettoria,
-}
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-destinazione = OUTPUT_DIR / f"a0_pilot_{TEST_CASE_ID}.json"
-with destinazione.open("w", encoding="utf-8") as out:
-    json.dump(risultato, out, indent=2, ensure_ascii=False)
+                    filtrato = blocco.loc[
+                        filtro_temporale
+                        & filtro_kpi,
+                        colonne
+                    ]
 
-print("\n=== RISULTATO PILOTA ===")
-print("Formato JSON:", validazione)
-print("Metriche:", json.dumps(metriche, indent=2, ensure_ascii=False))
-print("Risposta modello:\n", risposta_finale or "(mancante)")
-print("File salvato:", destinazione)
+                    if not filtrato.empty:
+
+                        blocchi.append(
+                            filtrato.copy()
+                        )
+
+    # =====================================================
+    # 4. RESTITUZIONE
+    # =====================================================
+
+    if not blocchi:
+
+        return pd.DataFrame(
+            columns=colonne
+        )
+
+    return pd.concat(
+        blocchi,
+        ignore_index=True
+    )
+
+
+
+
+
+def prepara_esperimento(
+    config: ExperimentConfig
+) -> dict:
+    """
+    Prepara un esperimento A0 oppure A1.
+
+    A0:
+        - recupera il caso dal manifest;
+        - crea i cinque tool;
+        - prepara l'istruzione OpenRCA.
+
+    A1:
+        - esegue gli stessi passaggi;
+        - carica metriche nodo e container;
+        - genera automaticamente le evidenze;
+        - aggiunge il report all'istruzione.
+
+    Questa funzione NON chiama Gemini.
+    """
+
+    # =====================================================
+    # 1. SELEZIONE DEL CASO
+    # =====================================================
+
+    caso = carica_caso(config)
+
+    cloudbed = caso["cloudbed"]
+    inizio = caso["start_unix"]
+    fine = caso["end_unix"]
+
+    # =====================================================
+    # 2. CREAZIONE DEI TOOL CONDIVISI
+    # =====================================================
+
+    tools = crea_tools_openrca(
+        cloudbed=cloudbed,
+        start_unix=inizio,
+        end_unix=fine
+    )
+
+    # =====================================================
+    # 3. ISTRUZIONE COMUNE AD A0 E A1
+    # =====================================================
+
+    richiesta = (
+        f"Official OpenRCA instruction:\n"
+        f"{caso['instruction']}\n\n"
+        f"Telemetry system: {cloudbed}.\n"
+        f"Use EXACT Unix seconds "
+        f"start_unix={inizio}, end_unix={fine}.\n"
+        "Tool calls must remain inside this interval. "
+        "Respond only in the official OpenRCA JSON format."
+    )
+
+    # =====================================================
+    # 3 BIS. COMPLETEZZA DELLA DIAGNOSI (A0 E A1)
+    # =====================================================
+    # Questo vincolo dipende solo dall'istruzione ufficiale
+    # visibile all'agente. Non usa record.csv o scoring_points.
+    richiesta += (
+        "\n\n"
+        "DIAGNOSTIC COMPLETENESS REQUIREMENTS:\n"
+        "Read the official incident instruction carefully.\n"
+        "If it specifies multiple failures, investigate "
+        "and report EACH requested failure separately.\n"
+        "The number of numbered root-cause entries in the "
+        "final JSON must match the number of failures "
+        "explicitly stated in the official instruction.\n"
+        "Use consecutive JSON keys starting from \"1\".\n"
+        "For every requested failure, identify its own "
+        "root cause occurrence datetime and root cause component.\n"
+        "Do not combine distinct failures into one diagnosis.\n"
+        "Do not assume that all failures share the same "
+        "root cause or affected component.\n"
+        "Only report conclusions supported by available telemetry; "
+        "do not invent evidence or fabricate root causes.\n"
+        "Before responding, check that every requested failure "
+        "has been addressed and that the JSON is valid.\n"
+    )
+
+    evidence_report = None
+    evidence_sha256 = None
+    preprocessing_seconds = 0.0
+
+    # =====================================================
+    # 4. HARNESS DETERMINISTICO: SOLO A1
+    # =====================================================
+
+    if config.variant == "A1":
+
+        # =====================================================
+        # 1. IMPORT DELL'HARNESS UNIFICATO
+        # =====================================================
+
+        from harness.evidence_builder import (
+            costruisci_report_evidenze_v2
+        )
+
+        from harness.evidence_selector import (
+            annota_qualita_evidenze
+        )
+
+        from harness.evidence_summarizer import (
+            sintetizza_evidenze
+        )
+
+        from harness.mesh_runtime_detector import (
+            rileva_evidenze_mesh_runtime,
+            aggrega_evidenze_mesh
+        )
+
+        from harness.unified_report import (
+            costruisci_report_unificato_v2
+        )
+
+        inizio_preprocessing = time.perf_counter()
+
+        # =====================================================
+        # 2. CARICAMENTO NODE E CONTAINER
+        # =====================================================
+
+        df_nodi = carica_metriche(
+            config=config,
+            caso=caso,
+            tipo="node_metrics"
+        )
+
+        df_container = carica_metriche(
+            config=config,
+            caso=caso,
+            tipo="container_metrics"
+        )
+
+        # =====================================================
+        # 3. EVIDENCE BUILDER A1-v2
+        # =====================================================
+
+        report_v2 = (
+            costruisci_report_evidenze_v2(
+                df_nodi=df_nodi,
+                df_container=df_container,
+                cloudbed=cloudbed,
+                start_unix=inizio,
+                end_unix=fine
+            )
+        )
+
+        # =====================================================
+        # 4. QUALITÀ DELLE EVIDENZE
+        # =====================================================
+
+        annotazioni = (
+            annota_qualita_evidenze(
+                report_v2=report_v2,
+                df_nodi=df_nodi,
+                df_container=df_container
+            )
+        )
+
+        # =====================================================
+        # 5. SINTESI NODE / CONTAINER
+        # =====================================================
+
+        sintesi = sintetizza_evidenze(
+            annotazioni=annotazioni,
+            max_evidenze=8,
+            tolleranza_secondi=60
+        )
+
+        # =====================================================
+        # 6. CARICAMENTO MESH E RUNTIME
+        # =====================================================
+
+        df_mesh = carica_telemetria_mesh_runtime(
+            config=config,
+            caso=caso,
+            sorgente="mesh"
+        )
+
+        df_runtime = carica_telemetria_mesh_runtime(
+            config=config,
+            caso=caso,
+            sorgente="runtime"
+        )
+
+        # =====================================================
+        # 7. DETECTOR MESH / RUNTIME
+        # =====================================================
+
+        # Budget locale elevato:
+        # tutte le anomalie devono poter partecipare
+        # all'aggregazione e alla selezione globale.
+
+        report_mr = rileva_evidenze_mesh_runtime(
+            df_mesh=df_mesh,
+            df_runtime=df_runtime,
+            start_unix=int(inizio),
+            end_unix=int(fine),
+            max_evidenze_mesh=1000,
+            max_evidenze_runtime=1000
+        )
+
+        # Non accettiamo evidenze troncate
+        # prima dell'aggregazione.
+
+        for sorgente in ("mesh", "runtime"):
+
+            rilevate = (
+                report_mr["conteggi"][
+                    f"{sorgente}_rilevate"
+                ]
+            )
+
+            selezionate = (
+                report_mr["conteggi"][
+                    f"{sorgente}_selezionate"
+                ]
+            )
+
+            if rilevate != selezionate:
+
+                raise ValueError(
+                    f"Evidenze {sorgente} "
+                    "troncate prima del budget globale."
+                )
+
+        # =====================================================
+        # 8. AGGREGAZIONE MESH MULTI-REPLICA
+        # =====================================================
+
+        aggregazione_mesh = aggrega_evidenze_mesh(
+            report=report_mr,
+            tolleranza_secondi=180
+        )
+
+        # =====================================================
+        # 9. REPORT UNIFICATO A1-v2
+        # =====================================================
+
+        evidence_report = (
+            costruisci_report_unificato_v2(
+                report_v2=report_v2,
+                sintesi=sintesi,
+                aggregazione_mesh=aggregazione_mesh,
+                report_mesh_runtime=report_mr,
+                max_evidenze_totali=10
+            )
+        )
+
+        if (
+            evidence_report["versione"]
+            != "unified_evidence_v2"
+        ):
+
+            raise ValueError(
+                "Versione del report A1 non valida."
+            )
+
+        # =====================================================
+        # 10. SERIALIZZAZIONE DETERMINISTICA
+        # =====================================================
+
+        evidence_text = json.dumps(
+            evidence_report,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False
+        )
+
+        evidence_sha256 = hashlib.sha256(
+            evidence_text.encode("utf-8")
+        ).hexdigest()
+
+        # =====================================================
+        # 11. AGGIUNTA AL PROMPT A1
+        # =====================================================
+
+        richiesta += (
+            "\n\n"
+            "DETERMINISTIC A1 UNIFIED EVIDENCE REPORT v2\n"
+            "\n"
+            "The following observations were generated "
+            "automatically from telemetry in the "
+            "requested time interval.\n"
+            "\n"
+            "The report may contain evidence from:\n"
+            "- Node metrics\n"
+            "- Container metrics\n"
+            "- Service Mesh metrics\n"
+            "- Runtime metrics\n"
+            "\n"
+            "These observations are NOT ground truth.\n"
+            "They do NOT establish the root cause.\n"
+            "Temporal correlation does NOT prove causality.\n"
+            "Correlated replicas and KPIs are not "
+            "independent causal proofs.\n"
+            "The absence of detected anomalies does not "
+            "prove that a component is healthy.\n"
+            "Some evidence may have been excluded "
+            "by deterministic selection budgets.\n"
+            "\n"
+            "Treat the report as investigative context, "
+            "not as a verified diagnosis.\n"
+            "Use the available tools to investigate "
+            "and verify hypotheses.\n"
+            "Do not automatically assume that the "
+            "earliest anomaly is the root cause.\n"
+            "\n"
+            "UNIFIED EVIDENCE JSON:\n"
+            f"{evidence_text}\n"
+        )
+
+        # =====================================================
+        # 12. TEMPO DI PREPROCESSING
+        # =====================================================
+
+        preprocessing_seconds = (
+            time.perf_counter()
+            - inizio_preprocessing
+        )
+
+    return {
+        "config": config,
+        "caso": caso,
+        "tools": tools,
+        "richiesta": richiesta,
+        "evidence_report": evidence_report,
+        "evidence_sha256": evidence_sha256,
+        "preprocessing_seconds": preprocessing_seconds
+    }
+def run_experiment(
+    config: ExperimentConfig,
+    llm=None,
+    verbose: bool = True,
+    salva: bool = False
+) -> dict:
+    """
+    Esegue un esperimento OpenRCA completo.
+
+    Utilizza lo stesso motore LangGraph per A0 e A1.
+
+    Se llm è None, crea il modello Gemini indicato nella
+    configurazione. Nei test possiamo passare un Fake LLM.
+
+    Non utilizza ground truth.
+    """
+
+    # Importiamo qui il motore condiviso.
+    from agent.graph_engine import (
+        crea_grafo_rca,
+        esegui_grafo_rca
+    )
+
+    import hashlib
+    import json
+    import time
+
+    from datetime import datetime
+
+    # Il prompt viene recuperato automaticamente
+    # in base alla variante sperimentale.
+    system_prompt = get_system_prompt(config.variant)
+
+    if not system_prompt.strip():
+        raise ValueError("Prompt di sistema vuoto.")
+
+    # =====================================================
+    # 1. INIZIO MISURAZIONE COMPLETA
+    # =====================================================
+
+    inizio_totale = time.perf_counter()
+
+    # =====================================================
+    # 2. PREPARAZIONE DEL CASO
+    # =====================================================
+
+    esperimento = prepara_esperimento(config)
+
+    caso = esperimento["caso"]
+    tools = esperimento["tools"]
+    richiesta = esperimento["richiesta"]
+
+    # La preparazione di A1 genera automaticamente
+    # le evidenze e misura il tempo del preprocessing.
+    preprocessing_seconds = esperimento[
+        "preprocessing_seconds"
+    ]
+
+    # =====================================================
+    # 3. CREAZIONE DEL MODELLO
+    # =====================================================
+
+    if llm is None:
+
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        llm = ChatGoogleGenerativeAI(
+            model=config.model_name
+        )
+
+    # =====================================================
+    # 4. COSTRUZIONE DEL GRAFO CONDIVISO
+    # =====================================================
+
+    grafo = crea_grafo_rca(
+        llm=llm,
+        tools=tools,
+        system_prompt=system_prompt,
+        max_tool_rounds=config.max_tool_rounds
+    )
+
+    # =====================================================
+    # 5. ESECUZIONE DELL'AGENTE
+    # =====================================================
+
+    esecuzione = esegui_grafo_rca(
+        grafo=grafo,
+        richiesta=richiesta,
+        recursion_limit=config.recursion_limit,
+        verbose=verbose
+    )
+
+    risposta = esecuzione["raw_response"]
+
+    # =====================================================
+    # 6. VALIDAZIONE DEL FORMATO OPENRCA
+    # =====================================================
+
+    predizione = None
+    json_status = None
+
+    if risposta is not None:
+
+        try:
+
+            predizione = json.loads(risposta)
+
+            if not isinstance(predizione, dict) or not predizione:
+                raise ValueError(
+                    "La predizione deve essere un dizionario non vuoto."
+                )
+
+            campi_richiesti = {
+                "root cause occurrence datetime",
+                "root cause component",
+                "root cause reason"
+            }
+
+            for indice, guasto in predizione.items():
+
+                if not str(indice).isdigit():
+                    raise ValueError(
+                        "Indice del guasto non numerico."
+                    )
+
+                if not isinstance(guasto, dict):
+                    raise ValueError(
+                        "Struttura del guasto non valida."
+                    )
+
+                if not campi_richiesti.issubset(guasto):
+                    raise ValueError(
+                        "Campi OpenRCA mancanti."
+                    )
+
+                datetime.strptime(
+                    guasto["root cause occurrence datetime"],
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+                for campo in (
+                    "root cause component",
+                    "root cause reason"
+                ):
+                    if not isinstance(guasto[campo], str):
+                        raise ValueError(
+                            f"Campo {campo} non testuale."
+                        )
+
+            json_status = "valid_json"
+
+        except (ValueError, TypeError) as exc:
+
+            predizione = None
+
+            json_status = (
+                f"invalid_json: {type(exc).__name__}: {exc}"
+            )
+
+    # =====================================================
+    # 7. MISURAZIONE DEI TEMPI
+    # =====================================================
+
+    tempo_totale = round(
+        time.perf_counter() - inizio_totale,
+        3
+    )
+
+    metriche = dict(esecuzione["metrics"])
+
+    # Tempo misurato durante la preparazione A1.
+    metriche["preprocessing_seconds"] = round(
+        preprocessing_seconds,
+        3
+    )
+
+    # Tempo completo: preparazione, creazione del modello
+    # ed esecuzione del grafo.
+    metriche["end_to_end_seconds"] = tempo_totale
+
+    # =====================================================
+    # 8. COSTRUZIONE DEL RISULTATO
+    # =====================================================
+
+    prompt_sha256 = hashlib.sha256(
+        system_prompt.encode("utf-8")
+    ).hexdigest()
+
+    risultato = {
+        "variant": config.variant,
+        "case_id": config.case_id,
+        "cloudbed": caso["cloudbed"],
+        "task_index": caso["task_index"],
+        "query_index": caso["query_index"],
+        "model": config.model_name,
+        "max_tool_rounds": config.max_tool_rounds,
+        "system_prompt_sha256": prompt_sha256,
+        "evidence_sha256": esperimento["evidence_sha256"],
+        "prediction": (
+            json.dumps(predizione, ensure_ascii=False)
+            if predizione is not None
+            else None
+        ),
+        "raw_response": risposta,
+        "json_status": json_status,
+        "error": esecuzione["error"],
+        "metrics": metriche,
+        "tool_trajectory": esecuzione["tool_trajectory"]
+    }
+
+    # =====================================================
+    # 9. SALVATAGGIO OPZIONALE
+    # =====================================================
+
+    if salva:
+
+        # Usiamo un nome diverso dai vecchi piloti:
+        # non dobbiamo sovrascrivere i risultati A0/A1
+        # già valutati ufficialmente.
+
+        destinazione = (
+            config.results_dir
+            / f"{config.variant.lower()}_unified_"
+              f"{config.case_id}.json"
+        )
+
+        destinazione.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        # Modalità "x": se il file esiste già,
+        # Python solleva un errore anziché sovrascriverlo.
+        with destinazione.open(
+            "x",
+            encoding="utf-8"
+        ) as file:
+
+            json.dump(
+                risultato,
+                file,
+                indent=2,
+                ensure_ascii=False
+            )
+
+        if verbose:
+            print("Risultato salvato:", destinazione)
+
+    return risultato
