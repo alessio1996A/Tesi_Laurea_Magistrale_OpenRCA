@@ -557,6 +557,20 @@ def prepara_esperimento(
             )
         )
 
+        # =====================================================
+        # 9 BIS. SEI REGOLE DIAGNOSTICHE OFFLINE (A1-R)
+        # =====================================================
+        # Solo telemetria nella finestra corrente: nessuna ground truth.
+        # Non modifica i tool, il modello, o il ramo A0.
+        from harness.rule_batch import costruisci_evidenze_regole
+
+        evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
+            df_nodi=df_nodi,
+            df_container=df_container,
+            start_unix=int(inizio),
+            end_unix=int(fine),
+        )
+
         if (
             evidence_report["versione"]
             != "unified_evidence_v2"
