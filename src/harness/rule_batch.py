@@ -14,14 +14,36 @@ import math
 import pandas as pd
 
 # Explicit allowlist: held-out Market fault classes are deliberately absent.
+
 RULE_SPECS = (
-    ("R01", "container", "harness.rules.rule_container_cpu", "valuta_r01_container_cpu", "container CPU load"),
-    ("R02", "container", "harness.rules.rule_container_memory", "valuta_r02_container_memory", "container memory load"),
-    ("R06", "container", "harness.rules.rule_container_read_io", "valuta_r06_container_read_io", "container read I/O load"),
-    ("R07", "node", "harness.rules.rule_node_cpu_load", "valuta_r07_node_cpu_load", "node CPU load"),
-    ("R08", "node", "harness.rules.rule_node_memory", "valuta_r08_node_memory", "node memory consumption"),
-    ("R11", "node", "harness.rules.rule_node_disk_space", "valuta_r11_node_disk_space", "node disk space consumption"),
+    ("R01", "container", "harness.rules.rule_container_cpu",
+     "valuta_r01_container_cpu", "container CPU load"),
+
+    ("R02", "container", "harness.rules.rule_container_memory",
+     "valuta_r02_container_memory", "container memory load"),
+
+    ("R06", "container", "harness.rules.rule_container_read_io",
+     "valuta_r06_container_read_io", "container read I/O load"),
+
+    ("R07", "node", "harness.rules.rule_node_cpu_load",
+     "valuta_r07_node_cpu_load", "node CPU load"),
+
+    ("R08", "node", "harness.rules.rule_node_memory",
+     "valuta_r08_node_memory", "node memory consumption"),
+
+    ("R09", "node", "harness.rules.rule_node_read_io",
+     "valuta_r09_node_disk_read_io",
+     "node disk read I/O consumption"),
+
+    ("R10", "node", "harness.rules.rule_node_write_io",
+     "valuta_r10_node_disk_write_io",
+     "node disk write I/O consumption"),
+
+    ("R11", "node", "harness.rules.rule_node_disk_space",
+     "valuta_r11_node_disk_space",
+     "node disk space consumption"),
 )
+
 
 STATUSES = ("candidato_da_verificare", "nessun_candidato", "evidenza_insufficiente")
 FIELDS = ("timestamp", "cmdb_id", "kpi_name", "value")
@@ -148,7 +170,7 @@ def costruisci_evidenze_regole(
     # Stable ordering; no implied causal ranking, no time-based preference.
     candidates.sort(key=lambda c: (c["regola"], c["componente_telemetria"]))
     output = {
-        "versione": "rule_based_A1_R_v0",
+        "versione": "rule_based_A1_R_v1",
         "tipo": "ipotesi_osservative_non_causali",
         "finestra": {
             "start_unix": start_unix,
@@ -164,7 +186,7 @@ def costruisci_evidenze_regole(
             "I candidati sono anomalie/possibili cause da verificare: NON sono ground truth.",
             "Non attribuire causalita' o priorita' al semplice ordine temporale delle anomalie.",
             "La baseline e' interna al caso e potrebbe includere gia' il guasto.",
-            "Le regole coprono solo sei classi autorizzate; assenza di candidato non esclude un guasto.",
+            "Le regole coprono solo otto classi autorizzate; assenza di candidato non esclude un guasto.",
             "Nessuna verifica topologica o causale PAVE e' stata ancora applicata in questa variante.",
         ],
     }
