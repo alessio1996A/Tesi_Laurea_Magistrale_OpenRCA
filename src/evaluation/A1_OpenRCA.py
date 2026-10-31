@@ -28,7 +28,7 @@ SRC_DIR = f"{REPO_DIR}/src"
 MANIFEST = "/content/drive/MyDrive/Tesi_OpenRCA/data/processed/benchmark_inputs_market.csv"
 OUTPUT_DIR = Path("/content/drive/MyDrive/Tesi_OpenRCA/data/results")
 
-# Primo test di integrazione su un caso ufficiale, NON valutazione finale.
+# Primo tests di integrazione su un caso ufficiale, NON valutazione finale.
 TEST_CASE_ID = "cloudbed-1_q009"
 MODEL_NAME = "gemini-3.5-flash-lite"
 MAX_TOOL_ROUNDS = 6
@@ -70,7 +70,7 @@ print("Modello:", MODEL_NAME, "| budget round:", MAX_TOOL_ROUNDS)
 # ============================================================
 # REPORT DETERMINISTICO A1-v1 (SOLO TELEMETRIA, NO GROUND TRUTH)
 # ============================================================
-# In questo primo smoke test il report è già stato generato in Colab.
+# In questo primo smoke tests il report è già stato generato in Colab.
 # Non includiamo quindi il suo costo di preparazione nel runtime misurato.
 EVIDENCE_PATH = Path(
     "/content/drive/MyDrive/Tesi_OpenRCA/data/processed/"
@@ -511,7 +511,7 @@ traiettoria = []  # Decisioni e risultati dei tool per verifiche successive.
 errore_esecuzione = None
 inizio = time.perf_counter()
 
-print("\nINIZIO ESECUZIONE A1-v1 (test pilota; non è il benchmark finale)")
+print("\nINIZIO ESECUZIONE A1-v1 (tests pilota; non è il benchmark finale)")
 try:
     for evento in graph_rca.stream(
         stato_iniziale, config={"recursion_limit": RECURSION_LIMIT},

@@ -651,7 +651,7 @@ def run_experiment(
     Utilizza lo stesso motore LangGraph per A0 e A1.
 
     Se llm è None, crea il modello Gemini indicato nella
-    configurazione. Nei test possiamo passare un Fake LLM.
+    configurazione. Nei tests possiamo passare un Fake LLM.
 
     Non utilizza ground truth.
     """
