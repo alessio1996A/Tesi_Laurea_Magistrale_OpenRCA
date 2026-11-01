@@ -35,7 +35,7 @@ def main() -> None:
     parser.add_argument(
         "--execute-pair", type=str,
         default=None,
-        help="Run exactly one already frozen pair (two model calls/arms).",
+        help="Run exactly one frozen pair (two arms, potentially multiple LLM calls each).",
     )
     parser.add_argument(
         "--confirm-api", action="store_true",
