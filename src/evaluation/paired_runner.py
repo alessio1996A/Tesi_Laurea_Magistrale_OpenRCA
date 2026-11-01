@@ -193,6 +193,8 @@ def _assert_result(
     case_id: str,
     expected_evidence_sha: str,
     max_tool_rounds: int,
+    model_name: str,
+    model_provider: str,
 ) -> list[str]:
     """Return integrity faults; do not discard evidence of a failed run."""
     issues = []
@@ -202,6 +204,9 @@ def _assert_result(
         ("variant", variant),
         ("case_id", case_id),
         ("evidence_sha256", expected_evidence_sha),
+        ("model", model_name),
+        ("model_provider", model_provider),
+        ("max_tool_rounds", max_tool_rounds),
     ):
         if result.get(key) != value:
             issues.append(f"{key}_incoerente")
@@ -316,6 +321,25 @@ def esegui_coppia(
         ):
             raise ValueError("Finestra del caso non valida")
 
+    # Ensure exactly the same official incident context and user request.
+    case_a = prepared["A1"]["caso"]
+    case_v = prepared["A1_VERIFY"]["caso"]
+    for key in ("cloudbed", "start_unix", "end_unix", "instruction"):
+        if case_a.get(key) != case_v.get(key):
+            raise ValueError(
+                f"Contesto ufficiale diverso fra i bracci: {key}"
+            )
+    if (
+        not isinstance(prepared["A1"].get("richiesta"), str)
+        or not prepared["A1"]["richiesta"].strip()
+        or prepared["A1"].get("richiesta")
+            != prepared["A1_VERIFY"].get("richiesta")
+    ):
+        raise ValueError(
+            "Prompt utente A1 e A1_VERIFY diverso: "
+            "non eseguire le chiamate API."
+        )
+
     # Repeat read-only checks immediately before the exclusive claim.
     renewed = preflight_paired(
         data_dir, repo_dir=repo_dir, expected_counts=expected_counts
@@ -355,6 +379,8 @@ def esegui_coppia(
             case_id=case_id,
             expected_evidence_sha=evidence_sha,
             max_tool_rounds=pair["max_tool_rounds"],
+            model_name=plan["model_name"],
+            model_provider=plan["model_provider"],
         )
         result["paired_provenance"] = {
             "protocol": PROTOCOL,
