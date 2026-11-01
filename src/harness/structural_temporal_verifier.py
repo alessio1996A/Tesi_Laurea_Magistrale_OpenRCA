@@ -172,7 +172,7 @@ def verifica_relazioni_strutturali_temporali(
         "node" if _NODE.fullmatch(root_cause.component)
         else "container" if (
             _CONTAINER.fullmatch(root_cause.component)
-            or re.fullmatch(r".+-\\d+", root_cause.component)
+            or re.fullmatch(r".+-\d+", root_cause.component)
         ) else "sconosciuto"
     )
     result["famiglia_ipotesi"] = claimed_family
