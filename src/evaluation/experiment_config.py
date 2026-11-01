@@ -46,7 +46,7 @@ class ExperimentConfig:
 
     # Default storico: nessun cambiamento alla validazione delle predizioni.
     # audit: aggiunge una diagnosi della conformita\u0027 senza modificarle.
-    output_contract_mode: Literal["legacy", "audit"] = "legacy"
+    output_contract_mode: Literal["legacy", "audit", "structured"] = "legacy"
 
     def __post_init__(self):
         """
@@ -68,7 +68,7 @@ class ExperimentConfig:
         if not isinstance(self.model_provider, str) or not self.model_provider.strip():
             raise ValueError("Provider LLM mancante.")
 
-        if self.output_contract_mode not in ("legacy", "audit"):
+        if self.output_contract_mode not in ("legacy", "audit", "structured"):
             raise ValueError("Modalita\u0027 output contract non valida.")
 
         if self.max_tool_rounds < 1:
