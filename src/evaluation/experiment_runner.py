@@ -669,8 +669,8 @@ def run_experiment(
 
     Utilizza lo stesso motore LangGraph per A0 e A1.
 
-    Se llm è None, crea il modello Gemini indicato nella
-    configurazione. Nei tests possiamo passare un Fake LLM.
+    Se llm e\u0027 None, crea il modello con la Model Factory indicata nella
+    configurazione. Nei test possiamo passare un Fake LLM.
 
     Non utilizza ground truth.
     """
@@ -722,10 +722,11 @@ def run_experiment(
 
     if llm is None:
 
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        from agent.model_factory import crea_modello
 
-        llm = ChatGoogleGenerativeAI(
-            model=config.model_name
+        llm = crea_modello(
+            provider=config.model_provider,
+            model_name=config.model_name
         )
 
     # =====================================================
@@ -853,6 +854,7 @@ def run_experiment(
         "task_index": caso["task_index"],
         "query_index": caso["query_index"],
         "model": config.model_name,
+        "model_provider": config.model_provider,
         "max_tool_rounds": config.max_tool_rounds,
         "system_prompt_sha256": prompt_sha256,
         "evidence_sha256": esperimento["evidence_sha256"],
