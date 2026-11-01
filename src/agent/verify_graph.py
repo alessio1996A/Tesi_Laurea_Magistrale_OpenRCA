@@ -389,10 +389,6 @@ def esegui_grafo_rca_verify(
                                 getattr(message, "content", None)
                             ) or None
 
-        metrics["tool_rounds"] = (
-            metrics["exploration_tool_rounds"]
-            + metrics["verification_tool_rounds"]
-        )
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         response_text = None
@@ -402,6 +398,12 @@ def esegui_grafo_rca_verify(
         if verbose:
             print("Errore variante verifica:", error)
 
+    # Anche su eccezione conserviamo i round gia' osservati
+    # dalla stream, invece di segnare impropriamente zero.
+    metrics["tool_rounds"] = (
+        metrics["exploration_tool_rounds"]
+        + metrics["verification_tool_rounds"]
+    )
     metrics["duration_seconds"] = round(
         time.perf_counter() - started, 3
     )
