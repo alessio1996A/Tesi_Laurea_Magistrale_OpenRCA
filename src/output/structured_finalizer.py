@@ -52,6 +52,7 @@ class StructuredFinalization:
     output_tokens: int
     total_tokens: int
     elapsed_seconds: float
+    usage_available: bool = True
 
 
 _EXTRACTIVE_SYSTEM = (
@@ -66,17 +67,20 @@ _EXTRACTIVE_SYSTEM = (
 )
 
 
-def _tokens(raw: Any) -> tuple[int, int, int]:
+def _tokens(raw: Any) -> tuple[int, int, int, bool]:
     usage = getattr(raw, "usage_metadata", None) or {}
     if not isinstance(usage, dict):
-        return (0, 0, 0)
+        return (0, 0, 0, False)
+    usage_available = (
+        "input_tokens" in usage and "output_tokens" in usage
+    )
     input_tokens = int(usage.get("input_tokens", 0) or 0)
     output_tokens = int(usage.get("output_tokens", 0) or 0)
     total_tokens = int(
         usage.get("total_tokens", input_tokens + output_tokens)
         or (input_tokens + output_tokens)
     )
-    return input_tokens, output_tokens, total_tokens
+    return input_tokens, output_tokens, total_tokens, usage_available
 
 
 def _parsed_payload(reply: Any) -> tuple[StructuredDiagnosis, Any]:
@@ -217,11 +221,12 @@ def formatta_diagnosi_strutturata(
     except OutputContractError as exc:
         raise StructuredOutputError(str(exc)) from exc
 
-    input_tokens, output_tokens, total_tokens = _tokens(raw)
+    input_tokens, output_tokens, total_tokens, usage_available = _tokens(raw)
     return StructuredFinalization(
         prediction=canonical,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
         elapsed_seconds=elapsed,
+        usage_available=usage_available,
     )
