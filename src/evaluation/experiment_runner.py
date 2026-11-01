@@ -848,6 +848,64 @@ def run_experiment(
             }
 
     # =====================================================
+    # 6 TER. FINALIZZAZIONE STRUTTURATA (NUOVA VARIANTE)
+    # =====================================================
+    # Una chiamata LLM aggiuntiva, contabilizzata separatamente.
+    # Non modifica raw_response; nessuna ground truth.
+    structured_report = None
+    structured_usage = None
+
+    if config.output_contract_mode == "structured":
+        from output.structured_finalizer import (
+            StructuredOutputError,
+            formatta_diagnosi_strutturata,
+        )
+
+        # Registriamo anche la diagnosi accettata dal vecchio parser.
+        original_json_status = json_status
+        original_prediction = (
+            json.dumps(predizione, ensure_ascii=False)
+            if predizione is not None else None
+        )
+        try:
+            output_strutturato = formatta_diagnosi_strutturata(
+                llm=llm,
+                raw_response=risposta,
+                # Cardinalita': ancora non verificata in questa fase.
+                expected_faults=None,
+            )
+            predizione = json.loads(output_strutturato.prediction)
+            json_status = "valid_json"
+            structured_usage = output_strutturato
+            structured_report = {
+                "status": "valid",
+                "error": None,
+                "original_json_status": original_json_status,
+                "original_prediction": original_prediction,
+                "cardinality_checked": False,
+                "additional_llm_calls": 1,
+                "elapsed_seconds": output_strutturato.elapsed_seconds,
+                "usage_complete": True,
+            }
+        except (StructuredOutputError, ValueError, TypeError) as exc:
+            predizione = None
+            json_status = (
+                f"invalid_structured_output: {type(exc).__name__}: {exc}"
+            )
+            structured_report = {
+                "status": "invalid",
+                "error": str(exc),
+                "original_json_status": original_json_status,
+                "original_prediction": original_prediction,
+                "cardinality_checked": False,
+                # Una chiamata API potrebbe essere stata fatturata
+                # prima di un errore del provider/parsing.
+                "additional_llm_calls": None,
+                "elapsed_seconds": None,
+                "usage_complete": False,
+            }
+
+    # =====================================================
     # 7. MISURAZIONE DEI TEMPI
     # =====================================================
 
@@ -867,6 +925,23 @@ def run_experiment(
     # Tempo completo: preparazione, creazione del modello
     # ed esecuzione del grafo.
     metriche["end_to_end_seconds"] = tempo_totale
+    # Il costo della finalizzazione non va nascosto nel confronto.
+    if config.output_contract_mode == "structured":
+        metriche["structured_usage_complete"] = structured_usage is not None
+        if structured_usage is not None:
+            metriche["llm_calls"] += 1
+            metriche["input_tokens"] += structured_usage.input_tokens
+            metriche["output_tokens"] += structured_usage.output_tokens
+            metriche["total_tokens"] += structured_usage.total_tokens
+            metriche["structured_output_seconds"] = (
+                structured_usage.elapsed_seconds
+            )
+            metriche["structured_output_tokens"] = (
+                structured_usage.total_tokens
+            )
+        else:
+            metriche["structured_output_seconds"] = None
+            metriche["structured_output_tokens"] = None
 
     # =====================================================
     # 8. COSTRUZIONE DEL RISULTATO
@@ -904,6 +979,9 @@ def run_experiment(
     if output_contract_audit is not None:
         risultato["output_contract_audit"] = output_contract_audit
 
+    if structured_report is not None:
+        risultato["structured_output"] = structured_report
+
     # =====================================================
     # 9. SALVATAGGIO OPZIONALE
     # =====================================================
@@ -914,13 +992,15 @@ def run_experiment(
         # non dobbiamo sovrascrivere i risultati A0/A1
         # già valutati ufficialmente.
 
-        suffisso_audit = (
-            "_contract_audit" if config.output_contract_mode == "audit" else ""
-        )
+        suffisso_output = {
+            "legacy": "",
+            "audit": "_contract_audit",
+            "structured": "_structured",
+        }[config.output_contract_mode]
         destinazione = (
             config.results_dir
             / f"{config.variant.lower()}_unified_"
-              f"{config.case_id}{suffisso_audit}.json"
+              f"{config.case_id}{suffisso_output}.json"
         )
 
         destinazione.parent.mkdir(
