@@ -217,7 +217,11 @@ def _assert_result(
             b = metrics.get("verification_tool_rounds")
             if type(a) is not int or type(b) is not int or a + b != rounds:
                 issues.append("contabilizzazione_round_non_coerente")
-            if result.get("verification", {}).get("causa_verificata") is not False:
+            verification = result.get("verification")
+            if (
+                not isinstance(verification, dict)
+                or verification.get("causa_verificata") is not False
+            ):
                 issues.append("verifica_causale_non_dimostrata")
     return issues
 
