@@ -397,7 +397,7 @@ def prepara_esperimento(
     # 4. HARNESS DETERMINISTICO: A1 E A1_V2
     # =====================================================
 
-    if config.variant in ("A1", "A1_V2"):
+    if config.variant in ("A1", "A1_V2", "A1_VERIFY"):
 
         # =====================================================
         # 1. IMPORT DELL'HARNESS UNIFICATO
@@ -566,7 +566,7 @@ def prepara_esperimento(
         # In questo modo isoliamo l'effetto informativo delle regole,
         # senza cambiare tool, modello, selezione Mesh/Runtime o prompt.
         # Nessuna lettura della ground truth.
-        if config.variant == "A1":
+        if config.variant in ("A1", "A1_VERIFY"):
             from harness.rule_batch import costruisci_evidenze_regole
 
             evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
@@ -733,23 +733,42 @@ def run_experiment(
     # 4. COSTRUZIONE DEL GRAFO CONDIVISO
     # =====================================================
 
-    grafo = crea_grafo_rca(
-        llm=llm,
-        tools=tools,
-        system_prompt=system_prompt,
-        max_tool_rounds=config.max_tool_rounds
-    )
-
-    # =====================================================
-    # 5. ESECUZIONE DELL'AGENTE
-    # =====================================================
-
-    esecuzione = esegui_grafo_rca(
-        grafo=grafo,
-        richiesta=richiesta,
-        recursion_limit=config.recursion_limit,
-        verbose=verbose
-    )
+    if config.variant == "A1_VERIFY":
+        # Nuovo braccio sperimentale, completamente separato dal grafo
+        # A0/A1. Budget totale: esplorazione + verifiche pre-finale.
+        from agent.verify_graph import (
+            crea_grafo_rca_verify,
+            esegui_grafo_rca_verify,
+        )
+        grafo = crea_grafo_rca_verify(
+            llm=llm,
+            tools=tools,
+            system_prompt=system_prompt,
+            max_tool_rounds=config.max_tool_rounds,
+            max_verification_checks=config.max_verification_checks,
+            evidence_report=esperimento["evidence_report"],
+            start_unix=int(caso["start_unix"]),
+            end_unix=int(caso["end_unix"]),
+        )
+        esecuzione = esegui_grafo_rca_verify(
+            grafo=grafo,
+            richiesta=richiesta,
+            recursion_limit=config.recursion_limit,
+            verbose=verbose,
+        )
+    else:
+        grafo = crea_grafo_rca(
+            llm=llm,
+            tools=tools,
+            system_prompt=system_prompt,
+            max_tool_rounds=config.max_tool_rounds
+        )
+        esecuzione = esegui_grafo_rca(
+            grafo=grafo,
+            richiesta=richiesta,
+            recursion_limit=config.recursion_limit,
+            verbose=verbose
+        )
 
     risposta = esecuzione["raw_response"]
 
@@ -975,6 +994,13 @@ def run_experiment(
         "metrics": metriche,
         "tool_trajectory": esecuzione["tool_trajectory"]
     }
+
+    if config.variant == "A1_VERIFY":
+        risultato["verification"] = esecuzione["verification"]
+        risultato["max_verification_checks"] = config.max_verification_checks
+        risultato["exploration_round_limit"] = (
+            config.max_tool_rounds - config.max_verification_checks
+        )
 
     # Per i nuovi audit conserviamo separatamente l'esito canonico:
     # la predizione originale e le metriche restano invariate.
