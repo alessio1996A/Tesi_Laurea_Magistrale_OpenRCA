@@ -32,7 +32,7 @@ def fake_rows():
     dev.extend([
         {"case_id": "cloudbed-1_q040", "split": "development"},
         {"case_id": "cloudbed-1_q052", "split": "development"},
-        {"case_id": "cloudbed-2_q012", "split": "development"},
+        {"case_id": "cloudbed-2_q031", "split": "development"},
     ])
     dev.extend([
         {"case_id": "cloudbed-1_q090", "split": "evaluation"},
@@ -122,6 +122,15 @@ class TestPairedCohort(unittest.TestCase):
             [{"case_id": "cloudbed-1_q001", "dataset_partition": "development"}],
         )
         with self.assertRaisesRegex(ValueError, "colonne mancanti"):
+            self.build()
+
+    def test_ground_truth_bearing_split_rejected_before_selection(self):
+        write_csv(
+            self.split, ["case_id", "split", "ground_truth"],
+            [{"case_id": r["case_id"], "split": r["split"],
+              "ground_truth": "NOT_ALLOWED"} for r in self.rows],
+        )
+        with self.assertRaisesRegex(ValueError, "GT"):
             self.build()
 
     def test_unknown_split_label_fails_closed(self):
