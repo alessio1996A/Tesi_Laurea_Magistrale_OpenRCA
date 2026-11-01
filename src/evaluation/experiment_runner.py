@@ -885,7 +885,7 @@ def run_experiment(
                 "cardinality_checked": False,
                 "additional_llm_calls": 1,
                 "elapsed_seconds": output_strutturato.elapsed_seconds,
-                "usage_complete": True,
+                "usage_complete": output_strutturato.usage_available,
             }
         except (StructuredOutputError, ValueError, TypeError) as exc:
             predizione = None
@@ -927,7 +927,9 @@ def run_experiment(
     metriche["end_to_end_seconds"] = tempo_totale
     # Il costo della finalizzazione non va nascosto nel confronto.
     if config.output_contract_mode == "structured":
-        metriche["structured_usage_complete"] = structured_usage is not None
+        metriche["structured_usage_complete"] = (
+            structured_usage is not None and structured_usage.usage_available
+        )
         if structured_usage is not None:
             metriche["llm_calls"] += 1
             metriche["input_tokens"] += structured_usage.input_tokens
