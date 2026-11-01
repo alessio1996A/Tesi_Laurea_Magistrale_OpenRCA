@@ -122,7 +122,7 @@ class TestPairedRunner(unittest.TestCase):
             result["verification"] = {"causa_verificata": False}
         return result
 
-    def run(self, **kwargs):
+    def execute_pair_fixture(self, **kwargs):
         return esegui_coppia(
             self.data_dir,
             repo_dir=self.repo_dir,
@@ -173,7 +173,7 @@ class TestPairedRunner(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_complete_pair_saves_distinct_immutable_results(self):
-        result = self.run()
+        result = self.execute_pair_fixture()
         self.assertTrue(result["evidence_sha256_equal"])
         self.assertTrue(result["api_execution_completed"])
         self.assertFalse(result["scoring_performed"])
@@ -200,10 +200,10 @@ class TestPairedRunner(unittest.TestCase):
         )
 
     def test_completed_pair_never_reruns(self):
-        self.run()
+        self.execute_pair_fixture()
         count = len(self.calls)
         with self.assertRaises(FileExistsError):
-            self.run()
+            self.execute_pair_fixture()
         self.assertEqual(len(self.calls), count)
 
     def test_sha_mismatch_is_detected_before_api_or_claim(self):
@@ -258,7 +258,7 @@ class TestPairedRunner(unittest.TestCase):
         self.assertEqual(self.preflight()["pairs"][0]["status"], "ready")
 
     def test_interrupted_claim_blocks_api_restart(self):
-        result = self.run()
+        result = self.execute_pair_fixture()
         Path(result["results_saved"][1]).unlink()
         self.assertEqual(
             self.preflight()["pairs"][0]["status"],
@@ -266,7 +266,7 @@ class TestPairedRunner(unittest.TestCase):
         )
         count = len(self.calls)
         with self.assertRaises(FileExistsError):
-            self.run()
+            self.execute_pair_fixture()
         self.assertEqual(len(self.calls), count)
 
     def test_exception_after_first_billed_run_blocks_repeat(self):
@@ -284,7 +284,7 @@ class TestPairedRunner(unittest.TestCase):
         self.assertEqual(self.preflight()["pairs"][0]["status"],
                          "interrupted_or_partial_manual_review")
         with self.assertRaises(FileExistsError):
-            self.run()
+            self.execute_pair_fixture()
 
     def test_integrity_fault_preserves_first_run_and_stops_second(self):
         def invalid_run(config):
@@ -329,7 +329,7 @@ class TestPairedRunner(unittest.TestCase):
             self.load()
 
     def test_code_sha_drift_detected_against_saved_run(self):
-        self.run()
+        self.execute_pair_fixture()
         with patch(
             "evaluation.paired_runner._git_sha",
             return_value="c" * 40,
@@ -356,7 +356,7 @@ class TestPairedRunner(unittest.TestCase):
         )
 
     def test_other_cases_are_not_touched(self):
-        self.run()
+        self.execute_pair_fixture()
         rows = self.preflight()["pairs"]
         self.assertEqual(rows[0]["status"], "completed_never_rerun")
         self.assertTrue(all(x["status"] == "ready" for x in rows[1:]))
