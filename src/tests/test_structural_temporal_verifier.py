@@ -196,6 +196,12 @@ class TestStructuralTemporalVerifier(unittest.TestCase):
         )
         self.assertEqual(result["stato"], "non_valutabile")
 
+    def test_null_rules_are_not_evidence_against_hypothesis(self):
+        data = report(include_rules=False)
+        data["regole_diagnostiche_v0"] = None
+        result = verify(RootCause(TIME, "node-5", "node CPU load"), data)
+        self.assertEqual(result["stato"], "non_valutabile")
+
     def test_no_candidates_not_evidence_of_health(self):
         result = verify(
             RootCause(TIME, "node-5", "node CPU load"), report([])
