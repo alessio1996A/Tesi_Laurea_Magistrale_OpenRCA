@@ -144,6 +144,52 @@ class TestStructuredFinalizer(unittest.TestCase):
                 fake_llm(parsed), risposta_grezza(), expected_faults=2
             )
 
+    def test_due_guasti_non_possono_essere_scambiati(self):
+        original = json.dumps({
+            "1": {
+                "root cause occurrence datetime": "2022-03-20 13:00:00",
+                "root cause component": "node-5",
+                "root cause reason": "node CPU load",
+            },
+            "2": {
+                "root cause occurrence datetime": "2022-03-20 13:11:00",
+                "root cause component": "frontend-0",
+                "root cause reason": "container CPU load",
+            },
+        })
+        swapped = StructuredDiagnosis(root_causes=[
+            StructuredFault(
+                occurrence_datetime="2022-03-20 13:11:00",
+                component="frontend-0",
+                reason="container CPU load",
+            ),
+            StructuredFault(
+                occurrence_datetime="2022-03-20 13:00:00",
+                component="node-5",
+                reason="node CPU load",
+            ),
+        ])
+        with self.assertRaisesRegex(StructuredOutputError, "associato"):
+            formatta_diagnosi_strutturata(fake_llm(swapped), original)
+
+    def test_cardinalita_non_puo_essere_modificata_dal_formatter(self):
+        duplicated = StructuredDiagnosis(root_causes=[
+            StructuredFault(
+                occurrence_datetime="2022-03-20 13:00:00",
+                component="node-5",
+                reason="node CPU load",
+            ),
+            StructuredFault(
+                occurrence_datetime="2022-03-20 13:00:00",
+                component="node-5",
+                reason="node CPU load",
+            ),
+        ])
+        with self.assertRaisesRegex(StructuredOutputError, "cardinalita"):
+            formatta_diagnosi_strutturata(
+                fake_llm(duplicated), risposta_grezza()
+            )
+
     def test_failure_provider_non_fa_retry_nascosti(self):
         llm = Mock()
         formatter = Mock()
