@@ -155,7 +155,7 @@ def verifica_relazioni_strutturali_temporali(
 
     if base["stato"] == "fuori_finestra":
         return {**result, "stato": "fuori_finestra"}
-    if evidence_report is None or "regole_diagnostiche_v0" not in evidence_report:
+    if base["stato"] == "non_valutabile":
         return result
 
     candidates = _normalize_candidates(evidence_report, start_unix, end_unix)
