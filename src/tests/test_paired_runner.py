@@ -91,6 +91,7 @@ class TestPairedRunner(unittest.TestCase):
     def prepared(self, config):
         return {
             "evidence_sha256": SHA,
+            "richiesta": "Investigate using the same deterministic report",
             "caso": {
                 "case_id": config.case_id,
                 "start_unix": 1000,
@@ -104,6 +105,9 @@ class TestPairedRunner(unittest.TestCase):
             "case_id": config.case_id,
             "variant": config.variant,
             "evidence_sha256": SHA,
+            "model": config.model_name,
+            "model_provider": config.model_provider,
+            "max_tool_rounds": config.max_tool_rounds,
             "metrics": {"tool_rounds": 1, "llm_calls": 2},
             "prediction": None,
             "raw_response": None,
@@ -210,6 +214,40 @@ class TestPairedRunner(unittest.TestCase):
             return result
 
         with self.assertRaisesRegex(ValueError, "divergono"):
+            esegui_coppia(
+                self.data_dir, repo_dir=self.repo_dir,
+                case_id=self.case_id, confirm_api=True,
+                expected_counts=self.expected_counts,
+                _prepare=wrong_prepare, _run=self.fake_run,
+            )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.preflight()["pairs"][0]["status"], "ready")
+
+    def test_prompt_mismatch_blocks_api_before_claim(self):
+        def wrong_prepare(config):
+            item = self.prepared(config)
+            if config.variant == "A1_VERIFY":
+                item["richiesta"] = "different prompt"
+            return item
+
+        with self.assertRaisesRegex(ValueError, "Prompt utente"):
+            esegui_coppia(
+                self.data_dir, repo_dir=self.repo_dir,
+                case_id=self.case_id, confirm_api=True,
+                expected_counts=self.expected_counts,
+                _prepare=wrong_prepare, _run=self.fake_run,
+            )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.preflight()["pairs"][0]["status"], "ready")
+
+    def test_window_mismatch_blocks_api_before_claim(self):
+        def wrong_prepare(config):
+            item = self.prepared(config)
+            if config.variant == "A1_VERIFY":
+                item["caso"]["end_unix"] = 1950
+            return item
+
+        with self.assertRaisesRegex(ValueError, "Contesto ufficiale"):
             esegui_coppia(
                 self.data_dir, repo_dir=self.repo_dir,
                 case_id=self.case_id, confirm_api=True,
