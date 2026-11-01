@@ -10,6 +10,7 @@ causale ne' una correzione del guasto. Non consulta ground truth.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -141,6 +142,28 @@ def formatta_diagnosi_strutturata(
     if expected_faults is not None and len(parsed.root_causes) != expected_faults:
         raise StructuredOutputError("Cardinalita' del task non rispettata")
 
+    # Se l'agente ha prodotto un JSON numerato, preserviamo anche
+    # cardinalita' e associazione indice -> guasto. Non permettiamo
+    # che il formatter scambi componenti o motivi tra due guasti.
+    try:
+        original = json.loads(raw_response)
+    except json.JSONDecodeError:
+        original = None
+
+    numbered_original = (
+        isinstance(original, dict)
+        and bool(original)
+        and all(
+            isinstance(key, str) and key.isdigit()
+            and isinstance(value, dict)
+            for key, value in original.items()
+        )
+    )
+    if numbered_original and len(original) != len(parsed.root_causes):
+        raise StructuredOutputError(
+            "Il formatter ha cambiato la cardinalita' dei guasti originali"
+        )
+
     # Il formatter non deve introdurre valori non detti dall'agente.
     # Non e' una prova di attribuzione: quella appartiene a PAVE.
     causes = []
@@ -155,6 +178,30 @@ def formatta_diagnosi_strutturata(
                     f"Guasto {index}: {field} non presente letteralmente nella "
                     "risposta originale"
                 )
+            if numbered_original:
+                source_fault = original.get(str(index))
+                if not isinstance(source_fault, dict):
+                    raise StructuredOutputError(
+                        f"Guasto {index}: indice sorgente mancante"
+                    )
+                # Esigere valori del medesimo guasto, non di altri indici.
+                if value not in source_fault.values():
+                    raise StructuredOutputError(
+                        f"Guasto {index}: {field} associato a un altro guasto "
+                        "o non presente nel guasto originale"
+                    )
+                known_key = {
+                    "occurrence_datetime": "root cause occurrence datetime",
+                    "component": "root cause component",
+                    "reason": "root cause reason",
+                }[field]
+                if (
+                    known_key in source_fault
+                    and source_fault[known_key] != value
+                ):
+                    raise StructuredOutputError(
+                        f"Guasto {index}: valore originale {field} modificato"
+                    )
         try:
             causes.append(RootCause(
                 occurrence_datetime=fault.occurrence_datetime,
