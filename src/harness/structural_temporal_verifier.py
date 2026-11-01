@@ -106,6 +106,14 @@ def _target_hosts(component: str, candidates: list[dict]) -> tuple[list[str], st
     return hosts, "host_da_identificativo_telemetria"
 
 
+def _classe_ipotesi(reason: str) -> tuple[str, str] | None:
+    normalized = " ".join(reason.split()).casefold()
+    for scope, family, label in _RULES.values():
+        if normalized == label.casefold():
+            return scope, family
+    return None
+
+
 def verifica_relazioni_strutturali_temporali(
     root_cause: RootCause,
     evidence_report: dict | None,
@@ -155,6 +163,24 @@ def verifica_relazioni_strutturali_temporali(
     result["host_candidati"] = hosts
     result["origine_host"] = origin
 
+    predicted_class = _classe_ipotesi(root_cause.reason)
+    if predicted_class is None:
+        return {**result, "stato": "classe_non_coperta"}
+
+    claimed_scope, claimed_family = predicted_class
+    component_scope = (
+        "node" if _NODE.fullmatch(root_cause.component)
+        else "container" if (
+            _CONTAINER.fullmatch(root_cause.component)
+            or re.fullmatch(r".+-\\d+", root_cause.component)
+        ) else "sconosciuto"
+    )
+    result["famiglia_ipotesi"] = claimed_family
+    result["livello_ipotesi"] = claimed_scope
+    result["livello_componente"] = component_scope
+    if component_scope != claimed_scope:
+        return {**result, "stato": "livello_non_verificabile"}
+
     if not hosts:
         return {**result, "stato": "host_non_osservato"}
     if len(hosts) > 1:
@@ -180,7 +206,8 @@ def verifica_relazioni_strutturali_temporali(
     pairs = []
     for node in nodes:
         for container in containers:
-            if node["family"] != container["family"]:
+            if (node["family"] != container["family"]
+                    or node["family"] != claimed_family):
                 continue
             delta = container["first"] - node["first"]
             if abs(delta) <= tolleranza_secondi:
