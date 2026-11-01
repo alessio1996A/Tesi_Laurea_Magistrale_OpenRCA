@@ -39,6 +39,16 @@ def _csv_rows(path: Path, required: set[str]) -> list[dict[str, str]]:
                 f"{path.name}: colonne mancanti {sorted(required-set(headers))}; "
                 f"presenti {headers}"
             )
+        # Reject label-bearing inputs BEFORE reading any row values.
+        dangerous = {
+            "reason", "scoring_points", "root_cause_reason",
+            "root cause reason", "root_cause_component",
+            "ground_truth", "label", "labels", "answer",
+            "fault_type", "fault_category", "failure_type",
+        }
+        found = {h.strip().casefold() for h in headers} & dangerous
+        if found:
+            raise ValueError(f"{path.name}: colonne GT non consentite: {sorted(found)}")
         rows = list(reader)
     if not rows:
         raise ValueError(f"{path.name}: CSV vuoto")
@@ -70,15 +80,6 @@ def costruisci_piano_abbinato(
     manifest_path = Path(manifest_path)
     split_rows = _csv_rows(split_path, {"case_id", "split"})
     manifest_rows = _csv_rows(manifest_path, {"case_id"})
-
-    # The manifest is read only for case_id crosschecking; if it contains
-    # label-bearing fields, refuse to use it at all.
-    with manifest_path.open("r", encoding="utf-8-sig", newline="") as f:
-        columns = csv.DictReader(f).fieldnames or []
-    prohibited = {"reason", "scoring_points", "root_cause_reason",
-                  "ground_truth", "label", "labels"}
-    if prohibited.intersection(set(columns)):
-        raise ValueError("Manifest contiene colonne potenzialmente GT")
 
     all_ids = set()
     grouped = {"cloudbed-1": [], "cloudbed-2": []}
