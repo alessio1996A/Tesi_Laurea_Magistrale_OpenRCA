@@ -5,7 +5,8 @@ import re
 
 
 # Varianti sperimentali supportate.
-Variant = Literal["A0", "A1"]
+# A1_V2 usa il report unificato senza la sezione delle regole.
+Variant = Literal["A0", "A1", "A1_V2"]
 
 
 @dataclass(frozen=True)
@@ -13,7 +14,7 @@ class ExperimentConfig:
     """
     Configurazione di un esperimento OpenRCA.
 
-    La stessa configurazione viene utilizzata da A0 e A1.
+    La stessa configurazione e i medesimi budget sono usati da A0, A1 e A1_V2.
 
     Non contiene:
     - chiavi API;
@@ -44,7 +45,7 @@ class ExperimentConfig:
         Verifica la validità della configurazione.
         """
 
-        if self.variant not in ("A0", "A1"):
+        if self.variant not in ("A0", "A1", "A1_V2"):
             raise ValueError("Variante non valida.")
 
         if not re.fullmatch(
@@ -109,7 +110,7 @@ class ExperimentConfig:
     @property
     def evidence_path(self) -> Path | None:
         """
-        A1 utilizza un report deterministico.
+        A1 e A1_V2 hanno report deterministici con percorsi distinti.
 
         A0 non deve ricevere questo report.
         """
@@ -120,7 +121,7 @@ class ExperimentConfig:
         return (
             self.data_dir
             / "data/processed"
-            / f"evidence_A1_v1_{self.case_id}.json"
+            / f"evidence_{self.variant}_v1_{self.case_id}.json"
         )
 
 

@@ -312,7 +312,7 @@ def prepara_esperimento(
     config: ExperimentConfig
 ) -> dict:
     """
-    Prepara un esperimento A0 oppure A1.
+    Prepara un esperimento A0, A1 (con regole) oppure A1_V2 (senza regole).
 
     A0:
         - recupera il caso dal manifest;
@@ -325,6 +325,7 @@ def prepara_esperimento(
         - genera automaticamente le evidenze;
         - aggiunge il report all'istruzione.
 
+    A1_V2 usa lo stesso report unificato di A1 ma senza le otto regole.
     Questa funzione NON chiama Gemini.
     """
 
@@ -393,10 +394,10 @@ def prepara_esperimento(
     preprocessing_seconds = 0.0
 
     # =====================================================
-    # 4. HARNESS DETERMINISTICO: SOLO A1
+    # 4. HARNESS DETERMINISTICO: A1 E A1_V2
     # =====================================================
 
-    if config.variant == "A1":
+    if config.variant in ("A1", "A1_V2"):
 
         # =====================================================
         # 1. IMPORT DELL'HARNESS UNIFICATO
@@ -558,18 +559,22 @@ def prepara_esperimento(
         )
 
         # =====================================================
-        # 9 BIS. SEI REGOLE DIAGNOSTICHE OFFLINE (A1-R)
+        # 9 BIS. ABLAZIONE DELLE OTTO REGOLE DIAGNOSTICHE
         # =====================================================
-        # Solo telemetria nella finestra corrente: nessuna ground truth.
-        # Non modifica i tool, il modello, o il ramo A0.
-        from harness.rule_batch import costruisci_evidenze_regole
+        # A1: report unificato + regole R01, R02, R06-R11.
+        # A1_V2: stesso report unificato, ma senza la sezione delle regole.
+        # In questo modo isoliamo l'effetto informativo delle regole,
+        # senza cambiare tool, modello, selezione Mesh/Runtime o prompt.
+        # Nessuna lettura della ground truth.
+        if config.variant == "A1":
+            from harness.rule_batch import costruisci_evidenze_regole
 
-        evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
-            df_nodi=df_nodi,
-            df_container=df_container,
-            start_unix=int(inizio),
-            end_unix=int(fine),
-        )
+            evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
+                df_nodi=df_nodi,
+                df_container=df_container,
+                start_unix=int(inizio),
+                end_unix=int(fine),
+            )
 
         if (
             evidence_report["versione"]

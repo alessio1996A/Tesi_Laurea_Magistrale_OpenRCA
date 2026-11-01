@@ -1,7 +1,8 @@
 from typing import Literal
 
 
-Variant = Literal["A0", "A1"]
+# Le tre varianti condividono il testo del prompt di sistema.
+Variant = Literal["A0", "A1", "A1_V2"]
 
 
 # Prompt comune per entrambi gli agenti.
@@ -135,13 +136,13 @@ def get_system_prompt(variant: Variant) -> str:
     """
     Restituisce il prompt di sistema condiviso.
 
-    A0 e A1 utilizzano esattamente lo stesso prompt.
+    A0, A1 e A1_V2 utilizzano esattamente lo stesso prompt.
 
     La differenza sperimentale è il report di evidenze
-    prodotto dall'harness soltanto per A1.
+    prodotto dall'harness per A1 e A1_V2; solo A1 aggiunge le regole.
     """
 
-    if variant not in ("A0", "A1"):
+    if variant not in ("A0", "A1", "A1_V2"):
         raise ValueError("Variante sperimentale non valida.")
 
     return SYSTEM_PROMPT_COMMON.strip()
