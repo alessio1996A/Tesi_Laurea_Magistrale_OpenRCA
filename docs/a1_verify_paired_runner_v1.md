@@ -109,6 +109,7 @@ sono uno studio di fattibilita', non un test conclusivo.
 I quattro piloti precedenti rimangono esclusi. Evaluation,
 mixed_quarantine e OOD_holdout non vengono interrogati.
 
-**Importante:** la nuova variante ha superato i 192 test offline.
-Questo nuovo runner accoppiato introduce ulteriori test, che vanno
-eseguiti prima di autorizzare qualsiasi chiamata API.
+**Importante:** la suite precedente ha superato 209 test offline.
+Il runner accoppiato aggiunge 18 nuovi test (totale atteso: 227)
+che NON sono ancora stati eseguiti in PyCharm e vanno verificati
+prima di autorizzare qualsiasi chiamata API.
