@@ -40,6 +40,10 @@ class ExperimentConfig:
         "/content/drive/MyDrive/Tesi_OpenRCA"
     )
 
+    # Provider indipendente dalla variante sperimentale.
+    # Posizionato alla fine per preservare le firme posizionali storiche.
+    model_provider: str = "google"
+
     def __post_init__(self):
         """
         Verifica la validità della configurazione.
@@ -56,6 +60,9 @@ class ExperimentConfig:
 
         if not self.model_name.strip():
             raise ValueError("Nome modello mancante.")
+
+        if not isinstance(self.model_provider, str) or not self.model_provider.strip():
+            raise ValueError("Provider LLM mancante.")
 
         if self.max_tool_rounds < 1:
             raise ValueError(
