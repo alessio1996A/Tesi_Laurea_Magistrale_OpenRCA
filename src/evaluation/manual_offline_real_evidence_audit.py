@@ -17,6 +17,7 @@ from pathlib import Path
 from evaluation.experiment_config import ExperimentConfig
 from evaluation.experiment_runner import prepara_esperimento
 from harness.observational_verifier import verifica_coerenza_osservativa
+from harness.hypothesis_coverage_audit import verifica_copertura_ipotesi
 from harness.structural_temporal_verifier import (
     verifica_relazioni_strutturali_temporali,
 )
@@ -115,6 +116,13 @@ def esegui_audit_offline(
             "causa_verificata": False,
         })
 
+    # Audit solo descrittivo: il report R8 e la tool_trajectory storica
+    # rimangono inalterati. Non dedurre che una causa sia confermata.
+    coverage = verifica_copertura_ipotesi(
+        diagnosis,
+        report,
+        historical.get("tool_trajectory", []),
+    )
     rules = report["regole_diagnostiche_v0"]
     return {
         "case_id": case_id,
@@ -124,6 +132,7 @@ def esegui_audit_offline(
         "sha_evidenze_storiche_coerente": True,
         "candidati_regole": rules["totale_candidati"],
         "candidati_omessi": rules["candidati_omessi_per_budget"],
+        "copertura_indagine": coverage,
         "diagnosi": results,
         "ground_truth_consultata": False,
         "llm_chiamato": False,
