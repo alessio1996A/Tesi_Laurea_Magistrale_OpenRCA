@@ -44,6 +44,10 @@ class ExperimentConfig:
     # Posizionato alla fine per preservare le firme posizionali storiche.
     model_provider: str = "google"
 
+    # Default storico: nessun cambiamento alla validazione delle predizioni.
+    # audit: aggiunge una diagnosi della conformita\u0027 senza modificarle.
+    output_contract_mode: Literal["legacy", "audit"] = "legacy"
+
     def __post_init__(self):
         """
         Verifica la validità della configurazione.
@@ -63,6 +67,9 @@ class ExperimentConfig:
 
         if not isinstance(self.model_provider, str) or not self.model_provider.strip():
             raise ValueError("Provider LLM mancante.")
+
+        if self.output_contract_mode not in ("legacy", "audit"):
+            raise ValueError("Modalita\u0027 output contract non valida.")
 
         if self.max_tool_rounds < 1:
             raise ValueError(
