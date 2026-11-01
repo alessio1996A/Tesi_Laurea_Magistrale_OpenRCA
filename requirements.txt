@@ -3,3 +3,4 @@ langchain-google-genai
 pandas
 python-dotenv
 networkx
+pydantic>=2,<3
