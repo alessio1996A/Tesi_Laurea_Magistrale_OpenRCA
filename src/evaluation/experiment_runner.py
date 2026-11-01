@@ -819,6 +819,35 @@ def run_experiment(
             )
 
     # =====================================================
+    # 6 BIS. AUDIT OPZIONALE: SOLO OSSERVAZIONE
+    # =====================================================
+    # Non cambia la predizione o lo stato del parser storico.
+    # Non ripara JSON e non consulta ground truth.
+    output_contract_audit = None
+
+    if config.output_contract_mode == "audit":
+        from output.openrca_contract import (
+            OutputContractError,
+            parse_openrca_json,
+        )
+
+        try:
+            diagnosi_canonica = parse_openrca_json(risposta)
+            output_contract_audit = {
+                "status": "valid",
+                "fault_count": len(diagnosi_canonica.root_causes),
+                "error": None,
+                "cardinality_checked": False,
+            }
+        except OutputContractError as exc:
+            output_contract_audit = {
+                "status": "invalid",
+                "fault_count": None,
+                "error": str(exc),
+                "cardinality_checked": False,
+            }
+
+    # =====================================================
     # 7. MISURAZIONE DEI TEMPI
     # =====================================================
 
@@ -870,6 +899,11 @@ def run_experiment(
         "tool_trajectory": esecuzione["tool_trajectory"]
     }
 
+    # Per i nuovi audit conserviamo separatamente l'esito canonico:
+    # la predizione originale e le metriche restano invariate.
+    if output_contract_audit is not None:
+        risultato["output_contract_audit"] = output_contract_audit
+
     # =====================================================
     # 9. SALVATAGGIO OPZIONALE
     # =====================================================
@@ -880,10 +914,13 @@ def run_experiment(
         # non dobbiamo sovrascrivere i risultati A0/A1
         # già valutati ufficialmente.
 
+        suffisso_audit = (
+            "_contract_audit" if config.output_contract_mode == "audit" else ""
+        )
         destinazione = (
             config.results_dir
             / f"{config.variant.lower()}_unified_"
-              f"{config.case_id}.json"
+              f"{config.case_id}{suffisso_audit}.json"
         )
 
         destinazione.parent.mkdir(
