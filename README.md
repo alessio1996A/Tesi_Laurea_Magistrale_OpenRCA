@@ -193,14 +193,35 @@ persistenti.
 L'elaborazione della telemetria dovrà essere progettata per leggere i dati
 a blocchi e limitare il consumo di memoria.
 
-## 10. Stato attuale
+## 10. Stato del progetto — 2 novembre 2026
 
-- [x] Creazione della struttura iniziale in PyCharm.
-- [x] Creazione del file .gitignore.
-- [x] Documentazione del progetto e delle ipotesi sperimentali.
-- [ ] Verifica dell'ambiente e delle dipendenze.
-- [ ] Ispezione completa di query.csv, record.csv e telemetria.
-- [ ] Definizione rigorosa del task diagnostico.
-- [ ] Prima baseline sperimentale.
-- [ ] Implementazione dell'harness iniziale.
-- [ ] Confronto A0/A1 e analisi degli errori.
+> Questa è una versione di presentazione. La coorte sperimentale è **immutabile** e si riferisce al commit `6927fcfa18fc29fce64ad65eac98231b2ba42184`. La documentazione di presentazione **non** cambia i risultati storici.
+
+**Realizzato:** cinque tool per metriche, log e trace; generazione e selezione deterministica delle evidenze; otto regole R01, R02, R06–R11; motore LangGraph per A0/A1/A1_V2/A1_VERIFY; planner di controlli mirati; output contract; test offline; scoring ufficiale e audit.
+
+**Sperimentato:** primo confronto accoppiato `A1-R8` vs `A1_VERIFY`, otto casi development (16 run), `gemini-3.5-flash-lite`. Score OpenRCA medio 0,3850 vs 0,3225; token 474.590 vs 258.649 (−45,50%); tempo 709,365 s vs 598,321 s (−15,65%). Gli output JSON validi sono stati 7/8 vs 8/8. Il vantaggio di efficienza **non** equivale a maggiore accuratezza.
+
+**Non completato:** replica integrale di PAVE; verifica di propagazione causale; integrazione online dei prototipi di verifica strutturale/temporale; knowledge transfer autonomo; test di generalizzazione sugli holdout OOD; provider aggiuntivi. Il codice della factory è predisposto per provider multipli, ma al momento è implementato soltanto Google/Gemini.
+
+### Navigazione rapida
+
+| Area | Percorso | Descrizione |
+| --- | --- | --- |
+| Agenti e tool | `src/agent/` | Prompt, factory modello, tool, grafi LangGraph |
+| Harness | `src/harness/` | Preprocessing, evidenze, regole e planner |
+| Regole | `src/harness/rules/` | Otto detector deterministici indipendenti |
+| Contratto output | `src/output/` | Parsing, validazione e formato RCA |
+| Valutazione | `src/evaluation/` | Runner, protocollo e controlli di integrità |
+| Test | `src/tests/` | Test automatici offline |
+| Protocollo e roadmap | `docs/` | Metodologia e limiti documentati |
+| Presentazione | `docs/PRESENTAZIONE_RELATORE.md` | Guida alla struttura e al notebook |
+| Dataset e risultati | Google Drive | Non inclusi nel repository per ragioni di dimensione e integrità |
+
+### Artefatti sperimentali immutabili (Drive)
+
+- Piano: `data/protocols/a1_verify_paired_development_v1_cohort_v1.json`.
+- Risultati: `data/results/paired/a1_verify_paired_development_v1/`.
+- Freeze: `data/protocols/a1_verify_paired_development_v1_results_freeze_v1.json` — SHA-256 `e8c350d3e3372d0e4afb6fd63d60f2f5632394bc7e2a4b996ca0ff864ae2ccf0`.
+- Scoring: `data/results/scoring/a1_verify_paired_development_v1_official_scoring_v1.json` — SHA-256 `2504295d89f49c20c5e14da552ee176e54e52286cc2f86c417755367a814fb5f`.
+
+Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. Il notebook storico originale di Colab resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
