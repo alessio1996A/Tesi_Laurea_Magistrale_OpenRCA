@@ -340,6 +340,8 @@ def esegui_coppia(
             "non eseguire le chiamate API."
         )
 
+    # Ripetiamo i controlli in sola lettura subito prima di occupare la coppia.
+    # Questo evita di rilanciare run gia' salvate o iniziate in precedenza.
     # Repeat read-only checks immediately before the exclusive claim.
     renewed = preflight_paired(
         data_dir, repo_dir=repo_dir, expected_counts=expected_counts
@@ -351,6 +353,8 @@ def esegui_coppia(
 
     claim_path, output_paths = _pair_paths(data_dir, pair)
     claim_path.parent.mkdir(parents=True, exist_ok=True)
+    # Il marcatore permanente viene creato PRIMA della prima chiamata API:
+    # in caso di crash blocca un retry che potrebbe duplicare i costi.
     _json_exclusive(claim_path, {
         "status": "started_permanent_no_auto_retry",
         "case_id": case_id,
@@ -365,6 +369,8 @@ def esegui_coppia(
         ),
     })
 
+    # Salvataggio esclusivo: non sovrascriviamo mai diagnosi storiche.
+    # Eventuali errori restano evidenze dell'esperimento.
     saved = []
     for index, variant in enumerate(pair["ordered_variants"]):
         result = run(configs[variant])
