@@ -249,6 +249,10 @@ Non e' una prova di maggiore accuratezza generalizzabile. I risultati sono stati
 congelati **prima** dello scoring ufficiale.
 
 - Protocollo: [docs/a1_verify_st_protocol_v1.md](docs/a1_verify_st_protocol_v1.md)
+- Notebook Colab **di sola lettura** per il relatore:
+  [notebooks/Colab_Demo_Relatore_A1_VERIFY_ST.ipynb](notebooks/Colab_Demo_Relatore_A1_VERIFY_ST.ipynb).
+- Piano di fattibilità delle regole di rete R03/R04/R05:
+  [docs/r11_feasibility_plan_v1.md](docs/r11_feasibility_plan_v1.md).
 - Report per relatore, casi, limiti, hash e percorsi Drive:
   [docs/a1_verify_st_paired_results_2026-11-02.md](docs/a1_verify_st_paired_results_2026-11-02.md).
 - Freeze manifest SHA-256: `43e646792685b1cde03052cadc2c8a82749d058a4e04ee0b01f607a7384fd104`.
