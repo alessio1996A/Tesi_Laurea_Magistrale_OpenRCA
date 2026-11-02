@@ -61,7 +61,24 @@ PYTHONPATH=src python src/evaluation/paired_st_cohort.py \
   --data-dir /content/drive/MyDrive/Tesi_OpenRCA
 ```
 
-Solo dopo aver verificato le suite e i confronti, aggiungere `--freeze` per registrare il piano in `data/protocols/a1_verify_st_paired_development_v1_cohort_v1.json`. Le chiamate Gemini richiedono un runner separato con protezioni contro retry e sovrascritture; **questo script non avvia alcun modello**.
+Solo dopo che la suite e' verde, aggiungere `--freeze` per registrare il piano in `data/protocols/a1_verify_st_paired_development_v1_cohort_v1.json`. Il generatore del piano NON avvia alcun modello.
+
+Runner ST, prima sola ispezione GT-free e controllo degli output:
+```bash
+PYTHONPATH=src python src/evaluation/manual_paired_st_batch.py \\
+  --data-dir /content/drive/MyDrive/Tesi_OpenRCA \\
+  --repo-dir /content/Tesi_OpenRCA
+```
+
+Per eseguire **una sola coppia** (richiede chiave API, puo' comportare costi e deve seguire preflight e freeze):
+```bash
+PYTHONPATH=src python src/evaluation/manual_paired_st_batch.py \\
+  --data-dir /content/drive/MyDrive/Tesi_OpenRCA \\
+  --repo-dir /content/Tesi_OpenRCA \\
+  --execute-pair cloudbed-2_q073 --confirm-api
+```
+
+Il runner registra un marcatore permanente prima delle API e salva ogni run con modalita' esclusiva: se una coppia si interrompe, **non avviare un retry automatico**. Continuare solo dopo controllo manuale di costi, output e provenienza. Ogni nuovo risultato deve riportare lo stesso commit Git dei precedenti.
 
 ## Misure e interpretazione
 
