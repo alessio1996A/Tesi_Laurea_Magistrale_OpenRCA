@@ -93,6 +93,20 @@ I file `record.csv`, `query.csv` e le predizioni storiche NON vanno eliminati se
 - Non cambiare nomi, percorsi o import dei moduli centrali in prossimità della discussione.
 - Eseguire `python -m unittest discover -s src/tests -p 'test_*.py' -v` in PyCharm prima di integrare il branch.
 
+## Demo aggiuntiva PAVE-inspired — offline, non sperimentata sul pilot
+
+Per mostrare al relatore cosa significa **verifica strutturale e temporale**, eseguire dalla root del progetto:
+
+```bash
+PYTHONPATH=src python src/evaluation/demo_verifica_pave_offline.py
+```
+
+Il file `src/evaluation/demo_verifica_pave_offline.py` usa gli stessi moduli già presenti nel repository: `structural_temporal_verifier.py` e `observational_verifier.py`. I dati sono **sintetici**, con tre esempi che mostrano relazione osservata sullo stesso host, assenza di relazione fra host differenti e nome di container ambiguo.
+
+Non richiede Gemini, dataset Market, chiavi API o ground truth. Non altera alcuna predizione. Questo è un prototipo mostrabile **a parte** dal confronto ufficiale A1-R8 / A1_VERIFY: nel pilot, il verificatore strutturale/temporale **non era integrato** nel grafo. Per misurarne l'efficacia servirebbero una variante versionata e nuovi casi development.
+
+Il notebook aggiornato per il relatore può includere questa demo come sezione intermedia fra replay e risultati, ma ogni suo output va etichettato «sintetico, offline, non valutato sull'accuratezza».
+
 ## Risultati da riportare senza esagerazioni
 
 | Misura, 8 casi development | A1-R8 | A1_VERIFY |
