@@ -73,15 +73,54 @@ def costruisci_piano(split_path: Path, manifest_path: Path, per_cloudbed: int = 
     def rank(case_id):
         return hashlib.sha256(f"{SEED}|{case_id}".encode()).hexdigest()
 
-    eligible = [row for row in split_rows
-                if row["split"] == "development" and row["case_id"] not in PREVIOUS]
-    selected = []
+    # Gli ID del benchmark non sono necessariamente incidenti indipendenti:
+    # due task possono riferirsi alla stessa finestra di telemetria.
+    # Escludiamo anche le finestre sovrapposte ai 12 task gia' ispezionati.
+    by_id = {row["case_id"]: row for row in split_rows}
+    if not PREVIOUS.issubset(by_id):
+        raise ValueError("Alcuni casi storici sono assenti dallo split")
+
+    def window(row):
+        start, end = int(row["start_unix"]), int(row["end_unix"])
+        if start >= end:
+            raise ValueError("Finestra temporale GT-free non valida")
+        return start, end
+
+    def overlaps(a, b):
+        if a["cloudbed"] != b["cloudbed"]:
+            return False
+        sa, ea = window(a)
+        sb, eb = window(b)
+        return sa < eb and sb < ea
+
+    previous_rows = [by_id[case_id] for case_id in sorted(PREVIOUS)]
+    eligible = [
+        row for row in split_rows
+        if row["split"] == "development"
+        and row["case_id"] not in PREVIOUS
+        and not any(overlaps(row, old) for old in previous_rows)
+    ]
+    selected_rows = []
     for cloudbed in ("cloudbed-1", "cloudbed-2"):
-        items = sorted((r["case_id"] for r in eligible if r["cloudbed"] == cloudbed), key=rank)
-        if len(items) < per_cloudbed:
-            raise ValueError("Casi development indipendenti insufficienti")
-        selected.extend(items[:per_cloudbed])
-    selected.sort(key=rank)
+        items = sorted(
+            (row for row in eligible if row["cloudbed"] == cloudbed),
+            key=lambda row: (rank(row["case_id"]), row["case_id"]),
+        )
+        winners = []
+        for row in items:
+            # Una sola richiesta per intervallo di telemetria, anche fra
+            # nuovi task diversi: evita dipendenza fra gli 8 casi del batch.
+            if any(overlaps(row, chosen) for chosen in winners):
+                continue
+            winners.append(row)
+            if len(winners) == per_cloudbed:
+                break
+        if len(winners) != per_cloudbed:
+            raise ValueError("Finestra indipendenti development insufficienti")
+        selected_rows.extend(winners)
+    selected = sorted(
+        (row["case_id"] for row in selected_rows), key=lambda case_id: (rank(case_id), case_id)
+    )
     pairs = []
     for case_id in selected:
         reversed_order = int(rank(case_id)[-2:], 16) % 2 == 1
@@ -101,7 +140,7 @@ def costruisci_piano(split_path: Path, manifest_path: Path, per_cloudbed: int = 
         "split_file_sha256": sha(split_path),
         "input_manifest_sha256": sha(manifest_path),
         "split_counts": COUNTS,
-        "historical_exclusions": sorted(PREVIOUS),
+        "historical_exclusions": sorted(PREVIOUS),\n        "selection_excludes_overlapping_historical_windows": True,\n        "selection_enforces_nonoverlapping_new_windows": True,
         "per_cloudbed": per_cloudbed,
         "case_count": len(pairs), "run_count": len(pairs) * 2,
         "model_provider": "google", "model_name": "gemini-3.5-flash-lite",
