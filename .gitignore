@@ -21,3 +21,15 @@ results/
 *.log
 .DS_Store
 Thumbs.db
+# Configurazione locale dell’IDE (non condividere tra macchine)
+.idea/
+
+# Cache di test, copertura e editor
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Notebook e asset locali di grandi dimensioni: conservare gli esperimenti in Drive
+.ipynb_checkpoints/
