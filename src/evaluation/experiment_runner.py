@@ -397,7 +397,7 @@ def prepara_esperimento(
     # 4. HARNESS DETERMINISTICO: A1 E A1_V2
     # =====================================================
 
-    if config.variant in ("A1", "A1_V2", "A1_VERIFY"):
+    if config.variant in ("A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
 
         # =====================================================
         # 1. IMPORT DELL'HARNESS UNIFICATO
@@ -566,7 +566,7 @@ def prepara_esperimento(
         # In questo modo isoliamo l'effetto informativo delle regole,
         # senza cambiare tool, modello, selezione Mesh/Runtime o prompt.
         # Nessuna lettura della ground truth.
-        if config.variant in ("A1", "A1_VERIFY"):
+        if config.variant in ("A1", "A1_VERIFY", "A1_VERIFY_ST"):
             from harness.rule_batch import costruisci_evidenze_regole
 
             evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
@@ -733,7 +733,7 @@ def run_experiment(
     # 4. COSTRUZIONE DEL GRAFO CONDIVISO
     # =====================================================
 
-    if config.variant == "A1_VERIFY":
+    if config.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
         # Nuovo braccio sperimentale, completamente separato dal grafo
         # A0/A1. Budget totale: esplorazione + verifiche pre-finale.
         from agent.verify_graph import (
