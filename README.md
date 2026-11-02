@@ -225,3 +225,22 @@ a blocchi e limitare il consumo di memoria.
 - Scoring: `data/results/scoring/a1_verify_paired_development_v1_official_scoring_v1.json` — SHA-256 `2504295d89f49c20c5e14da552ee176e54e52286cc2f86c417755367a814fb5f`.
 
 Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. La [versione demo su Drive](https://drive.google.com/file/d/1JIdqEdpvHuUIgDQ96_QCFabBBCf2IGyP/view?usp=drivesdk) e' separata dal notebook storico originale, che resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
+
+
+## Esperimento in preparazione — A1_VERIFY_ST
+
+Sul branch `feature/a1-verify-st-v1` e' stata implementata una **prima integrazione
+pre-finalizzazione** del verificatore strutturale/temporale, senza introdurre
+nuove classi di regole e senza modificare la ripartizione storica 4+2.
+Il sistema conserva le otto regole R01, R02, R06, R07, R08, R09, R10, R11;
+confronta solo tre coppie cross-layer della stessa famiglia (CPU, memoria,
+read I/O) e non pretende di certificare causalita' o percorsi di propagazione.
+
+La nuova variante e' distinta da `A1_VERIFY`. La procedura sperimentale e'
+documentata in [docs/a1_verify_st_protocol_v1.md](docs/a1_verify_st_protocol_v1.md).
+Contiene un nuovo generatore GT-free di casi development, runner accoppiato
+con salvataggi esclusivi e test offline. La suite sul branch e i nuovi
+run Gemini devono ancora essere verificati/eseguiti nell'ambiente del progetto:
+**nessun punteggio ST e' stato ancora prodotto**. Gli otto casi gia' valutati
+non vengono riutilizzati per stimare l'effetto della nuova variante.
+
