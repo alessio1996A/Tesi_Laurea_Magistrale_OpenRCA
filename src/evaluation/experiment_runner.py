@@ -733,6 +733,20 @@ def run_experiment(
     # 4. COSTRUZIONE DEL GRAFO CONDIVISO
     # =====================================================
 
+    # A1_VERIFY_ST: il report ST e' calcolato in assenza di ground truth.
+    # In A1_VERIFY (baseline) rimane None e il codice del grafo si comporta
+    # come nella versione storica, senza aggiungere token al contesto.
+    structural_context = None
+    if config.variant == "A1_VERIFY_ST":
+        from harness.structural_temporal_verifier import (
+            costruisci_contesto_strutturale_temporale,
+        )
+        structural_context = costruisci_contesto_strutturale_temporale(
+            esperimento["evidence_report"],
+            start_unix=int(caso["start_unix"]),
+            end_unix=int(caso["end_unix"]),
+        )
+
     if config.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
         # Nuovo braccio sperimentale, completamente separato dal grafo
         # A0/A1. Budget totale: esplorazione + verifiche pre-finale.
@@ -749,6 +763,7 @@ def run_experiment(
             evidence_report=esperimento["evidence_report"],
             start_unix=int(caso["start_unix"]),
             end_unix=int(caso["end_unix"]),
+            structural_context=structural_context,
         )
         esecuzione = esegui_grafo_rca_verify(
             grafo=grafo,
