@@ -1,5 +1,17 @@
 # Guida alla presentazione del progetto (2 novembre 2026)
 
+## Aggiornamento: secondo esperimento A1_VERIFY_ST completato (2 novembre 2026)
+
+**Codice storico primo esperimento:** `6927fcfa18fc29fce64ad65eac98231b2ba42184`.
+**Codice congelato secondo esperimento:** `138fb523efec4a665a2424ab2faedb698f10562e`.
+Il branch del relatore include ora entrambi gli esperimenti e puo' ricevere commit documentali successivi: per verificare le run usare i rispettivi commit, non il branch HEAD.
+
+**Risultato A1_VERIFY vs A1_VERIFY_ST (altra coorte development, 8 coppie):** score medio 0,2288 vs 0,2913; vittorie ST 1, sconfitte ST 1, pareggi 6; output JSON validi 7/8 vs 8/8; token 318.154 vs 349.266; durata 536,519 s vs 520,649 s. Miglioramento medio non robusto, concentrato in `cloudbed-2_q053`. A1_VERIFY_ST usa un contesto osservativo cross-layer alla finalizzazione, **non** una verifica causale PAVE.
+
+[Report sperimentale ST e hash dei file su Drive](a1_verify_st_paired_results_2026-11-02.md).
+
+
+
 ## Obiettivo della dimostrazione
 
 Presentare il software Python progettato in PyCharm e gli esperimenti condotti in Google Colab. Lo sviluppo non deve compromettere gli 8 casi accoppiati già conclusi, congelati e valutati.
@@ -30,7 +42,7 @@ Tesi_Laurea_Magistrale_OpenRCA/
 │   │   ├── rule_batch.py          # 8 regole implementate
 │   │   ├── rules/                 # detector per node e container
 │   │   ├── investigation_planner.py
-│   │   └── structural_temporal_verifier.py  # prototipo OFFLINE
+│   │   └── structural_temporal_verifier.py  # contesto ST integrato e osservativo
 │   ├── output/                    # contratto JSON canonico
 │   ├── evaluation/                # runner, coorte, audit, scoring separato
 │   └── tests/                     # regressione software
@@ -93,19 +105,15 @@ I file `record.csv`, `query.csv` e le predizioni storiche NON vanno eliminati se
 - Non cambiare nomi, percorsi o import dei moduli centrali in prossimità della discussione.
 - Eseguire `python -m unittest discover -s src/tests -p 'test_*.py' -v` in PyCharm prima di integrare il branch.
 
-## Demo aggiuntiva PAVE-inspired — offline, non sperimentata sul pilot
+## Secondo esperimento: mostrare i risultati reali, non il vecchio prototipo sintetico
 
-Per mostrare al relatore cosa significa **verifica strutturale e temporale**, eseguire dalla root del progetto:
+Il file dimostrativo sintetico `src/evaluation/demo_verifica_pave_offline.py` **e' stato eliminato** e non va richiamato. Al suo posto utilizzare `src/harness/structural_temporal_verifier.py`, `src/agent/verify_graph.py` e il report ST congelato. Il nuovo confronto non modifica il primo.
 
-```bash
-PYTHONPATH=src python src/evaluation/demo_verifica_pave_offline.py
-```
+**Frozen ST**: `data/protocols/a1_verify_st_paired_development_v1_predictions_frozen_v1.json`, SHA-256 `43e646792685b1cde03052cadc2c8a82749d058a4e04ee0b01f607a7384fd104`.
 
-Il file `src/evaluation/demo_verifica_pave_offline.py` usa gli stessi moduli già presenti nel repository: `structural_temporal_verifier.py` e `observational_verifier.py`. I dati sono **sintetici**, con tre esempi che mostrano relazione osservata sullo stesso host, assenza di relazione fra host differenti e nome di container ambiguo.
+**Scoring ST**: `data/results/a1_verify_st_paired_development_v1_official_scoring_v1.json`, SHA-256 `26f10169e379f9a8ceabcd83923ae7daa72ca90f705e021d77e6eb5772027f45`.
 
-Non richiede Gemini, dataset Market, chiavi API o ground truth. Non altera alcuna predizione. Questo è un prototipo mostrabile **a parte** dal confronto ufficiale A1-R8 / A1_VERIFY: nel pilot, il verificatore strutturale/temporale **non era integrato** nel grafo. Per misurarne l'efficacia servirebbero una variante versionata e nuovi casi development.
-
-Il notebook aggiornato per il relatore può includere questa demo come sezione intermedia fra replay e risultati, ma ogni suo output va etichettato «sintetico, offline, non valutato sull'accuratezza».
+Usare un notebook Colab **di sola lettura**, separato dal notebook storico e senza chiamate Gemini; non eseguire i comandi `--execute-pair` o `--confirm-api`. Per riproducibilita' usare il commit sperimentale ST esatto.
 
 ## Risultati da riportare senza esagerazioni
 
@@ -125,4 +133,4 @@ Interpretazione: significativa riduzione osservata del costo in token (−45,50%
 - Scoring file SHA256: `2504295d89f49c20c5e14da552ee176e54e52286cc2f86c417755367a814fb5f`.
 - Scorer ufficiale Microsoft: commit `2a481ae63cb045c3eadbeca9eddaa10ec1151979`.
 
-**Regola generale:** presentare la ricerca conclusa senza scambiare i prototipi offline per componenti già valutati.
+**Regola generale:** non scambiare il primo prototipo offline per il contesto ST integrato e testato; la relazione osservativa non dimostra causalita'.
