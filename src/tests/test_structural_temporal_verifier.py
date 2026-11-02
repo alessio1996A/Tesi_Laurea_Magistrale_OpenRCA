@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from harness.structural_temporal_verifier import (
     verifica_relazioni_strutturali_temporali,
+    costruisci_contesto_strutturale_temporale,
 )
 from output.openrca_contract import RootCause
 
@@ -257,6 +258,77 @@ class TestStructuralTemporalVerifier(unittest.TestCase):
                 for p in result["relazioni_cross_layer"]
             ]
         self.assertEqual(core(a), core(b))
+
+
+class TestStructuralContextForFinalization(unittest.TestCase):
+    """Verifica offline del report ST per A1_VERIFY_ST, senza Gemini."""
+
+    def context(self, data, max_relazioni=8):
+        return costruisci_contesto_strutturale_temporale(
+            data, start_unix=START, end_unix=END, max_relazioni=max_relazioni
+        )
+
+    def test_three_observable_pairs_no_causal_proof(self):
+        dati = report([
+            cand("R07", "node-5", T),
+            cand("R01", "node-5.frontend-0", T + 120),
+            cand("R08", "node-5", T),
+            cand("R02", "node-5.frontend-0", T),
+            cand("R09", "node-5", T),
+            cand("R06", "node-5.frontend-0", T),
+            cand("R10", "node-5", T),
+            cand("R11", "node-5", T),
+        ])
+        old = copy.deepcopy(dati)
+        result = self.context(dati)
+        self.assertEqual(result["totale_relazioni"], 3)
+        self.assertEqual({r["famiglia"] for r in result["relazioni"]},
+                         {"cpu", "memory", "read_io"})
+        self.assertEqual(result["stato"], "relazioni_osservate")
+        self.assertFalse(result["causa_verificata"])
+        self.assertFalse(result["propagazione_verificata"])
+        self.assertEqual(dati, old)
+
+    def test_different_host_and_family_are_not_merged(self):
+        result = self.context(report([
+            cand("R07", "node-5", T),
+            cand("R01", "node-6.frontend-0", T),
+            cand("R02", "node-5.frontend-0", T),
+        ]))
+        self.assertEqual(result["totale_relazioni"], 0)
+        self.assertEqual(result["stato"], "nessuna_relazione_osservata")
+
+    def test_temporal_order_is_observation_only(self):
+        result = self.context(report([
+            cand("R07", "node-5", T),
+            cand("R01", "node-5.frontend-0", T + 180),
+        ]))
+        self.assertEqual(
+            result["relazioni"][0]["ordine_osservato"],
+            "segnale_nodo_precede_container",
+        )
+        self.assertFalse(result["propagazione_verificata"])
+
+    def test_absent_rules_is_unknown_not_healthy(self):
+        result = self.context(report(include_rules=False))
+        self.assertEqual(result["stato"], "non_valutabile")
+
+    def test_report_budget_truncates_without_discarding_count(self):
+        result = self.context(report([
+            cand("R07", "node-5", T),
+            cand("R01", "node-5.frontend-0", T),
+            cand("R08", "node-5", T),
+            cand("R02", "node-5.frontend-0", T),
+        ]), max_relazioni=1)
+        self.assertEqual(result["totale_relazioni"], 2)
+        self.assertEqual(len(result["relazioni"]), 1)
+        self.assertEqual(result["relazioni_omesse_per_budget"], 1)
+
+    def test_invalid_window_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Finestra"):
+            costruisci_contesto_strutturale_temporale(
+                report([]), start_unix=END, end_unix=START
+            )
 
 
 if __name__ == "__main__":
