@@ -200,6 +200,8 @@ def crea_grafo_rca_verify(
     # L'output non puo' attivare nuovi tool o correggere la ground truth.
     def finale(state: VerifyRCAState):
         context = _contesto_finale_testuale(state["messages"])
+        if structural_context_text is not None:
+            context += "\n\nSTRUCTURAL_CONTEXT_JSON:\n" + structural_context_text
         policy = (
             "\n\nINVESTIGATION VERIFICATION POLICY:\n"
             "Deterministic telemetry checks, when present, are only "
