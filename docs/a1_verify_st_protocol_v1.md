@@ -38,7 +38,7 @@ R10 (write I/O nodo) e R11 (spazio disco nodo) restano nel report senza essere f
 ## Coorte indipendente di sviluppo
 
 Generatore: `src/evaluation/paired_st_cohort.py` (nessun LLM).
-Selezione SHA-256 su `a1-verify-st-2026-11-02-v1|case_id`, 4 development per cloudbed. Esclusi i quattro piloti storici e gli otto casi gia' valutati nel batch A1_VERIFY. Evaluation, mixed_quarantine e OOD_holdout non vengono ispezionati per la selezione.
+Selezione SHA-256 su `a1-verify-st-2026-11-02-v1|case_id`, 4 development per cloudbed. Esclusi i quattro piloti storici e gli otto casi gia' valutati nel batch A1_VERIFY **sia per case_id che per sovrapposizione delle finestre nel medesimo cloudbed**. La selezione garantisce inoltre che i nuovi otto casi non si sovrappongano fra loro. Questo evita di scambiare due task sullo stesso incidente per casi indipendenti. Evaluation, mixed_quarantine e OOD_holdout non vengono ispezionati per la selezione.
 
 Le 16 esecuzioni (8 coppie, 1 run per braccio/caso) devono usare:
 - stessa versione SHA del codice, stesso modello/provider, stessi dati e stesse istruzioni;
