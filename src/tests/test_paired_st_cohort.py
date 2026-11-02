@@ -72,6 +72,37 @@ class TestPairedStructuralCohort(unittest.TestCase):
             sum(pair["cloudbed"] == "cloudbed-2" for pair in first["pairs"]), 4
         )
 
+    def test_same_historical_window_is_excluded_even_with_different_id(self):
+        with TemporaryDirectory() as tmp:
+            split, manifest = self.make_inputs(Path(tmp))
+            initial = costruisci_piano(split, manifest)
+            target = next(p["case_id"] for p in initial["pairs"]
+                          if p["cloudbed"] == "cloudbed-1")
+            historical = "cloudbed-1_q052"
+
+            def replace_window(path):
+                with path.open("r", newline="", encoding="utf-8") as inp:
+                    reader = csv.DictReader(inp)
+                    fields = reader.fieldnames
+                    rows = list(reader)
+                old = next(r for r in rows if r["case_id"] == historical)
+                victim = next(r for r in rows if r["case_id"] == target)
+                victim["start_unix"], victim["end_unix"] = (
+                    old["start_unix"], old["end_unix"]
+                )
+                with path.open("w", newline="", encoding="utf-8") as output:
+                    writer = csv.DictWriter(output, fieldnames=fields)
+                    writer.writeheader()
+                    writer.writerows(rows)
+
+            replace_window(split)
+            replace_window(manifest)
+            new_plan = costruisci_piano(split, manifest)
+            self.assertNotIn(
+                target, {row["case_id"] for row in new_plan["pairs"]}
+            )
+            self.assertEqual(new_plan["case_count"], 8)
+
     def test_label_column_rejected(self):
         with TemporaryDirectory() as tmp:
             split, manifest = self.make_inputs(Path(tmp), extra_gt=True)
