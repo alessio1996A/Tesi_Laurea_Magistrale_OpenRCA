@@ -1010,12 +1010,22 @@ def run_experiment(
         "tool_trajectory": esecuzione["tool_trajectory"]
     }
 
-    if config.variant == "A1_VERIFY":
+    if config.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
         risultato["verification"] = esecuzione["verification"]
         risultato["max_verification_checks"] = config.max_verification_checks
         risultato["exploration_round_limit"] = (
             config.max_tool_rounds - config.max_verification_checks
         )
+
+    if config.variant == "A1_VERIFY_ST":
+        # Il report osservativo e' conservato separato dalla diagnosi.
+        risultato["structural_temporal_context"] = structural_context
+        risultato["structural_temporal_context_sha256"] = hashlib.sha256(
+            json.dumps(
+                structural_context, sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"), allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
 
     # Per i nuovi audit conserviamo separatamente l'esito canonico:
     # la predizione originale e le metriche restano invariate.
