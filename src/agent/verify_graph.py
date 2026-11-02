@@ -96,6 +96,18 @@ def crea_grafo_rca_verify(
 
     # Dei round totali, una quota e' riservata alle verifiche mirate.
     # Con budget 6 e max_verification_checks=2: 4 round esplorativi.
+    # Il contesto strutturale e' opzionale e non altera la policy del planner.
+    if structural_context is not None and (
+        not isinstance(structural_context, dict)
+        or structural_context.get("versione") != "structural_temporal_context_v1"
+        or structural_context.get("causa_verificata") is not False
+        or structural_context.get("propagazione_verificata") is not False
+    ):
+        raise ValueError("Contesto strutturale non valido")
+    structural_context_text = (
+        json.dumps(structural_context, sort_keys=True, ensure_ascii=False, allow_nan=False)
+        if structural_context is not None else None
+    )
     exploration_budget = max_tool_rounds - max_verification_checks
     llm_with_tools = llm.bind_tools(tools)
 
