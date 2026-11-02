@@ -16,9 +16,10 @@ Il branch del relatore include ora entrambi gli esperimenti e puo' ricevere comm
 
 Presentare il software Python progettato in PyCharm e gli esperimenti condotti in Google Colab. Lo sviluppo non deve compromettere gli 8 casi accoppiati già conclusi, congelati e valutati.
 
-**Commit sperimentale immutabile**: `6927fcfa18fc29fce64ad65eac98231b2ba42184`.
+**Commit sperimentale del primo confronto**: `6927fcfa18fc29fce64ad65eac98231b2ba42184`.
+**Commit sperimentale del confronto ST**: `138fb523efec4a665a2424ab2faedb698f10562e`.
 **Branch di presentazione**: `presentation/relatore-2026-11-02`.
-Questo branch contiene solo pulizia documentale, commenti e rimozione di file locali dell'IDE.
+Questo branch contiene anche il codice A1_VERIFY_ST e documentazione aggiornata. I due commit sperimentali fissati restano i riferimenti per verificare le run.
 
 ## Struttura del repository
 
@@ -107,7 +108,9 @@ I file `record.csv`, `query.csv` e le predizioni storiche NON vanno eliminati se
 
 ## Secondo esperimento: mostrare i risultati reali, non il vecchio prototipo sintetico
 
-Il file dimostrativo sintetico `src/evaluation/demo_verifica_pave_offline.py` **e' stato eliminato** e non va richiamato. Al suo posto utilizzare `src/harness/structural_temporal_verifier.py`, `src/agent/verify_graph.py` e il report ST congelato. Il nuovo confronto non modifica il primo.
+Il file dimostrativo sintetico `src/evaluation/demo_verifica_pave_offline.py` **e' stato eliminato** e non va richiamato.
+
+Per la demo aggiornata aprire [Colab_Demo_Relatore_A1_VERIFY_ST.ipynb](../notebooks/Colab_Demo_Relatore_A1_VERIFY_ST.ipynb): notebook indipendente **di sola lettura** che verifica i manifest e visualizza la tabella appaiata, senza chiamate API. Per il piano di verifica delle 3 nuove regole consultare [r11_feasibility_plan_v1.md](r11_feasibility_plan_v1.md). Al suo posto utilizzare `src/harness/structural_temporal_verifier.py`, `src/agent/verify_graph.py` e il report ST congelato. Il nuovo confronto non modifica il primo.
 
 **Frozen ST**: `data/protocols/a1_verify_st_paired_development_v1_predictions_frozen_v1.json`, SHA-256 `43e646792685b1cde03052cadc2c8a82749d058a4e04ee0b01f607a7384fd104`.
 
