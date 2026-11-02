@@ -240,3 +240,113 @@ def verifica_relazioni_strutturali_temporali(
     result["relazioni_cross_layer"] = pairs
     result["stato"] = "relazioni_osservate" if pairs else "nessuna_relazione_osservata"
     return result
+
+
+def costruisci_contesto_strutturale_temporale(
+    evidence_report: dict | None,
+    *,
+    start_unix: int,
+    end_unix: int,
+    tolleranza_secondi: int = 60,
+    max_relazioni: int = 8,
+) -> dict[str, Any]:
+    """Estrae relazioni cross-layer PRIMA della diagnosi dell'LLM.
+
+    A differenza di verifica_relazioni_strutturali_temporali, non richiede
+    una RootCause: percio' e' adatto al contesto della finalizzazione A1_VERIFY_ST.
+
+    I soli collegamenti ammessi sono gli identificativi qualificati
+    node-N.container e i KPI della stessa famiglia su nodo/container.
+    L'ordine dei primi segnali NON e' una dimostrazione di propagazione.
+    Questa funzione non usa ground truth, tool o modelli LLM.
+    """
+    if type(start_unix) is not int or type(end_unix) is not int or start_unix >= end_unix:
+        raise ValueError("Finestra temporale non valida")
+    if type(tolleranza_secondi) is not int or tolleranza_secondi < 0:
+        raise ValueError("Tolleranza non valida")
+    if type(max_relazioni) is not int or max_relazioni < 1:
+        raise ValueError("Limite relazioni non valido")
+
+    base = {
+        "versione": "structural_temporal_context_v1",
+        "stato": "non_valutabile",
+        "relazioni": [],
+        "totale_relazioni": 0,
+        "relazioni_omesse_per_budget": 0,
+        "causa_verificata": False,
+        "propagazione_verificata": False,
+        "nota": (
+            "Associazioni lessicali nodo-container e ordine dei segnali; "
+            "non rappresentano una topologia di servizi verificata, "
+            "un percorso di propagazione o una prova causale. "
+            "L'assenza di una coppia non esclude un guasto."
+        ),
+    }
+    if evidence_report is None:
+        return base
+    if not isinstance(evidence_report, dict):
+        raise TypeError("Report evidenze non valido")
+    if evidence_report.get("versione") != "unified_evidence_v2":
+        raise ValueError("Versione report evidenze inattesa")
+    case = evidence_report.get("caso")
+    if not isinstance(case, dict) or (case.get("start_unix"), case.get("end_unix")) != (start_unix, end_unix):
+        raise ValueError("Finestra report non coerente con il caso")
+
+    rules = evidence_report.get("regole_diagnostiche_v0")
+    if rules is None:
+        return base
+    if not isinstance(rules, dict) or rules.get("versione") != "rule_based_A1_R_v1":
+        raise ValueError("Report regole non valido")
+    w = rules.get("finestra")
+    if not isinstance(w, dict) or (w.get("start_unix"), w.get("end_unix")) != (start_unix, end_unix):
+        raise ValueError("Finestra regole non coerente")
+    omitted = rules.get("candidati_omessi_per_budget")
+    if type(omitted) is not int or omitted < 0:
+        raise ValueError("Numero candidati omessi non valido")
+
+    # Validazione riutilizzata dal verificatore offline esistente.
+    # Le anomalie non vengono ordinate per gravita' o causalita'.
+    candidates = _normalize_candidates(evidence_report, start_unix, end_unix)
+    nodes = [item for item in candidates if item["scope"] == "node"]
+    containers = [item for item in candidates if item["scope"] == "container"]
+
+    pairs = []
+    for node in nodes:
+        for container in containers:
+            if node["host"] != container["host"] or node["family"] != container["family"]:
+                continue
+            # Le famiglie confrontabili sono CPU, memoria e read I/O:
+            # R10 e R11 restano nel report, ma non hanno una coppia container.
+            delta = container["first"] - node["first"]
+            if abs(delta) <= tolleranza_secondi:
+                order = "segnali_quasi_contemporanei"
+            elif delta > 0:
+                order = "segnale_nodo_precede_container"
+            else:
+                order = "segnale_container_precede_nodo"
+            pairs.append({
+                "host": node["host"],
+                "container": container["component"],
+                "famiglia": node["family"],
+                "regola_nodo": node["rule"],
+                "regola_container": container["rule"],
+                "delta_secondi_container_meno_nodo": delta,
+                "ordine_osservato": order,
+                "provenienza": [
+                    f"regole_diagnostiche_v0.candidati_riportati[{node['source_index']}]",
+                    f"regole_diagnostiche_v0.candidati_riportati[{container['source_index']}]",
+                ],
+            })
+    pairs.sort(key=lambda x: (
+        x["host"], x["container"], x["famiglia"], x["regola_nodo"],
+        x["regola_container"], x["delta_secondi_container_meno_nodo"],
+    ))
+    return {
+        **base,
+        "stato": "relazioni_osservate" if pairs else "nessuna_relazione_osservata",
+        "relazioni": pairs[:max_relazioni],
+        "totale_relazioni": len(pairs),
+        "relazioni_omesse_per_budget": max(0, len(pairs) - max_relazioni),
+        "candidati_omessi_dal_report_regole": omitted,
+        "famiglie_potenzialmente_confrontabili": ["cpu", "memory", "read_io"],
+    }
