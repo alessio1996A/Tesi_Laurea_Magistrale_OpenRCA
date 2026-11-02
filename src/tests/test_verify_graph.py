@@ -334,5 +334,59 @@ class TestVerificationGraph(unittest.TestCase):
         self.assertEqual(result["metrics"]["tool_rounds"], 1)
 
 
+class TestVerifyStructuralIntegration(unittest.TestCase):
+    """Il confronto A1_VERIFY/ST isola la sola informazione aggiunta."""
+
+    def test_same_budget_same_planner_more_structural_context(self):
+        from harness.structural_temporal_verifier import (
+            costruisci_contesto_strutturale_temporale,
+        )
+        data = report([
+            candidate("R07", "node-5", "node CPU load"),
+            candidate("R01", "node-5.frontend-0", "container CPU load"),
+        ])
+        st = costruisci_contesto_strutturale_temporale(
+            data, start_unix=START, end_unix=END
+        )
+        self.assertEqual(st["totale_relazioni"], 1)
+
+        def run_for(structural_context):
+            fake = FakeModel([msg("Explore done")])
+            graph = crea_grafo_rca_verify(
+                llm=fake, tools=TOOLS, system_prompt="You are an RCA agent",
+                max_tool_rounds=6, max_verification_checks=2,
+                evidence_report=data, start_unix=START, end_unix=END,
+                structural_context=structural_context,
+            )
+            output = esegui_grafo_rca_verify(
+                graph, richiesta="Investigate", verbose=False
+            )
+            last_context = fake.calls[-1][1][-1].content
+            return output, last_context
+
+        baseline, baseline_context = run_for(None)
+        extended, extended_context = run_for(st)
+        self.assertEqual(baseline["raw_response"], extended["raw_response"])
+        self.assertEqual(
+            baseline["metrics"]["verification_tool_rounds"],
+            extended["metrics"]["verification_tool_rounds"]
+        )
+        self.assertNotIn("STRUCTURAL_CONTEXT_JSON", baseline_context)
+        self.assertIn("STRUCTURAL_CONTEXT_JSON", extended_context)
+        self.assertIn("segnali_quasi_contemporanei", extended_context)
+
+    def test_new_variant_config_is_4_plus_2(self):
+        from agent.prompts import get_system_prompt
+        config = ExperimentConfig(
+            variant="A1_VERIFY_ST", case_id="cloudbed-1_q009",
+            max_tool_rounds=6, max_verification_checks=2,
+        )
+        self.assertEqual(config.max_tool_rounds - config.max_verification_checks, 4)
+        self.assertEqual(
+            get_system_prompt("A1_VERIFY_ST"),
+            get_system_prompt("A1_VERIFY"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
