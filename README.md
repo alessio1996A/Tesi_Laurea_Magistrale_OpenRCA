@@ -201,7 +201,7 @@ a blocchi e limitare il consumo di memoria.
 
 **Sperimentato:** primo confronto accoppiato `A1-R8` vs `A1_VERIFY`, otto casi development (16 run), `gemini-3.5-flash-lite`. Score OpenRCA medio 0,3850 vs 0,3225; token 474.590 vs 258.649 (−45,50%); tempo 709,365 s vs 598,321 s (−15,65%). Gli output JSON validi sono stati 7/8 vs 8/8. Il vantaggio di efficienza **non** equivale a maggiore accuratezza.
 
-**Non completato:** replica integrale di PAVE; verifica di propagazione causale; integrazione online dei prototipi di verifica strutturale/temporale; knowledge transfer autonomo; test di generalizzazione sugli holdout OOD; provider aggiuntivi. Il codice della factory è predisposto per provider multipli, ma al momento è implementato soltanto Google/Gemini.
+**Non completato:** replica integrale di PAVE; verifica causale e ricostruzione di percorsi di propagazione fra servizi; knowledge transfer autonomo; test di generalizzazione sugli holdout OOD; provider aggiuntivi. Il codice della factory è predisposto per provider multipli, ma al momento è implementato soltanto Google/Gemini.
 
 ### Navigazione rapida
 
@@ -227,20 +227,34 @@ a blocchi e limitare il consumo di memoria.
 Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. La [versione demo su Drive](https://drive.google.com/file/d/1JIdqEdpvHuUIgDQ96_QCFabBBCf2IGyP/view?usp=drivesdk) e' separata dal notebook storico originale, che resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
 
 
-## Esperimento in preparazione — A1_VERIFY_ST
+## Secondo confronto completato — A1_VERIFY vs A1_VERIFY_ST
 
-Sul branch `feature/a1-verify-st-v1` e' stata implementata una **prima integrazione
-pre-finalizzazione** del verificatore strutturale/temporale, senza introdurre
-nuove classi di regole e senza modificare la ripartizione storica 4+2.
-Il sistema conserva le otto regole R01, R02, R06, R07, R08, R09, R10, R11;
-confronta solo tre coppie cross-layer della stessa famiglia (CPU, memoria,
-read I/O) e non pretende di certificare causalita' o percorsi di propagazione.
+La variante `A1_VERIFY_ST` e' stata implementata e valutata nel commit sperimentale
+`138fb523efec4a665a2424ab2faedb698f10562e` (indipendente dai
+futuri commit documentali del branch di presentazione). Confronto appaiato su
+**8 casi development nuovi, 16 run, evidenze iniziali identiche**, budget massimo
+**4+2** e modello `gemini-3.5-flash-lite`:
 
-La nuova variante e' distinta da `A1_VERIFY`. La procedura sperimentale e'
-documentata in [docs/a1_verify_st_protocol_v1.md](docs/a1_verify_st_protocol_v1.md).
-Contiene un nuovo generatore GT-free di casi development, runner accoppiato
-con salvataggi esclusivi e test offline. La suite sul branch e i nuovi
-run Gemini devono ancora essere verificati/eseguiti nell'ambiente del progetto:
-**nessun punteggio ST e' stato ancora prodotto**. Gli otto casi gia' valutati
-non vengono riutilizzati per stimare l'effetto della nuova variante.
+| Misura | A1_VERIFY | A1_VERIFY_ST |
+| --- | ---: | ---: |
+| Score medio ufficiale | 0,2288 | 0,2913 |
+| Score esatto 1 | 0/8 | 1/8 |
+| JSON conformi (parser legacy) | 7/8 | 8/8 |
+| Token | 318.154 | 349.266 |
+| Secondi end-to-end | 536,519 | 520,649 |
 
+**Risultato appaiato:** ST migliora in 1 caso, peggiora in 1 e pareggia in 6.
+La media positiva (+0,0625) dipende principalmente da un singolo incidente.
+Non e' una prova di maggiore accuratezza generalizzabile. I risultati sono stati
+congelati **prima** dello scoring ufficiale.
+
+- Protocollo: [docs/a1_verify_st_protocol_v1.md](docs/a1_verify_st_protocol_v1.md)
+- Report per relatore, casi, limiti, hash e percorsi Drive:
+  [docs/a1_verify_st_paired_results_2026-11-02.md](docs/a1_verify_st_paired_results_2026-11-02.md).
+- Freeze manifest SHA-256: `43e646792685b1cde03052cadc2c8a82749d058a4e04ee0b01f607a7384fd104`.
+- Scoring SHA-256: `26f10169e379f9a8ceabcd83923ae7daa72ca90f705e021d77e6eb5772027f45`.
+
+Il modulo strutturale-temporale e' ora **integrato nella finalizzazione**
+di A1_VERIFY_ST, ma non ricostruisce ne' verifica ancora percorsi causali
+di propagazione fra microservizi. La copertura attuale resta di 8 regole:
+R03, R04 e R05 sono una possibile estensione, **da valutare prima di implementarla**.
