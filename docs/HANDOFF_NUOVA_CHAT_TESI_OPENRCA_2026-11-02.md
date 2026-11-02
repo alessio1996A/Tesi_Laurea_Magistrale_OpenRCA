@@ -155,3 +155,84 @@ Usare `docs/r11_feasibility_plan_v1.md`. **Se mancano segnali specifici non inve
 ## 10. Avvertenza su continuità della chat
 
 La memoria trasversale di ChatGPT può aiutare ma **non conserva necessariamente ogni dettaglio, file, hash e comando**. Il presente file è il punto di riferimento duraturo. Nella nuova chat chiedere esplicitamente di leggerlo e riprendere dall'audit GT-free R03–R05. Se una fonte non è accessibile, non inventare lo stato corrente: recuperarla tramite il connettore GitHub o il repository locale.
+
+
+---
+
+## 11. Fonti scientifiche recuperate e studiate
+
+**Questo paragrafo è un indice ragionato, NON sostituisce le pubblicazioni originali.** I testi originali sono stati precedentemente caricati nella Library ChatGPT; una nuova chat con accesso alla Library può cercarli per nome. Per una verifica di citazioni e dettagli tecnici leggere le fonti originali; non attribuire loro risultati solo sulla base di questa sintesi.
+
+1. **OpenRCA 1.0** — Junjielong Xu, Qinan Zhang, Zhiqing Zhong, Shilin He e altri, *OpenRCA: Can Large Language Models Locate the Root Cause of Software Failures?*, ICLR 2025; PDF già studiato con nome `13411_OpenRCA_Can_Large_Langua.pdf`. Benchmark generale: **335 failure cases** da 3 sistemi, >68 GB di telemetria (metriche, log e trace); **Market** usato nella tesi è un sottoinsieme distinto con **148 casi**, 44 componenti e 15 categorie. Il paper propone un RCA-agent che riceve una query, interroga tool e ricerca cause (elementi richiesti: tempo, componente, reason). L'esito storico riportato nel paper per Claude 3.5 è 11,34% di casi risolti nel setting studiato: **non è direttamente confrontabile** con gli score dei nostri otto casi Market.
+   - Codice/benchmark: https://github.com/microsoft/OpenRCA
+2. **OpenRCA 2.0 / PAVE** — Aoyang Fang, Yifan Yang, Jin'ao Shang e altri, *OpenRCA 2.0: From Outcome Labels to Causal Process Supervision*, arXiv:2606.27154v2, 30 giugno 2026; PDF in Library `2606.27154v2.pdf` (sono presenti anche copie numerate). PAVE significa **Path Annotation via Verified Effects**: annota e verifica step-wise percorsi di propagazione in **record di fault injection con interventi noti** (causa→effetto, forward verification), con controllo di topologia, anomalie di telemetria e compatibilità temporale. OpenRCA 2.0 propone 500 istanze cross-system con annotazioni causali. Distinguere metriche di risultato (root-cause accuracy) da metriche di **percorso** (path reachability, node/edge matching). **La nostra implementazione sul Market 1.0 non possiede gli interventi/annotazioni di quel setting e NON riproduce il protocollo PAVE.**
+   - Paper: https://arxiv.org/abs/2606.27154
+3. **White paper di lavoro sulle tecniche** — *Agent Harness, Agent Harnessing e Harness Engineering — Definizioni, perimetro architetturale, tassonomia delle tecniche e analisi critica della letteratura*, **versione 1.0, 13 ottobre 2026, 14 pagine**. Documenti della Library ChatGPT: `Agent_Harnessing_2026.docx`, `Agent_Harnessing_2026(1).docx`. Fonte di **definizioni operative e tassonomia proposta**, non un nuovo benchmark empirico né una legge che molte più tecniche migliorino sempre l'agente.
+
+### Definizioni e concetti chiave del white paper
+
+- **Agent Harness** = runtime che media e governa ciclo modello–ambiente, azioni, contesto, stato e verifiche.
+- **Agent Harnessing** = strategie runtime che regolano osservazioni, azioni, controllo, feedback senza cambiare i pesi dell'LLM.
+- **Harness Engineering** = progettare, implementare, versionare, valutare e migliorare l'harness con costi, rischi e qualità misurabili.
+- Distinguere **prompt engineering** (istruzioni), **context engineering** (selezione/struttura informazioni), **harnessing** (governo operativo) ed **engineering** (processo scientifico e software).
+- Principio guida: partire da baseline minima, identificare failure mode, cambiare **una tecnica alla volta**, usare ablation e regression, considerare token/tempo/accuratezza/validità. Più componenti non implicano migliore qualità.
+
+### Le sedici voci della tassonomia del white paper (stessi titoli/numeri del testo)
+
+1. Agent execution loop e ReAct.
+2. Tool calling, action interface e tool design.
+3. Context construction e retrieval policy.
+4. Context compaction.
+5. Tool-output offloading.
+6. Progressive disclosure di skills e tools.
+7. Persistent memory e task state management.
+8. Planning e task decomposition.
+9. Multi-agent orchestration e delegation.
+10. Hooks, middleware e guardrail deterministici.
+11. Sandboxing e constrained execution.
+12. Feedback loop, self-verification e external verification.
+13. Human-in-the-loop e handoff.
+14. Observability, tracing ed evaluation.
+15. Instruction, prompt e policy management.
+16. Long-running execution, checkpoint e session handoff.
+
+Il white paper distingue **6 responsabilità funzionali** dell'harness (Guo et al.: observation, context, control, action, state, verification/governance) e **7 sottosistemi** ricorrenti nei coding agent (Barbaste et al.: agent loop, LLM integration, tools/actions, memory/context, safety/permissions, orchestration, extensibility). Queste due mappe sono classificazioni con granularità diverse, **non** 6 o 7 ulteriori tecniche da sommare alle 16.
+
+**Tecniche effettivamente pertinenti/realizzate nella nostra tesi:** 1 loop agentico LangGraph; 2 tool calling sui 5 tool e guardie di finestra; 3 costruzione/sintesi del contesto per RCA; 8 planning (4 round LLM + max 2 controlli); 10 validazione degli input/output e vincoli; 12 feedback osservativo e verifica di copertura, non di causalità; 14 tracing, audit, token/tempo, scorer e test; 15 prompt/output contract versionati; 16 freeze, provenance, manifest e isolamento dei run. **Non dichiarare che tutte le 16 siano state implementate.**
+
+White paper: il primo harness può perfino peggiorare l'esito (es. Dhage), e il valore delle tecniche è **model/task-dependent**. Per questo abbiamo interpretato rigorosamente 1 vittoria ST, 1 sconfitta e 6 pareggi.
+
+### Altri paper di Harness Engineering citati dal white paper (riferimenti da verificare per uso in bibliografia finale)
+
+- Guo et al. (2026), *From Question Answering to Task Completion: A Survey on Agent System and Harness Design* (arXiv:2606.20683).
+- Barbaste et al. (2026), *Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents—A Source-Code Study of Eleven Systems* (arXiv:2609.00006).
+- Lin et al. (2026), *Agentic Harness Engineering: Observability-Driven Automatic Evolution of Coding-Agent Harnesses* (arXiv:2604.25850).
+- Lee et al. (2026), *Meta-Harness: End-to-End Optimization of Model Harnesses* (arXiv:2603.28052).
+- Zhang et al. (2026), *Self-Harness: Harnesses That Improve Themselves* (arXiv:2606.09498).
+- Dhage (2026), *Harness Engineering for Predictable Agentic Systems: An Empirical Study of Deterministic Execution Constraints* (arXiv:2608.26197).
+- Yao et al., *ReAct* (arXiv:2210.03629); Yang et al., *SWE-agent* (arXiv:2405.15793); Shinn et al., *Reflexion* (arXiv:2303.11366); Gou et al., *CRITIC* (arXiv:2305.11738).
+- Practitioner: Addy Osmani, *Agent Harness Engineering* (2026); Hamel Bowne-Anderson, *Stop Overengineering Your Agent Harness* (2026).
+- **Questi sono riferimenti contenuti nel white paper**; distinguere la loro bibliografia dall'effettiva lettura/validazione integrale di ogni singolo paper. Consultare le fonti originali prima di riportare cifre o citazioni nella tesi.
+
+## 12. Indicazioni del professore/relatore — ricostruzione prudente da conversazioni precedenti
+
+**Provenienza e limite:** il 21 ottobre 2026 l'utente ha condiviso la trascrizione di un colloquio con il relatore su Agent AI, LangGraph, Harness Engineering e OpenRCA Market. Non disponiamo qui della trascrizione integrale verificabile parola per parola. I punti sotto sono una **ricostruzione di note e risposte successive**, non citazioni letterali e non necessariamente tutti ordini esplicitamente pronunciati dal professore. Per contestazioni e formulazioni precise recuperare la trascrizione originale.
+
+- **Obiettivo discusso:** studiare come il codice esterno di harnessing che recupera e prepara il contesto cambi il comportamento di un agente RCA a pesi fissi, rispetto a un agente senza harness. Far emergere qualità/efficienza, non solo una demo che funziona.
+- **Prova iniziale suggerita:** un pilot limitato (nelle note ricorre una prova di circa **tre giorni**, eventualmente partendo dal sistema più piccolo) per confermare fattibilità prima di investire in una pipeline più grande. Questo si riferiva alla fase iniziale, già superata.
+- **Confrontabilità:** stessi casi, task, modello, formato e condizioni quando si confrontano varianti; misurare accuratezza, falsi positivi/coverage, tempi e token. Distinguere i risultati storici da ablation appaiate sullo stesso insieme di casi.
+- **Progressione architetturale discussa:** A0 agente autonomo vs A1 con preparazione deterministica del contesto; possibili livelli successivi di compatibilità temporale, dipendenze e verifiche, ed eventualmente integrazione ibrida. Nei primi riassunti di conversazione compariva una terminologia *concettuale* `B0` baseline rule-based, `A0`, `A1`, `A2`, `A3`, `A4`: **non confonderla** con le varianti realmente implementate e attualmente denominate `A1_V2`, `A1-R8`, `A1_VERIFY`, `A1_VERIFY_ST`.
+- **Possibile obiettivo avanzato:** valutare se diagnosi validate possano diventare nuove regole deterministiche (*knowledge transfer*), tenendo categorie di guasto OOD non viste durante il training/sviluppo. Questo resta **futuro**: nessun loop automatico di apprendimento o nuova regola validata è stato implementato finora.
+- **PAVE/OpenRCA 2.0:** fonte di idee per aggiungere dipendenze e verifiche osservabili, senza affermare che un grafo dedotto da soli `cmdb_id` equivalga a causalità accertata. Non confondere l'eventuale roadmap concettuale discussa con una richiesta formalmente conclusa o con un esperimento già eseguito.
+
+### Cose NON disponibili in modo completo con l'attuale recupero
+
+- **Parole testuali e ordine completo della trascrizione con il professore**, eventuali ulteriori richieste, scadenze, nomi o decisioni successive non registrate negli estratti.
+- **Testo completo dei tre documenti scientifici nel repository**: il GitHub contiene i riferimenti/riassunti ma non i PDF/DOCX originali; i file sono stati individuati nella Library di ChatGPT. Per discussioni puntuali su formule, figure e limiti dei paper, consultarli direttamente.
+- **Trascrizione completa di tutte le vecchie chat**: la memoria può riassumere ma non essere un registro perfetto.
+
+Se nella nuova conversazione emerge un punto attribuito al professore ma non documentato, **non inventare né attribuire frasi letterali**. Recuperare gli appunti o chiedere all'utente il testo originale solo se davvero indispensabile.
+
+## 13. Ripresa consigliata nella nuova chat
+
+L'utente deve incollare: «Leggi integralmente `docs/HANDOFF_NUOVA_CHAT_TESI_OPENRCA_2026-11-02.md` sul branch `presentation/relatore-2026-11-02`; recupera quando necessario il white paper `Agent_Harnessing_2026.docx`, OpenRCA 1.0 e OpenRCA 2.0 dalla Library. Considera le note sul relatore una ricostruzione da verificare, non citazioni verbatim. Riprendiamo dall'audit GT-free R03/R04/R05, senza nuove chiamate Gemini e senza modificare i freeze.»
