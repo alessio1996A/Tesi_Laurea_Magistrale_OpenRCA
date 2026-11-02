@@ -65,6 +65,7 @@ def crea_grafo_rca_verify(
     evidence_report: dict,
     start_unix: int,
     end_unix: int,
+    structural_context: dict | None = None,
 ):
     """Crea una variante chiusa, isolata e provider-agnostic.
 
