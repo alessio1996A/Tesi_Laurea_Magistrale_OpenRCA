@@ -224,4 +224,4 @@ a blocchi e limitare il consumo di memoria.
 - Freeze: `data/protocols/a1_verify_paired_development_v1_results_freeze_v1.json` — SHA-256 `e8c350d3e3372d0e4afb6fd63d60f2f5632394bc7e2a4b996ca0ff864ae2ccf0`.
 - Scoring: `data/results/scoring/a1_verify_paired_development_v1_official_scoring_v1.json` — SHA-256 `2504295d89f49c20c5e14da552ee176e54e52286cc2f86c417755367a814fb5f`.
 
-Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. Il notebook storico originale di Colab resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
+Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. La [versione demo su Drive](https://drive.google.com/file/d/1JIdqEdpvHuUIgDQ96_QCFabBBCf2IGyP/view?usp=drivesdk) e' separata dal notebook storico originale, che resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
