@@ -15,6 +15,8 @@ import pandas as pd
 
 # Explicit allowlist: held-out Market fault classes are deliberately absent.
 
+# Catalogo delle otto classi diagnostiche attualmente coperte.
+# Ogni voce indica ID, livello di telemetria, modulo, funzione e nome della classe.
 RULE_SPECS = (
     ("R01", "container", "harness.rules.rule_container_cpu",
      "valuta_r01_container_cpu", "container CPU load"),
@@ -108,6 +110,8 @@ def costruisci_evidenze_regole(
     if not isinstance(max_candidati_report, int) or max_candidati_report < 1:
         raise ValueError("max_candidati_report deve essere un intero positivo")
 
+    # La baseline e' una porzione iniziale DELLA finestra del caso:
+    # potrebbe contenere un'anomalia e non costituisce ground truth.
     baseline_end = start_unix + int((end_unix - start_unix) * quota_baseline)
     if not start_unix < baseline_end < end_unix:
         raise ValueError("Finestra troppo corta per la baseline")
@@ -117,6 +121,8 @@ def costruisci_evidenze_regole(
     candidates: list[dict[str, Any]] = []
     per_rule: list[dict[str, Any]] = []
 
+    # Eseguiamo ogni regola su tutti i componenti osservati nel suo livello.
+    # Produciamo ipotesi candidate, mai una root cause gia' confermata.
     for rule_id, kind, module_name, func_name, expected_class in RULE_SPECS:
         function = getattr(import_module(module_name), func_name)
         counters = Counter()
@@ -168,6 +174,7 @@ def costruisci_evidenze_regole(
         })
 
     # Stable ordering; no implied causal ranking, no time-based preference.
+    # Ordinamento stabile: NON rappresenta una graduatoria causale.
     candidates.sort(key=lambda c: (c["regola"], c["componente_telemetria"]))
     output = {
         "versione": "rule_based_A1_R_v1",
