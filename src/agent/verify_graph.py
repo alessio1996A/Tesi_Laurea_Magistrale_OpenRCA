@@ -93,9 +93,12 @@ def crea_grafo_rca_verify(
     if not required.issubset(tool_names):
         raise ValueError("Tool metriche obbligatori mancanti")
 
+    # Dei round totali, una quota e' riservata alle verifiche mirate.
+    # Con budget 6 e max_verification_checks=2: 4 round esplorativi.
     exploration_budget = max_tool_rounds - max_verification_checks
     llm_with_tools = llm.bind_tools(tools)
 
+    # Fase 1: l'LLM sceglie liberamente i tool fino al budget esplorativo.
     def agente(state: VerifyRCAState):
         rounds = state.get("exploration_rounds", 0)
         if rounds >= exploration_budget:
@@ -114,6 +117,8 @@ def crea_grafo_rca_verify(
     def route_agente(state: VerifyRCAState):
         return "tools" if state.get("phase") == "exploring" else "planner"
 
+    # Fase 2: il planner usa SOLO evidenze e traiettoria gia' osservate.
+    # Le sue proposte non sono prove causali ne' chiamate all'LLM.
     def planner(state: VerifyRCAState):
         exploration_rounds = state.get("exploration_rounds", 0)
         available = max_tool_rounds - exploration_rounds
@@ -133,6 +138,8 @@ def crea_grafo_rca_verify(
             "verification_status": report["stato"],
         }
 
+    # Fase 3: ToolNode esegue i controlli deterministici ammessi.
+    # Ogni verifica occupa un round ma non richiede una scelta LLM.
     def verifica(state: VerifyRCAState):
         plan = state.get("verification_plan", [])
         cursor = state.get("verification_cursor", 0)
@@ -176,6 +183,8 @@ def crea_grafo_rca_verify(
             else "agente"
         )
 
+    # Fase 4: una sola chiamata LLM per la diagnosi definitiva.
+    # L'output non puo' attivare nuovi tool o correggere la ground truth.
     def finale(state: VerifyRCAState):
         context = _contesto_finale_testuale(state["messages"])
         policy = (
