@@ -6,7 +6,7 @@ import re
 
 # Varianti sperimentali supportate.
 # A1_V2 usa il report unificato senza la sezione delle regole.
-Variant = Literal["A0", "A1", "A1_V2", "A1_VERIFY"]
+Variant = Literal["A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"]
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,7 @@ class ExperimentConfig:
     # audit: aggiunge una diagnosi della conformita\u0027 senza modificarle.
     output_contract_mode: Literal["legacy", "audit", "structured"] = "legacy"
 
-    # Solo A1_VERIFY: round riservati a controlli mirati pre-finalizzazione.
+    # A1_VERIFY e A1_VERIFY_ST: stesso budget di 4 esplorazioni + 2 verifiche.
     # Posizionato alla fine per preservare le firme storiche.
     max_verification_checks: int = 2
 
@@ -57,7 +57,7 @@ class ExperimentConfig:
         Verifica la validità della configurazione.
         """
 
-        if self.variant not in ("A0", "A1", "A1_V2", "A1_VERIFY"):
+        if self.variant not in ("A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
             raise ValueError("Variante non valida.")
 
         if not re.fullmatch(
@@ -80,7 +80,7 @@ class ExperimentConfig:
                 "max_tool_rounds deve essere positivo."
             )
 
-        if self.variant == "A1_VERIFY":
+        if self.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
             if (
                 type(self.max_verification_checks) is not int
                 or not 0 <= self.max_verification_checks < self.max_tool_rounds
