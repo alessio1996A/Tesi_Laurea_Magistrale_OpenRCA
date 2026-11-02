@@ -55,7 +55,7 @@ I commenti in italiano sono introdotti nelle fasi chiave di `verify_graph.py` se
 
 ## Cosa mostrare in Colab
 
-Il notebook **Colab_Demo_Relatore_OpenRCA.ipynb** è stato creato come file separato dal notebook storico `Tesi_OpenRCA.ipynb` (122 celle). Si consiglia di caricarlo in Colab e percorrerne le sezioni in ordine:
+Il notebook **Colab_Demo_Relatore_OpenRCA.ipynb** è stato creato come file separato dal notebook storico `Tesi_OpenRCA.ipynb` (122 celle). Il notebook e' stato [caricato nella cartella demo_relatore su Drive](https://drive.google.com/file/d/1JIdqEdpvHuUIgDQ96_QCFabBBCf2IGyP/view?usp=drivesdk). Aprirlo da Colab tramite Google Drive e percorrerne le sezioni in ordine:
 
 1. Mount Drive e checkout **del commit sperimentale fissato**, senza `git pull`.
 2. Mappa del progetto e creazione dei cinque tool (non invoca Gemini).
