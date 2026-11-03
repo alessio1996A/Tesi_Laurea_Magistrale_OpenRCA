@@ -710,6 +710,15 @@ def run_experiment(
     tools = esperimento["tools"]
     richiesta = esperimento["richiesta"]
 
+    # V2 enforce: stessa istruzione per tutti i cinque agenti, costruita
+    # SOLO da task_index e instruction del manifest GT-free. Non altera V1.
+    if config.output_contract_mode == "v2_enforce":
+        from output.v2_task_contract import task_output_instruction
+        system_prompt += task_output_instruction(
+            task_index=caso["task_index"],
+            instruction=caso["instruction"],
+        )
+
     # La preparazione di A1 genera automaticamente
     # le evidenze e misura il tempo del preprocessing.
     preprocessing_seconds = esperimento[
@@ -940,6 +949,36 @@ def run_experiment(
             }
 
     # =====================================================
+    # 6 QUATER. CONTRATTO V2 TASK-AWARE, UGUALE PER TUTTI GLI AGENTI
+    # =====================================================
+    # I vincoli richiesti dallo specifico task sono controllati prima di
+    # accettare una predizione; il fuori finestra resta un warning.
+    # v2_audit non tocca le predizioni legacy; v2_enforce e' esplicito.
+    # Nessuna chiamata LLM aggiuntiva, nessun repair automatico.
+    v2_task_audit = None
+    if config.output_contract_mode in ("v2_audit", "v2_enforce"):
+        from output.v2_task_contract import (
+            audit_task_output,
+            enforce_task_output,
+        )
+        v2_context = {
+            "task_index": caso["task_index"],
+            "instruction": caso["instruction"],
+            "start_unix": int(caso["start_unix"]),
+            "end_unix": int(caso["end_unix"]),
+        }
+        if config.output_contract_mode == "v2_audit":
+            v2_task_audit = audit_task_output(risposta, **v2_context)
+        else:
+            validated_json, json_status, v2_task_audit = enforce_task_output(
+                risposta, **v2_context
+            )
+            predizione = (
+                json.loads(validated_json)
+                if validated_json is not None else None
+            )
+
+    # =====================================================
     # 7. MISURAZIONE DEI TEMPI
     # =====================================================
 
@@ -1035,6 +1074,10 @@ def run_experiment(
     if structured_report is not None:
         risultato["structured_output"] = structured_report
 
+    if v2_task_audit is not None:
+        risultato["output_contract_v2"] = v2_task_audit
+        risultato["output_contract_mode"] = config.output_contract_mode
+
     # =====================================================
     # 9. SALVATAGGIO OPZIONALE
     # =====================================================
@@ -1049,9 +1092,17 @@ def run_experiment(
             "legacy": "",
             "audit": "_contract_audit",
             "structured": "_structured",
+            "v2_audit": "_v2_audit",
+            "v2_enforce": "_v2_enforce",
         }[config.output_contract_mode]
+        # V2 salva in una directory distinta, sempre create-only.
+        results_directory = (
+            config.results_dir / "v2"
+            if config.output_contract_mode in ("v2_audit", "v2_enforce")
+            else config.results_dir
+        )
         destinazione = (
-            config.results_dir
+            results_directory
             / f"{config.variant.lower()}_unified_"
               f"{config.case_id}{suffisso_output}.json"
         )
