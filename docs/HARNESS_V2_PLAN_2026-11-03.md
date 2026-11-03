@@ -12,9 +12,9 @@
 |---|---|---|
 | V2.1 | Contratto JSON uniforme: chiavi, campi, timestamp Asia/Shanghai, cardinalità dalla sola istruzione GT-free | 12 test sintetici eseguiti in PyCharm: OK |
 | V2.2 | Audit integrità delle due coorti V1: split, manifest, durata, overlap tra casi e piloti | 6 test sintetici eseguiti in PyCharm: OK; audit Colab reale ancora da eseguire |
-| V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale delle 32 predizioni eseguito: 30 legacy, 20 V2 completo, 8 timestamp fuori finestra, 2 cardinalità, 2 schemi; scomposizione nuova da verificare con 7 test PyCharm e Colab |
-| V2.4 | Nuova configurazione di esecuzione dei cinque agenti con contratto per task (7 tipologie), test fake-LLM | Codice pubblicato; test PyCharm e audit Colab task-aware da verificare |
-| V2.5 | Coorte development V2 preregistrata, selezione senza finestre coincidenti con tutte le attività già viste | Da concordare e congelare dopo audit |
+| V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale eseguito: 30/32 legacy; 28/32 canonico struttura/cardinalità; 20/32 anche entro finestra; controllo temporale separato confermato |
+| V2.4 | Output conforme al task + integrazione nei cinque agenti e test fake-LLM | Audit Colab eseguito: 29/32 task-aware; controllo enforce cronologico e test locali ancora da confermare |
+| V2.5 | Proposta deterministica coorte development V2, escludendo tutte le finestre già note | Selettore GT-free pubblicato; audit A/2 e test PyCharm da confermare; nessuna coorte congelata |
 | V2.6 | Nuovi esperimenti reali A0/A1_V2/A1-R8/A1_VERIFY/A1_VERIFY_ST e confronto eventuale 4+2 vs 5+1 | Richiede consenso all'uso delle API, esecuzioni Colab, freeze e solo successivamente scoring |
 
 **Il codice testato e il protocollo sono un obiettivo realistico a breve termine. Una campagna completa con API, scoring e repliche non deve essere dichiarata conclusa finché non è stata realmente eseguita e verificata.** Non ci sono operazioni in background.
@@ -84,3 +84,9 @@ Una nuova serie di risultati potrà sostituire **nelle conclusioni** la V1, **no
 ## Evidenza audit reale e scomposizione multilivello
 
 [Nota dei risultati V2.3 (32 run)](V2_3_REAL_FROZEN_AUDIT_2026-11-03.md). Il nuovo audit distingue conformità rigorosa di schema/cardinalità dal controllo temporale aggiuntivo, senza modificare i vecchi freeze. Il requisito di confinare il timestamp di diagnosi alla finestra va trattato come **policy interna di plausibilità** finché non sia verificato come obbligo del benchmark.
+
+## Nuova evidenza task-aware e selettore V2.5 — 3 novembre
+
+La conformità **task-aware** nei due esperimenti storici è **29/32**: due problemi di cardinalità e un campo obbligatorio mancante. Il codice distingue inoltre la conformità in modalità enforce (che controlla anche l'ordine cronologico dei task con data) nel campo `task_aware_enforce_valid_total`; questo valore richiede la nuova esecuzione Colab.
+
+Il [piano V2.5](V2_5_COHORT_PROPOSAL_2026-11-03.md) introduce una proposta di **otto casi development**, quattro per cloudbed e cinque agenti (40 run ipotizzati). Prima di congelarla è necessario verificare gli hash, le quattro finestre dell'audit A/2, tutti i 25 casi storici censiti e gli eventuali altri casi osservati. Il codice non consulta score, etichette o telemetria; la proposta non significa che le API siano autorizzate.
