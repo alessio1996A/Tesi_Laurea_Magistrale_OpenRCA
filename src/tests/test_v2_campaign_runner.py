@@ -52,7 +52,7 @@ def fake_result(config):
         }),
         "json_status": "valid_json",
         "output_contract_v2": {"valid": True},
-        "evidence_sha256": "b" * 64,
+        "evidence_sha256": None if config.variant == "A0" else "b" * 64,
         "metrics": {
             "tool_rounds": 1,
             "exploration_tool_rounds": 1,
@@ -199,7 +199,7 @@ class V2CampaignRunnerTests(unittest.TestCase):
                             "start_unix": 1647747000,
                             "end_unix": 1647748800,
                         },
-                        "evidence_sha256": "b" * 64,
+                        "evidence_sha256": None,
                     },
                 ),
             ):
@@ -213,11 +213,96 @@ class V2CampaignRunnerTests(unittest.TestCase):
                 self.assertTrue(output.exists())
                 result = json.loads(output.read_text(encoding="utf-8"))
                 self.assertEqual(result["v2_provenance"]["run_id"], run_id)
+                self.assertIsNone(result["evidence_sha256"])
+                self.assertIsNone(
+                    json.loads(claim.read_text(encoding="utf-8"))[
+                        "evidence_sha256_before_api"
+                    ]
+                )
                 with self.assertRaises(FileExistsError):
                     execute_exactly_one(
                         root, root, run_id=run_id, confirm_api=True,
                         _runner=fake_result,
                     )
+
+    def test_non_a0_missing_evidence_preclaim_fails_without_file(self):
+        plan = fake_plan()
+        plan["cases"][0]["ordered_variants"] = [
+            "A1_V2", "A0", "A1", "A1_VERIFY", "A1_VERIFY_ST"
+        ]
+        plan["cases"][0]["run_ids"] = [
+            f"{PROTOCOL}__cloudbed-1_q005__{v.lower()}__r01"
+            for v in plan["cases"][0]["ordered_variants"]
+        ]
+        run_id = plan["cases"][0]["run_ids"][0]
+        case = {
+            "case_id": "cloudbed-1_q005", "cloudbed": "cloudbed-1",
+            "task_index": "task_2",
+            "start_unix": 1647747000, "end_unix": 1647748800,
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with (
+                patch(
+                    "evaluation.v2_campaign_runner.load_preregistered",
+                    return_value=(plan, "c" * 64),
+                ),
+                patch(
+                    "evaluation.experiment_runner.carica_caso",
+                    return_value=case,
+                ),
+                patch(
+                    "evaluation.experiment_runner.prepara_esperimento",
+                    return_value={
+                        "caso": case, "evidence_sha256": None,
+                    },
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "SHA delle evidenze"):
+                    execute_exactly_one(
+                        root, root, run_id=run_id,
+                        confirm_api=True, _runner=fake_result,
+                    )
+                claim, output = _output_paths(root, run_id)
+                self.assertFalse(claim.exists())
+                self.assertFalse(output.exists())
+
+    def test_a0_unexpected_evidence_preclaim_fails(self):
+        plan = fake_plan()
+        run_id = plan["cases"][0]["run_ids"][0]
+        case = {
+            "case_id": "cloudbed-1_q005", "cloudbed": "cloudbed-1",
+            "task_index": "task_2",
+            "start_unix": 1647747000, "end_unix": 1647748800,
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with (
+                patch(
+                    "evaluation.v2_campaign_runner.load_preregistered",
+                    return_value=(plan, "c" * 64),
+                ),
+                patch(
+                    "evaluation.experiment_runner.carica_caso",
+                    return_value=case,
+                ),
+                patch(
+                    "evaluation.experiment_runner.prepara_esperimento",
+                    return_value={
+                        "caso": case, "evidence_sha256": "b" * 64,
+                    },
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "A0 non deve generare",
+                ):
+                    execute_exactly_one(
+                        root, root, run_id=run_id,
+                        confirm_api=True, _runner=fake_result,
+                    )
+                claim, output = _output_paths(root, run_id)
+                self.assertFalse(claim.exists())
+                self.assertFalse(output.exists())
 
     def test_fake_runner_error_still_preserves_claim_no_retry(self):
         plan = fake_plan()
@@ -249,7 +334,7 @@ class V2CampaignRunnerTests(unittest.TestCase):
                             "start_unix": 1647747000,
                             "end_unix": 1647748800,
                         },
-                        "evidence_sha256": "b" * 64,
+                        "evidence_sha256": None,
                     },
                 ),
             ):
