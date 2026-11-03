@@ -88,17 +88,44 @@ class TestNetworkSignalProfile(unittest.TestCase):
         self.assertFalse(report["classification_performed"])
         self.assertEqual(report["gemini_calls"], 0)
         self.assertTrue(report["profiles"])
-        self.assertTrue(all(
-            p["kpi_name"] != "unlisted_kpi"
-            and p["statistics"]["maximum"] <= 3.0
-            and p["unit"] == "non_verificata"
-            and not p["root_cause_verified"]
-            for p in report["profiles"]
-        ))
+        missing_only = []
+        for profile in report["profiles"]:
+            stats = profile["statistics"]
+            self.assertNotEqual(profile["kpi_name"], "unlisted_kpi")
+            self.assertEqual(profile["unit"], "non_verificata")
+            self.assertFalse(profile["root_cause_verified"])
+            self.assertEqual(
+                stats["rows"],
+                stats["numeric_samples"] + stats["non_numeric_or_non_finite"],
+            )
+            if stats["numeric_samples"] > 0:
+                self.assertIsNotNone(stats["maximum"])
+                self.assertLessEqual(stats["maximum"], 3.0)
+            else:
+                # NaN non e' uno zero misurato: il profilo e' privo
+                # di campioni numerici e deve conservare il valore None.
+                self.assertIsNone(stats["minimum"])
+                self.assertIsNone(stats["median"])
+                self.assertIsNone(stats["maximum"])
+                self.assertGreater(stats["non_numeric_or_non_finite"], 0)
+                missing_only.append(profile)
+        self.assertTrue(missing_only, "La prova sintetica deve coprire NaN")
         rendered = json.dumps(report, allow_nan=False)
         self.assertNotIn("GROUND_TRUTH_NEVER_READ", rendered)
         self.assertNotIn("8888888", rendered)
         self.assertNotIn("9999999", rendered)
+
+    def test_describe_entirely_non_numeric_series(self):
+        from evaluation.network_signal_profile import _describe
+
+        stats = _describe([(100, None), (110, None)])
+        self.assertEqual(stats["rows"], 2)
+        self.assertEqual(stats["numeric_samples"], 0)
+        self.assertEqual(stats["non_numeric_or_non_finite"], 2)
+        self.assertIsNone(stats["minimum"])
+        self.assertIsNone(stats["median"])
+        self.assertIsNone(stats["p95"])
+        self.assertIsNone(stats["maximum"])
 
     def test_inventory_selection_tampering_blocks(self):
         with tempfile.TemporaryDirectory() as tmp:
