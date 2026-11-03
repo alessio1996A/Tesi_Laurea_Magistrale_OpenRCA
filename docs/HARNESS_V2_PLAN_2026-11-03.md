@@ -100,3 +100,7 @@ Il runner V2.6 ora applica il vincolo sull'ordine dei cinque agenti per incident
 ## Correzione V2.6A del tentativo A0 pre-API
 
 Il primo avvio A0 sul freeze `..._v1` ha trovato un bug nel controllo SHA del preprocessing: la baseline A0 ha `evidence_sha256=None` per definizione. La verifica e' fallita prima del claim e di Gemini. Vedi [rapporto di revisione](V2_6A_A0_SHA_REVISION_2026-11-03.md). Il piano originale resta intatto; nuovo protocollo `openrca_harness_v2_five_agents_development_v2`, nuovo file freeze, 70 test offline attesi. Nessuna delle 40 run v1 e' stata eseguita dal tentativo fallito.
+
+## Ripresa da V2.6B — dipendenza modello
+
+Nel primo run A0 del freeze `..._v2`, il runner ha creato un claim permanente ma ha fallito l'import `langchain_google_genai` prima del grafo e della richiesta Gemini. Il `requirements.txt` contiene gia' il pacchetto `langchain-google-genai`, da installare nel runtime Colab. Il piano v2 e il claim v2 vanno conservati come audit trail. Il nuovo protocollo `openrca_harness_v2_five_agents_development_v3` prepara un distinto freeze con stesse condizioni sperimentali e guardia delle dipendenze **prima** del claim. Serve una nuova conferma di **71 test**, preview e SHA prima del primo run. Vedi [resoconto V2.6B](V2_6B_DEPENDENCY_RECOVERY_2026-11-03.md).
