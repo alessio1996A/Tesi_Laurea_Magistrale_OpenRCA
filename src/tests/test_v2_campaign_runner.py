@@ -131,6 +131,19 @@ class V2CampaignRunnerTests(unittest.TestCase):
                         "end_unix": 1647748800,
                     },
                 ),
+                patch(
+                    "evaluation.experiment_runner.prepara_esperimento",
+                    return_value={
+                        "caso": {
+                            "case_id": "cloudbed-1_q005",
+                            "cloudbed": "cloudbed-1",
+                            "task_index": "task_2",
+                            "start_unix": 1647747000,
+                            "end_unix": 1647748800,
+                        },
+                        "evidence_sha256": "b" * 64,
+                    },
+                ),
             ):
                 first = execute_exactly_one(
                     root, root, run_id=run_id, confirm_api=True,
@@ -166,6 +179,19 @@ class V2CampaignRunnerTests(unittest.TestCase):
                         "task_index": "task_2",
                         "start_unix": 1647747000,
                         "end_unix": 1647748800,
+                    },
+                ),
+                patch(
+                    "evaluation.experiment_runner.prepara_esperimento",
+                    return_value={
+                        "caso": {
+                            "case_id": "cloudbed-1_q005",
+                            "cloudbed": "cloudbed-1",
+                            "task_index": "task_2",
+                            "start_unix": 1647747000,
+                            "end_unix": 1647748800,
+                        },
+                        "evidence_sha256": "b" * 64,
                     },
                 ),
             ):
