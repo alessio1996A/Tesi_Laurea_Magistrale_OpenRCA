@@ -15,7 +15,7 @@
 | V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale eseguito: 30/32 legacy; 28/32 canonico struttura/cardinalità; 20/32 anche entro finestra; controllo temporale separato confermato |
 | V2.4 | Output conforme al task + integrazione nei cinque agenti e test fake-LLM | Audit Colab eseguito: 29/32 task-aware; controllo enforce cronologico e test locali ancora da confermare |
 | V2.5 | Proposta development V2 bilanciata per task, cardinalità e cloudbed | Colab ha confermato 8 ID GT-free; selettore versionato aggiornato; test PyCharm e riesecuzione Colab da confermare; NON congelata |
-| V2.6 | Nuovi esperimenti reali A0/A1_V2/A1-R8/A1_VERIFY/A1_VERIFY_ST e confronto eventuale 4+2 vs 5+1 | Richiede consenso all'uso delle API, esecuzioni Colab, freeze e solo successivamente scoring |
+| V2.6 | Preregistrazione e runner in sicurezza per cinque agenti (40 run); ablation 5+1 separata | Strumenti dry-run/freeze create-only/runner una run alla volta pubblicati; 66 test attesi, ancora da verificare, nessuna API o freeze eseguito |
 
 **Il codice testato e il protocollo sono un obiettivo realistico a breve termine. Una campagna completa con API, scoring e repliche non deve essere dichiarata conclusa finché non è stata realmente eseguita e verificata.** Non ci sono operazioni in background.
 
@@ -90,3 +90,7 @@ Una nuova serie di risultati potrà sostituire **nelle conclusioni** la V1, **no
 La conformità **task-aware** nei due esperimenti storici è **29/32**: due problemi di cardinalità e un campo obbligatorio mancante. Il codice distingue inoltre la conformità in modalità enforce (che controlla anche l'ordine cronologico dei task con data) nel campo `task_aware_enforce_valid_total`; questo valore richiede la nuova esecuzione Colab.
 
 Il [piano V2.5](V2_5_COHORT_PROPOSAL_2026-11-03.md) introduce una proposta di **otto casi development**, quattro per cloudbed e cinque agenti (40 run ipotizzati). Prima di congelarla è necessario verificare gli hash, le quattro finestre dell'audit A/2, tutti i 25 casi storici censiti e gli eventuali altri casi osservati. Il codice non consulta score, etichette o telemetria; la proposta non significa che le API siano autorizzate.
+
+## V2.6 — Nuovi strumenti preregistrazione e runner
+
+Il [runbook operativo V2.6](V2_6_PREREGISTRATION_RUNBOOK_2026-11-03.md) contiene test, preview senza scritture, freeze create-only e preflight, con esecuzione API disattivata per default. Sono pubblicati `evaluation.v2_preregister` e `evaluation.v2_campaign_runner` con **11 test offline nuovi**, portando il totale atteso a **66**. Il protocollo resta non congelato finché non sono stati superati i test e verificata la preview; non sono stati eseguiti modelli o nuovi score.
