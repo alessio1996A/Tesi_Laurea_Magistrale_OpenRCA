@@ -304,6 +304,47 @@ class V2CampaignRunnerTests(unittest.TestCase):
                 self.assertFalse(claim.exists())
                 self.assertFalse(output.exists())
 
+
+    def test_dependency_failure_preclaim_preserves_run_ready(self):
+        plan = fake_plan()
+        run_id = plan["cases"][0]["run_ids"][0]
+        case = {
+            "case_id": "cloudbed-1_q005", "cloudbed": "cloudbed-1",
+            "task_index": "task_2",
+            "start_unix": 1647747000, "end_unix": 1647748800,
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with (
+                patch(
+                    "evaluation.v2_campaign_runner.load_preregistered",
+                    return_value=(plan, "c" * 64),
+                ),
+                patch(
+                    "evaluation.experiment_runner.carica_caso",
+                    return_value=case,
+                ),
+                patch(
+                    "evaluation.experiment_runner.prepara_esperimento",
+                    return_value={"caso": case, "evidence_sha256": None},
+                ),
+                patch(
+                    "evaluation.v2_campaign_runner._ensure_runtime_ready",
+                    side_effect=RuntimeError(
+                        "Dipendenza runtime mancante/incompatibile"
+                    ),
+                ),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "Dipendenza runtime"):
+                    execute_exactly_one(
+                        root, root, run_id=run_id, confirm_api=True,
+                    )
+                claim, output = _output_paths(root, run_id)
+                self.assertFalse(claim.exists())
+                self.assertFalse(output.exists())
+                status = preflight_campaign(root, root)
+                self.assertEqual(status["runs"][0]["status"], "ready")
+
     def test_fake_runner_error_still_preserves_claim_no_retry(self):
         plan = fake_plan()
         run_id = plan["cases"][0]["run_ids"][0]
