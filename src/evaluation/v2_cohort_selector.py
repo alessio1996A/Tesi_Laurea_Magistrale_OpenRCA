@@ -27,6 +27,7 @@ PROTOCOL = "openrca_harness_v2_five_agents_development_v1"
 SEED = "openrca-harness-v2-five-agents-2026-11-03-v1"
 AUDIT_SEED = "network-kpi-inventory-2026-11-03-v1"
 VARIANTS = ("A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST")
+BALANCED_SEED = "openrca-harness-v2-balanced-seven-tasks-2026-11-03-v1"
 # Snapshot letterale di SEEN_CASE_IDS in src/evaluation/network_kpi_inventory.py
 # del branch feature/r03-r05-feasibility-schema-v1.
 # Include 12 piloti/coorte iniziale, 8 ST, q009 e ulteriori batch development.
