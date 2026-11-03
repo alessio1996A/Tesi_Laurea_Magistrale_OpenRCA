@@ -24,7 +24,7 @@ from evaluation.v2_case_window_audit import (
     _read_csv, _window,
 )
 from output.v2_contract import audit_openrca_v2
-from output.v2_task_contract import audit_task_output
+from output.v2_task_contract import audit_task_output, enforce_task_output
 
 
 FREEZE_NAMES = (
@@ -215,6 +215,12 @@ def audit_frozen_predictions(
                 instruction=manifest[case_id]["instruction"],
                 start_unix=start, end_unix=end,
             )
+            _, _, enforce_audit = enforce_task_output(
+                raw,
+                task_index=manifest[case_id]["task_index"],
+                instruction=manifest[case_id]["instruction"],
+                start_unix=start, end_unix=end,
+            )
             rows.append({
                 "protocol": protocol,
                 "case_id": case_id,
@@ -231,6 +237,8 @@ def audit_frozen_predictions(
                 "raw_response_present": isinstance(raw, str) and bool(raw.strip()),
                 "task_index": manifest[case_id]["task_index"],
                 "task_aware_valid": task_audit["valid"],
+                "task_aware_enforce_valid": enforce_audit["valid"],
+                "task_aware_enforce_error": enforce_audit["error"],
                 "task_aware_error": task_audit["error"],
                 "task_aware_required_fields": task_audit["required_fields"],
                 "task_aware_expected_faults": task_audit["expected_faults"],
@@ -264,6 +272,9 @@ def audit_frozen_predictions(
                 x["timestamp_in_window"] is True for x in selected
             ),
             "task_aware_valid": sum(x["task_aware_valid"] for x in selected),
+            "task_aware_enforce_valid": sum(
+                x["task_aware_enforce_valid"] for x in selected
+            ),
         }
     return {
         "audit": "v2_frozen_prediction_audit_v1",
@@ -277,6 +288,13 @@ def audit_frozen_predictions(
             x["task_aware_error"] for x in rows if not x["task_aware_valid"]
         )),
         "task_aware_valid_total": sum(x["task_aware_valid"] for x in rows),
+        "task_aware_enforce_valid_total": sum(
+            x["task_aware_enforce_valid"] for x in rows
+        ),
+        "task_aware_enforce_invalid_reasons": dict(Counter(
+            x["task_aware_enforce_error"]
+            for x in rows if not x["task_aware_enforce_valid"]
+        )),
         "error_breakdown": {
             "schema_or_cardinality_failures": sum(
                 not x["schema_cardinality_valid"] for x in rows
