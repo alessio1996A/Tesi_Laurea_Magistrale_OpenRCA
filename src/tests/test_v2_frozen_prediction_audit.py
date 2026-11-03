@@ -223,6 +223,52 @@ class FrozenPredictionAuditTests(unittest.TestCase):
             self.assertIn("aggiuntivi", item["v2_reason"])
             self.assertNotEqual(result["raw_response"], old)
 
+    def test_temporal_outlier_reported_separately_from_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            make_fixture(root)
+            protocol = PROTOCOLS[0]
+            run_id = f"{protocol}__cloudbed-1_q001__a1__r01"
+            path = root / "data/results/paired" / protocol / f"{run_id}.json"
+            result = json.loads(path.read_text(encoding="utf-8"))
+            predicted = json.loads(result["raw_response"])
+            # Caso 001: 11:00-11:30 locale, 20 secondi dopo end.
+            predicted["1"]["root cause occurrence datetime"] = (
+                "2022-03-20 11:30:20"
+            )
+            result["raw_response"] = json.dumps(predicted)
+            path.write_text(json.dumps(result), encoding="utf-8")
+            update_sha_after_mutation(root, 0, run_id)
+            before = path.read_bytes()
+            report = audit_frozen_predictions(
+                root, verify_original_hashes=False,
+            )
+            self.assertEqual(before, path.read_bytes())
+            row = next(x for x in report["runs"] if x["run_id"] == run_id)
+            self.assertTrue(row["schema_cardinality_valid"])
+            self.assertFalse(row["v2_valid"])
+            self.assertFalse(row["timestamp_in_window"])
+            self.assertEqual(
+                row["temporal_outliers"][0][
+                    "signed_seconds_from_nearest_boundary"
+                ],
+                20,
+            )
+            self.assertEqual(
+                report["error_breakdown"]["temporal_only_failures"],
+                1,
+            )
+            self.assertEqual(
+                report["error_breakdown"][
+                    "outliers_within_60_seconds_of_boundary"
+                ],
+                1,
+            )
+            self.assertEqual(
+                report["error_breakdown"]["schema_or_cardinality_failures"],
+                0,
+            )
+
     def test_mismatched_hash_rejected_before_interpretation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
