@@ -23,7 +23,7 @@ from evaluation.v2_case_window_audit import (
 )
 from output.v2_contract import infer_requested_faults
 
-PROTOCOL = "openrca_harness_v2_five_agents_development_v2"
+PROTOCOL = "openrca_harness_v2_five_agents_development_v3"
 SEED = "openrca-harness-v2-five-agents-2026-11-03-v1"
 AUDIT_SEED = "network-kpi-inventory-2026-11-03-v1"
 VARIANTS = ("A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST")
