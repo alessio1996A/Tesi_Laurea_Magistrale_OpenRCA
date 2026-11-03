@@ -249,22 +249,7 @@ def propose_v2_cohort(
         and row["case_id"] not in seen
         and not any(_overlap(row, old) for old in protected)
     ]
-    selected = []
-    for cb in ("cloudbed-1", "cloudbed-2"):
-        picked = []
-        for row in sorted(
-            (r for r in eligible if r["cloudbed"] == cb),
-            key=lambda r: (_rank(SEED, r["case_id"]), r["case_id"]),
-        ):
-            if not any(_overlap(row, old) for old in picked):
-                picked.append(row)
-            if len(picked) == per_cloudbed:
-                break
-        if len(picked) != per_cloudbed:
-            raise ValueError(
-                f"Finestre development indipendenti insufficienti per {cb}"
-            )
-        selected.extend(picked)
+    selected = _select_balanced(eligible, manifest, per_cloudbed)
     if any(
         _overlap(a, b)
         for i, a in enumerate(selected) for b in selected[i + 1:]
@@ -286,7 +271,12 @@ def propose_v2_cohort(
     return {
         "protocol": PROTOCOL,
         "status": "PROPOSED_NOT_FROZEN_NOT_EXECUTED",
-        "seed": SEED,
+        "seed": BALANCED_SEED,
+        "selection_policy": "seven_tasks_and_multifault_per_cloudbed_v1",
+        "task_coverage": sorted({x["task"] for x in selected}),
+        "multi_fault_cases_per_cloudbed": dict(sorted(Counter(
+            x["cloudbed"] for x in selected if x["faults"] >= 2
+        ).items())),
         "split_sha256": split_sha,
         "manifest_sha256": manifest_sha,
         "network_inventory_sha256": hashlib.sha256(raw).hexdigest(),
