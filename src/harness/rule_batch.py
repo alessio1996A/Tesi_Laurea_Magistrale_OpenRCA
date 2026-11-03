@@ -1,8 +1,11 @@
-"""R01/R02/R06/R07/R08/R11: deterministic A1 evidence adapter.
+"""Adattatore delle otto regole diagnostiche deterministiche R01–R11.
 
-Input: metrics already loaded by the A1 runner for the official incident window.
-No file reading, label access, model calls, or changes to the A0 tools.
-Only observational hypotheses, never verified root causes.
+Regole attive: R01, R02, R06, R07, R08, R09, R10, R11.
+Riceve metriche node/container gia' filtrate dal runner sulla finestra
+ufficiale. Non legge etichette del benchmark, non chiama LLM e non
+modifica i cinque tool o l'agente baseline A0.
+
+Restituisce ipotesi e segnali osservativi, non cause radice verificate.
 """
 from __future__ import annotations
 
@@ -94,11 +97,12 @@ def costruisci_evidenze_regole(
     quota_baseline: float = 0.4,
     max_candidati_report: int = 16,
 ) -> dict[str, Any]:
-    """Evaluate exactly six predeclared rule classes on current-window telemetry.
+    """Valuta le otto regole predefinite sulla telemetria della finestra.
 
-    Returns a compact, deterministic and strict-JSON-safe report. No use of
-    benchmark answers. `max_candidati_report` limits display only: all
-    available components are evaluated and counts stay complete.
+    Restituisce un report compatto, deterministico e serializzabile in JSON
+    rigoroso, senza consultare risposte ufficiali o ground truth.
+    max_candidati_report limita i candidati MOSTRATI, non quelli valutati:
+    tutti i componenti disponibili vengono analizzati.
     """
     if not isinstance(df_nodi, pd.DataFrame) or not isinstance(df_container, pd.DataFrame):
         raise TypeError("df_nodi e df_container devono essere DataFrame")
