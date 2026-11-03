@@ -18,12 +18,12 @@ L'audit Colab del 3 novembre ha riportato:
 
 Le tre non conformita' task-aware sono **due cardinalita' errate** (1 invece di 2 e 2 invece di 1) e **un campo richiesto mancante** (`root cause reason`). Gli **otto timestamp fuori dall'intervallo** sono una diagnostica temporale separata e non vengono contati come invalidita' di formato benchmark.
 
-Il conteggio di 29/32 viene dalla modalità *audit*. Il nuovo report distingue anche `task_aware_enforce_valid_total`, che comprende un controllo sull'ordine cronologico per le task con data richiesta. **Finche' il nuovo report non e' eseguito, questo secondo numero e' ignoto.**
+L'audit Colab successivo ha confermato **28/32 conformi in modalita' enforce**: due errori di cardinalita', un campo richiesto mancante e un caso con guasti multipli non ordinati temporalmente. Sono misure di conformita', non di accuratezza RCA.
 
 ## 2. Protocollo proposto
 
 - *Obiettivo:* confronto appaiato di **A0, A1_V2, A1-R8 (codice `A1`), A1_VERIFY e A1_VERIFY_ST** su una coorte development comune.
-- *Campione proposto:* **8 casi**, 4 per cloudbed, selezione deterministica SHA-256 con seed fisso `openrca-harness-v2-five-agents-2026-11-03-v1`.
+- *Campione proposto:* **8 casi**, 4 per cloudbed, tutte e sette le tipologie di task e almeno un caso multi-guasto per cloudbed. Selezione deterministica SHA-256 con seed `openrca-harness-v2-balanced-seven-tasks-2026-11-03-v1`.
 - *Output:* contratto uniforme `v2_enforce` e prompt task-aware GT-free per i cinque agenti.
 - *Budget:* 6 round di tool massimi; A1_VERIFY/A1_VERIFY_ST con configurazione iniziale 4+2. **Non** cambiare contemporaneamente in 5+1: e' una ablation distinta.
 - *Ripetizioni iniziali:* 1 per variante/caso, quindi **40 run previsti**. Una replica non consente di stimare la variabilita' stocastica. Eventuali repliche successive vanno preregistrate e svolte per tutte le varianti, non solo per quelle favorite.
@@ -94,3 +94,20 @@ Non esegue alcuna chiamata modello e non scrive file. Per congelare la coorte sa
 ## 7. Prima di giovedi' 5 novembre
 
 Ordine vincolante: test offline → audit sui freeze + confronto enforce → ispezione proposta e copertura task → eventuale protocollo coorte → runner preregistrato e test fake LLM → autorizzazione esplicita ai modelli → run reali → freeze → scorer → interpretazione. Nessun passaggio successivo può essere dichiarato concluso in assenza dell'output reale e dei gate superati.
+
+## 8. Selezione bilanciata verificata sul notebook (non congelata)
+
+Il notebook Colab ha confermato, usando solo split/manifest GT-free, che questa combinazione copre tutte le sette task, quattro casi per cloudbed e due casi multi-guasto:
+
+| Caso | Task | Guasti richiesti |
+|---|---|---:|
+| cloudbed-1_q005 | task_2 | 1 |
+| cloudbed-1_q066 | task_6 | 1 |
+| cloudbed-1_q027 | task_7 | 2 |
+| cloudbed-1_q013 | task_5 | 1 |
+| cloudbed-2_q071 | task_4 | 2 |
+| cloudbed-2_q020 | task_6 | 1 |
+| cloudbed-2_q034 | task_1 | 1 |
+| cloudbed-2_q024 | task_3 | 1 |
+
+Il selettore versionato `evaluation.v2_cohort_selector` e' stato aggiornato per applicare **gli stessi criteri di ricerca** e lo stesso seed. Il nuovo output deve essere confrontato con questi otto ID prima di congelare la coorte. Non e' ancora stato verificato da test PyCharm o dalla riesecuzione Colab del modulo aggiornato. Nessun run Gemini e' partito.
