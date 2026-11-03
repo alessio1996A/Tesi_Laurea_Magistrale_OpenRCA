@@ -96,3 +96,7 @@ Il [piano V2.5](V2_5_COHORT_PROPOSAL_2026-11-03.md) introduce una proposta di **
 Il [runbook operativo V2.6](V2_6_PREREGISTRATION_RUNBOOK_2026-11-03.md) contiene test, preview senza scritture, freeze create-only e preflight, con esecuzione API disattivata per default. Sono pubblicati `evaluation.v2_preregister` e `evaluation.v2_campaign_runner` con **13 test offline nuovi**, portando il totale atteso a **68**. Il protocollo resta non congelato finché non sono stati superati i test e verificata la preview; non sono stati eseguiti modelli o nuovi score.
 
 Il runner V2.6 ora applica il vincolo sull'ordine dei cinque agenti per incidente: prima della chiamata API verifica i risultati e la provenienza dei predecessori. Una campagna vergine ha 8 run ready e 32 waiting_for_previous_variant. Non congelare anteprime prodotte da commit precedenti a questo aggiornamento: rieseguire test e preview sul commit Git finale.
+
+## Correzione V2.6A del tentativo A0 pre-API
+
+Il primo avvio A0 sul freeze `..._v1` ha trovato un bug nel controllo SHA del preprocessing: la baseline A0 ha `evidence_sha256=None` per definizione. La verifica e' fallita prima del claim e di Gemini. Vedi [rapporto di revisione](V2_6A_A0_SHA_REVISION_2026-11-03.md). Il piano originale resta intatto; nuovo protocollo `openrca_harness_v2_five_agents_development_v2`, nuovo file freeze, 70 test offline attesi. Nessuna delle 40 run v1 e' stata eseguita dal tentativo fallito.
