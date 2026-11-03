@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 
 from evaluation.network_kpi_inventory import SPLIT_HEADERS, select_audit_windows
@@ -203,12 +204,39 @@ class TestNetworkTemporalAlignment(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 analyze_temporal_alignment(**args)
 
+    def test_strict_manifest_sha_blocks_fabricated_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = self.fixture(Path(tmp))
+            args["verify_hashes"] = True
+            # Il manifest sintetico deve fallire il controllo ufficiale.
+            with self.assertRaisesRegex(ValueError, "Manifest GT-free non originale"):
+                analyze_temporal_alignment(**args)
+
     def test_strict_split_sha_blocks_fabricated_data(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = self.fixture(Path(tmp))
             args["verify_hashes"] = True
-            with self.assertRaisesRegex(ValueError, "SHA-256 split"):
-                analyze_temporal_alignment(**args)
+            manifest = (
+                args["data_dir"] / "data/processed/benchmark_inputs_market.csv"
+            )
+            synthetic_manifest_sha = hashlib.sha256(
+                manifest.read_bytes()
+            ).hexdigest()
+            # Rendiamo valido SOLO il digest del manifest sintetico
+            # nel contesto di test, per raggiungere il controllo split.
+            # I digest di produzione restano invariati.
+            with (
+                patch(
+                    "evaluation.network_signal_profile.EXPECTED_MANIFEST_SHA256",
+                    synthetic_manifest_sha,
+                ),
+                patch(
+                    "evaluation.network_temporal_alignment.EXPECTED_MANIFEST_SHA256",
+                    synthetic_manifest_sha,
+                ),
+            ):
+                with self.assertRaisesRegex(ValueError, "SHA-256 split"):
+                    analyze_temporal_alignment(**args)
 
 
 if __name__ == "__main__":
