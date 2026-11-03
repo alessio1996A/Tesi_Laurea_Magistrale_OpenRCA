@@ -106,27 +106,62 @@ def audit_openrca_v2(
     start_unix: int,
     end_unix: int,
 ) -> dict:
-    """Resoconto GT-free serializzabile, senza includere la risposta grezza."""
+    """Audit multilivello: JSON/schema/cardinalita' separati dal vincolo temporale.
+
+    'valid' mantiene la definizione V2 originale (tutti i controlli).
+    'schema_cardinality_valid' NON comporta che il timestamp sia nella finestra.
+    Gli istanti fuori finestra non vengono mai modificati o normalizzati.
+
+    La finestra diagnostica e' un controllo interno di plausibilita':
+    il benchmark non e' stato ancora dimostrato richiederla in ogni caso.
+    """
+    result = {
+        "valid": False,
+        "reason": None,
+        "expected_faults": None,
+        "diagnosed_faults": None,
+        "schema_cardinality_valid": False,
+        "timestamp_in_window": None,
+        "temporal_outliers": [],
+    }
     try:
+        if (
+            type(start_unix) is not int
+            or type(end_unix) is not int
+            or start_unix >= end_unix
+        ):
+            raise OutputContractError("Finestra Unix non valida")
         expected = infer_requested_faults(instruction)
-        diagnosis = validate_openrca_v2(
-            raw_response,
-            instruction=instruction,
-            start_unix=start_unix,
-            end_unix=end_unix,
-        )
-        return {
-            "valid": True,
-            "reason": None,
-            "expected_faults": expected,
-            "diagnosed_faults": len(diagnosis.root_causes),
-        }
+        result["expected_faults"] = expected
+        if expected is None:
+            raise OutputContractError(
+                "Numero di guasti non ricavabile univocamente dall'istruzione"
+            )
+        diagnosis = parse_openrca_json(raw_response, expected_faults=expected)
+        result["schema_cardinality_valid"] = True
+        result["diagnosed_faults"] = len(diagnosis.root_causes)
+        for index, fault in enumerate(diagnosis.root_causes, 1):
+            instant = int(datetime.strptime(
+                fault.occurrence_datetime, "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=_SHANGHAI).timestamp())
+            if instant < start_unix or instant >= end_unix:
+                result["temporal_outliers"].append({
+                    "fault_index": index,
+                    "reported_local_datetime": fault.occurrence_datetime,
+                    "signed_seconds_from_nearest_boundary": (
+                        instant - start_unix
+                        if instant < start_unix else instant - end_unix
+                    ),
+                    "position": "before_start" if instant < start_unix
+                                else "at_or_after_end",
+                })
+        result["timestamp_in_window"] = not result["temporal_outliers"]
+        if not result["timestamp_in_window"]:
+            first = result["temporal_outliers"][0]["fault_index"]
+            raise OutputContractError(
+                f"Guasto {first}: timestamp fuori dall'intervallo ufficiale"
+            )
+        result["valid"] = True
     except (OutputContractError, ValueError, TypeError) as exc:
-        return {
-            "valid": False,
-            "reason": f"{type(exc).__name__}: {exc}",
-            "expected_faults": (
-                expected if "expected" in locals() else None
-            ),
-            "diagnosed_faults": None,
-        }
+        result["reason"] = f"{type(exc).__name__}: {exc}"
+    return result
