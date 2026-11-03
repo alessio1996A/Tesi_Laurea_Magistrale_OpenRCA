@@ -191,6 +191,8 @@ class FrozenPredictionAuditTests(unittest.TestCase):
                 root, verify_original_hashes=False,
             )
             self.assertEqual(report["runs_checked"], 32)
+            self.assertEqual(report["task_aware_valid_total"], 32)
+            self.assertTrue(all(x["task_aware_valid"] for x in report["runs"]))
             self.assertEqual(len(report["studies"]), 2)
             self.assertEqual(report["by_variant"]["A1"]["runs"], 8)
             self.assertEqual(report["by_variant"]["A1_VERIFY"]["runs"], 16)
