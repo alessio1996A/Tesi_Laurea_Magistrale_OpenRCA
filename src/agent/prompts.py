@@ -1,13 +1,13 @@
 from typing import Literal
 
 
-# Le tre varianti condividono il testo del prompt di sistema.
+# Tutte le cinque varianti condividono il prompt di sistema generale.
 Variant = Literal["A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"]
 
 
-# Prompt comune per entrambi gli agenti.
-# Le differenze tra A0 e A1 saranno gestite
-# dal report deterministico aggiunto alla richiesta.
+# Prompt generale: lo stesso testo e' utilizzato dalle cinque varianti.
+# La differenza tra A0 e le varianti A1 dipende dal report di evidenze;
+# per VERIFY/VERIFY_ST cambia anche il grafo e il contesto di finalizzazione.
 SYSTEM_PROMPT_COMMON = """
 You are an autonomous Root Cause Analysis (RCA) agent
 specialized in distributed microservices systems.
@@ -136,10 +136,11 @@ def get_system_prompt(variant: Variant) -> str:
     """
     Restituisce il prompt di sistema condiviso.
 
-    A0, A1 e A1_V2 utilizzano esattamente lo stesso prompt.
-
-    La differenza sperimentale è il report di evidenze
-    prodotto dall'harness per A1 e A1_V2; solo A1 aggiunge le regole.
+    Tutte le varianti utilizzano lo stesso prompt generale.
+    Nel protocollo V3 le istruzioni specifiche del task vengono aggiunte
+    uniformemente dal runner. A1_V2 (nome di presentazione A1) aggiunge
+    il report deterministico; A1 (nome di presentazione A1_8R) aggiunge
+    anche le otto regole; VERIFY e VERIFY_ST hanno un grafo differente.
     """
 
     if variant not in ("A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
