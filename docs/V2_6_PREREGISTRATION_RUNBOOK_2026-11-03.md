@@ -38,7 +38,7 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_v2*.py" -v
 ```
 
-Attesi **68 test**: 55 dei blocchi precedenti + 6 di preregistrazione + 7 del runner campagna. Tutti devono essere `OK`. Eseguire anche `python -m unittest discover -s src/tests -v` se il progetto ha dipendenze installate, ma NON avviare altri script con chiamate modello.
+Attesi **70 test**: 55 dei blocchi precedenti + 6 di preregistrazione + 9 del runner campagna. Tutti devono essere `OK`. Eseguire anche `python -m unittest discover -s src/tests -v` se il progetto ha dipendenze installate, ma NON avviare altri script con chiamate modello.
 
 ## Step B — Colab: preview del piano, senza scrivere nulla
 
@@ -130,3 +130,7 @@ Richiedono autorizzazione esplicita all'uso delle API e verifica del budget. Ogn
 Il runner ora blocca un agente quando il precedente dello stesso incidente non e' completo. Prima della chiamata API verifica claim, file JSON e provenienza del precedente, hash del piano e `integrity_issues=[]`. Una nuova campagna completamente vergine mostra **8 run `ready`** (il primo agente di ogni incidente) e **32 `waiting_for_previous_variant`**. Le run vanno lanciate una alla volta nell'ordine preregistrato per ogni incidente. Non vengono mai effettuati retry automatici.
 
 Se la preview precedente mostrava il commit `adfc005c738077e0bc2c2b6d928eadbd751c31b8`, quello era valido prima di questi controlli aggiuntivi: **ripetere il pull e la preview**; il freeze deve identificare il nuovo commit HEAD.
+
+## Correzione successiva V2.6A — NON usare il freeze originario
+
+Il primo tentativo A0 sul protocollo ..._v1 si e' arrestato **prima del claim e prima di Gemini**, per un controllo SHA errato: A0 non ha report deterministico e quindi ha `evidence_sha256=None`. Il codice e' stato corretto e il protocollo e' stato versionato **`openrca_harness_v2_five_agents_development_v2`**: un **nuovo** piano create-only, con commit Git e SHA differenti, va generato prima del primo run. **Non sostituire, eliminare o modificare il piano congelato ..._v1**. La correzione e i controlli sono documentati nel [rapporto V2.6A](V2_6A_A0_SHA_REVISION_2026-11-03.md). I test attesi sono ora **70** e il file piano corretto e' `data/protocols/v2/openrca_harness_v2_five_agents_development_v2_plan_v1.json`.
