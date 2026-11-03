@@ -38,17 +38,19 @@ SPLITS = {"development", "evaluation", "mixed_quarantine", "ood_holdout"}
 CLOUDBEDS = ("cloudbed-1", "cloudbed-2")
 
 # 12 casi storici di src/evaluation/paired_st_cohort.py (inclusi piloti),
-# 8 del piano ST congelato + q009 gia' presente nei report development.
+# 8 del piano ST congelato + q009 e 4 casi della vecchia coorte 93ddc0c 
+# visibili nei nomi degli artefatti development di Google Drive.
 # Qualsiasi finestra sovrapposta a uno di essi viene esclusa.
 SEEN_CASE_IDS = frozenset({
     "cloudbed-1_q002", "cloudbed-1_q009", "cloudbed-1_q016",
-    "cloudbed-1_q035", "cloudbed-1_q036", "cloudbed-1_q038",
-    "cloudbed-1_q040", "cloudbed-1_q043", "cloudbed-1_q052",
-    "cloudbed-1_q063", "cloudbed-1_q065",
+    "cloudbed-1_q034", "cloudbed-1_q035", "cloudbed-1_q036",
+    "cloudbed-1_q038", "cloudbed-1_q040", "cloudbed-1_q043",
+    "cloudbed-1_q052", "cloudbed-1_q063", "cloudbed-1_q065",
+    "cloudbed-1_q067",
     "cloudbed-2_q006", "cloudbed-2_q007", "cloudbed-2_q012",
-    "cloudbed-2_q033", "cloudbed-2_q046", "cloudbed-2_q053",
-    "cloudbed-2_q055", "cloudbed-2_q066", "cloudbed-2_q067",
-    "cloudbed-2_q073",
+    "cloudbed-2_q015", "cloudbed-2_q033", "cloudbed-2_q046",
+    "cloudbed-2_q053", "cloudbed-2_q055", "cloudbed-2_q066",
+    "cloudbed-2_q067", "cloudbed-2_q068", "cloudbed-2_q073",
 })
 METRIC_SOURCES = (
     "metric_container.csv",
