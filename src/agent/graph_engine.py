@@ -1,11 +1,13 @@
-"""Motore LangGraph condiviso per gli esperimenti OpenRCA A0 e A1.
+"""Grafo LangGraph ReAct-style per A0 e varianti con harness senza planner.
 
-Il budget di esplorazione limita i *round* in cui il modello puo` richiedere
-strumenti. Al raggiungimento del budget viene eseguito UN SOLO tentativo di
-finalizzazione senza strumenti; richieste di tool in questa fase non vengono
-eseguite e sono registrate come fallimento esplicito.
+L'agente LLM usa i tool registrati con bind_tools. Quando richiede strumenti,
+ToolNode esegue le chiamate e aggiunge le osservazioni ai messaggi. Il ciclo
+agente -> strumenti -> agente continua entro un budget massimo di round.
 
-Non contiene etichette, ground truth o logica specifica dei due agenti.
+Dopo il budget e' consentita UNA SOLA finalizzazione senza strumenti;
+eventuali richieste di nuovi tool sono considerate errori espliciti.
+Il grafo non legge ground truth, non implementa una memoria persistente e
+non contiene logica diagnostica dipendente dalla variante sperimentale.
 """
 
 from __future__ import annotations
@@ -21,7 +23,11 @@ from langgraph.prebuilt import ToolNode
 
 
 class RCAState(TypedDict):
-    """Stato condiviso del grafo, indipendente dalla variante A0/A1."""
+    """Stato della singola esecuzione: messaggi, round e finalizzazione.
+
+    add_messages aggiorna la sequenza degli scambi con l'LLM e i tool.
+    Non e' un checkpointer persistente tra esecuzioni differenti.
+    """
 
     messages: Annotated[list[BaseMessage], add_messages]
     tool_rounds: int
