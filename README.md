@@ -262,3 +262,10 @@ Il modulo strutturale-temporale e' ora **integrato nella finalizzazione**
 di A1_VERIFY_ST, ma non ricostruisce ne' verifica ancora percorsi causali
 di propagazione fra microservizi. La copertura attuale resta di 8 regole:
 R03, R04 e R05 sono una possibile estensione, **da valutare prima di implementarla**.
+
+
+## Presentazione integrata per il relatore — 3 novembre 2026
+
+La [relazione con interpretazione dei risultati](docs/RELATORE_PRESENTAZIONE_INTEGRATA_2026-11-03.md) e il [notebook Colab di sola lettura con 9 grafici](notebooks/Colab_Relatore_Risultati_e_Regole_2026_11_03.ipynb) sono nel branch `presentation/relatore-2026-11-02`. Mostrano i due confronti ufficiali **su coorti development distinte**, senza ricalcolare lo scoring né richiamare Gemini. A0 e A1_V2 compaiono come architetture, senza score non documentati.
+
+Gli audit GT-free A/1–A/6 sono stati sviluppati sul branch dedicato `feature/r03-r05-feasibility-schema-v1`. R03 fornisce segnali TCP di nodo non attribuibili direttamente al container; R04 mostra solo valori nulli per le metriche di errore/drop osservate; R05 presenta durate RPC ma non una misura isolata di latenza di rete. [Nota tecnica](docs/network_r03_r05_feasibility_relatore_2026-11-03.md). **Nessuna nuova regola è stata aggiunta: restano otto detector.**
