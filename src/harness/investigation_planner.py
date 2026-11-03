@@ -1,8 +1,11 @@
-"""Policy v0: *plan* bounded candidate investigations before final RCA.
+"""Pianificatore deterministico delle verifiche mirate prima della diagnosi.
 
-No model inference, no tool execution, no ground truth, no prediction edits.
-This planner is deliberately NOT connected to the historical LangGraph.
-The evidence rules produce observable *hypotheses*, not ground truth.
+Il planner seleziona un numero limitato di controlli per i candidati delle
+otto regole. Non chiama l'LLM, non esegue direttamente i tool, non consulta
+la ground truth e non modifica le predizioni. Il grafo VERIFY utilizza
+questo piano per lanciare controlli mediante ToolNode.
+
+Le anomalie osservate sono ipotesi da verificare, non root cause certe.
 """
 from __future__ import annotations
 
@@ -28,7 +31,7 @@ def _integer(value: Any) -> bool:
 def _checked_calls(
     trajectory: list[dict[str, Any]], start: int, end: int
 ) -> list[tuple[str, str, str | None, int, int]]:
-    """Only valid scoped tool calls; broad calls do not imply targeted checks."""
+    """Riconosce solo chiamate mirate e valide: una ricerca generica non basta."""
     checked = []
     for index, item in enumerate(trajectory):
         if not isinstance(item, dict):
@@ -66,12 +69,12 @@ def pianifica_verifiche_mirate(
     max_checks: int,
     remaining_rounds: int,
 ) -> dict[str, Any]:
-    """Suggest up to min(max_checks, remaining_rounds) distinct tool calls.
+    """Propone al massimo min(max_checks, remaining_rounds) chiamate distinte.
 
-    Selection is deterministic, round-robin between container and node,
-    with at most one first-pass request per component before a second-pass
-    request on the same component. This is a *coverage* policy only:
-    no severity or causal ranking is inferred from candidate order.
+    La selezione e' deterministica: alterna container e node quando
+    disponibili, ed evita richieste duplicate sullo stesso componente.
+    L'ordine e' una politica di *copertura investigativa*, non una stima
+    della gravita' o della probabilita' causale dei guasti.
     """
     if (
         not _integer(start_unix) or not _integer(end_unix)
@@ -146,9 +149,9 @@ def pianifica_verifiche_mirate(
             kpi = None
 
         tool_name = METRICS_TOOL[scope]
-        # An earlier call is considered sufficient for planning purposes
-        # only if it covered the *candidate signal interval*. This does
-        # NOT certify the result was useful or the cause is correct.
+        # Una chiamata precedente copre il candidato solo se include
+        # l'intervallo del segnale. Non significa che il controllo
+        # abbia dimostrato la causa radice.
         was_queried = any(
             name == tool_name and comp == component
             and (prior_kpi is None or prior_kpi == kpi or kpi is None)
@@ -175,8 +178,8 @@ def pianifica_verifiche_mirate(
         }
         (already_covered if was_queried else pending).append(proposed)
 
-    # Avoid duplicate calls that have identical target parameters:
-    # these can correspond to distinct rule candidates, not extra tool work.
+    # Evitiamo controlli duplicati: due regole possono proporre
+    # la stessa interrogazione senza richiedere due chiamate ai tool.
     unique = {}
     for candidate in sorted(
         pending,
@@ -196,8 +199,8 @@ def pianifica_verifiche_mirate(
     for candidate in unique.values():
         scope_queues[candidate["scope"]].append(candidate)
 
-    # Fairness across component identities within each scope:
-    # one per component before revisiting that component with another KPI.
+    # Copertura equilibrata dei componenti di uno stesso livello:
+    # una verifica per componente prima di riproporne un'altra con KPI diverso.
     queues = {}
     for scope, items in scope_queues.items():
         groups = defaultdict(list)
