@@ -216,6 +216,9 @@ def audit_frozen_predictions(
                 "json_legacy_valid": result.get("json_status") == "valid_json",
                 "v2_valid": audit["valid"],
                 "v2_reason": audit["reason"],
+                "schema_cardinality_valid": audit["schema_cardinality_valid"],
+                "timestamp_in_window": audit["timestamp_in_window"],
+                "temporal_outliers": audit["temporal_outliers"],
                 "expected_faults": audit["expected_faults"],
                 "diagnosed_faults": audit["diagnosed_faults"],
                 "raw_response_present": isinstance(raw, str) and bool(raw.strip()),
@@ -240,6 +243,12 @@ def audit_frozen_predictions(
             "runs": len(selected),
             "legacy_json_valid": sum(x["json_legacy_valid"] for x in selected),
             "v2_contract_valid": sum(x["v2_valid"] for x in selected),
+            "schema_cardinality_valid": sum(
+                x["schema_cardinality_valid"] for x in selected
+            ),
+            "timestamp_in_window_among_schema_valid": sum(
+                x["timestamp_in_window"] is True for x in selected
+            ),
         }
     return {
         "audit": "v2_frozen_prediction_audit_v1",
@@ -249,6 +258,27 @@ def audit_frozen_predictions(
         "v2_invalid_reasons": dict(Counter(
             x["v2_reason"] for x in rows if not x["v2_valid"]
         )),
+        "error_breakdown": {
+            "schema_or_cardinality_failures": sum(
+                not x["schema_cardinality_valid"] for x in rows
+            ),
+            "temporal_only_failures": sum(
+                x["schema_cardinality_valid"]
+                and x["timestamp_in_window"] is False
+                for x in rows
+            ),
+            "out_of_window_fault_timestamps": sum(
+                len(x["temporal_outliers"]) for x in rows
+            ),
+            "outliers_within_60_seconds_of_boundary": sum(
+                abs(item["signed_seconds_from_nearest_boundary"]) <= 60
+                for x in rows for item in x["temporal_outliers"]
+            ),
+            "outliers_over_60_seconds_of_boundary": sum(
+                abs(item["signed_seconds_from_nearest_boundary"]) > 60
+                for x in rows for item in x["temporal_outliers"]
+            ),
+        },
         "runs": rows,
         "read_ground_truth": False,
         "read_market_zip": False,
