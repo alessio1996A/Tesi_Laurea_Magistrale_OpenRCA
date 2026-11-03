@@ -22,7 +22,7 @@ Criteri: 4+4 cloudbed, 7 task coperte, un multi-guasto per cloudbed, zero overla
 - `src/evaluation/v2_preregister.py`: costruisce il piano con 40 ID univoci; default **dry-run**, `--write` crea una sola volta un piano sotto `data/protocols/v2`, con hash e commit Git.
 - `src/evaluation/v2_campaign_runner.py`: default **preflight** delle 40 run senza inferenza. L'esecuzione richiede **`--execute --run-id ... --confirm-api`** e permette una sola run per invocazione, senza batch/retry automatici.
 - `src/tests/test_v2_preregister.py`: 6 test offline.
-- `src/tests/test_v2_campaign_runner.py`: 5 test offline con runner finto.
+- `src/tests/test_v2_campaign_runner.py`: 7 test offline con runner finto, inclusi ordine preregistrato e provenance dei predecessori.
 
 Il piano registra modello `gemini-3.5-flash-lite`, 6 round, 4+2 per A1_VERIFY e A1_VERIFY_ST, output `v2_enforce`, nome di ogni caso e suo timestamp ufficiale. Le cinque varianti sono A0, A1_V2, A1-R8 (internamente A1), A1_VERIFY, A1_VERIFY_ST. L'ordine viene ruotato per incidente, senza pretendere una randomizzazione perfetta. **Una replica per agente/caso non permette stime attendibili di variabilità tra run.**
 
@@ -38,7 +38,7 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_v2*.py" -v
 ```
 
-Attesi **66 test**: 55 dei blocchi precedenti + 6 di preregistrazione + 5 del runner campagna. Tutti devono essere `OK`. Eseguire anche `python -m unittest discover -s src/tests -v` se il progetto ha dipendenze installate, ma NON avviare altri script con chiamate modello.
+Attesi **68 test**: 55 dei blocchi precedenti + 6 di preregistrazione + 7 del runner campagna. Tutti devono essere `OK`. Eseguire anche `python -m unittest discover -s src/tests -v` se il progetto ha dipendenze installate, ma NON avviare altri script con chiamate modello.
 
 ## Step B — Colab: preview del piano, senza scrivere nulla
 
@@ -107,7 +107,9 @@ p = subprocess.run([
     "--data-dir", str(data_dir), "--repo-dir", str(repo),
 ], cwd=repo, env=env, capture_output=True, text=True, check=True)
 report = json.loads(p.stdout)
-print(report["status_counts"])  # dovrebbe essere {"ready":40}
+print(report["status_counts"])
+# Prima di qualsiasi run:
+# {"ready": 8, "waiting_for_previous_variant": 32}
 print(report["plan_sha256"])
 ```
 
@@ -122,3 +124,9 @@ Richiedono autorizzazione esplicita all'uso delle API e verifica del budget. Ogn
 - Ogni run ha output e claim separati; i run non ripresi automaticamente.
 - Non si dichiara la campagna conclusa senza 40 output ispezionati, hash congelati e scoring ufficiale successivo al freeze.
 - Il confronto 4+2 contro 5+1 è un esperimento successivo e separato; non fa parte dei 40 run.
+
+## Verifica aggiuntiva dell'ordine di esecuzione
+
+Il runner ora blocca un agente quando il precedente dello stesso incidente non e' completo. Prima della chiamata API verifica claim, file JSON e provenienza del precedente, hash del piano e `integrity_issues=[]`. Una nuova campagna completamente vergine mostra **8 run `ready`** (il primo agente di ogni incidente) e **32 `waiting_for_previous_variant`**. Le run vanno lanciate una alla volta nell'ordine preregistrato per ogni incidente. Non vengono mai effettuati retry automatici.
+
+Se la preview precedente mostrava il commit `adfc005c738077e0bc2c2b6d928eadbd751c31b8`, quello era valido prima di questi controlli aggiuntivi: **ripetere il pull e la preview**; il freeze deve identificare il nuovo commit HEAD.
