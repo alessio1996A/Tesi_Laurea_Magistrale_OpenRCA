@@ -141,6 +141,7 @@ def preflight_campaign(data_dir: Path, repo_dir: Path) -> dict:
     plan, plan_sha = load_preregistered(data_dir, repo_dir)
     runs = []
     for case in plan["cases"]:
+        predecessors_complete = True
         for index, (variant, run_id) in enumerate(zip(
             case["ordered_variants"], case["run_ids"]
         )):
@@ -152,12 +153,17 @@ def preflight_campaign(data_dir: Path, repo_dir: Path) -> dict:
             elif output.exists():
                 status = "orphan_output_REVIEW"
             else:
-                status = "ready"
+                status = (
+                    "ready" if predecessors_complete
+                    else "waiting_for_previous_variant"
+                )
             runs.append({
                 "run_id": run_id, "case_id": case["case_id"],
                 "variant": variant, "order_index": index,
                 "status": status,
             })
+            if status != "complete":
+                predecessors_complete = False
     return {
         "protocol": PROTOCOL,
         "plan_sha256": plan_sha,
@@ -229,6 +235,29 @@ def execute_exactly_one(
     plan, plan_sha = load_preregistered(data_dir, repo_dir)
     case = next(x for x in plan["cases"] if x["case_id"] == row["case_id"])
     variant = row["variant"]
+
+    # Il protocollo preregistra un ordine interno a ogni incidente.
+    # Ogni precedente deve avere claim, output e provenienza validi.
+    # Questo controllo avviene prima di leggere telemetria o chiamare API.
+    for previous_id in case["run_ids"][:row["order_index"]]:
+        prior_claim, prior_output = _output_paths(data_dir, previous_id)
+        if not prior_claim.is_file() or not prior_output.is_file():
+            raise RuntimeError("Variante precedente incompleta: ordine bloccato")
+        previous = json.loads(prior_output.read_text(encoding="utf-8"))
+        claim_data = json.loads(prior_claim.read_text(encoding="utf-8"))
+        provenance = previous.get("v2_provenance") or {}
+        if (
+            claim_data.get("run_id") != previous_id
+            or claim_data.get("plan_sha256") != plan_sha
+            or provenance.get("run_id") != previous_id
+            or provenance.get("plan_sha256") != plan_sha
+            or provenance.get("git_commit") != plan["git_commit"]
+            or provenance.get("integrity_issues") != []
+        ):
+            raise ValueError(
+                "Provenienza o integrita' della variante precedente errata"
+            )
+
     config = ExperimentConfig(
         variant=variant,
         case_id=case["case_id"],
