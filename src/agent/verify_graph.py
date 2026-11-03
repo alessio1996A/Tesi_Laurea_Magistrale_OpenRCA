@@ -31,6 +31,12 @@ from harness.investigation_planner import pianifica_verifiche_mirate
 
 
 class VerifyRCAState(TypedDict, total=False):
+    """Stato a fasi: esplorazione LLM, pianificazione, verifiche e finale.
+
+    total=False rende facoltative le chiavi del TypedDict nel type checking;
+    lo stato iniziale viene comunque costruito esplicitamente dal runner.
+    Nessun checkpointer persistente e' collegato al grafo.
+    """
     messages: Annotated[list[BaseMessage], add_messages]
     phase: str
     exploration_rounds: int
@@ -42,7 +48,11 @@ class VerifyRCAState(TypedDict, total=False):
 
 
 def _traccia_chiamate(messages: list[BaseMessage]) -> list[dict]:
-    """Ricostruzione del solo storico chiamate prima delle verifiche."""
+    """Ricostruisce le chiamate LLM eseguite prima delle verifiche pianificate.
+
+    Il planner usa questo storico per evitare di ripetere interrogazioni
+    gia' sufficientemente mirate sulla stessa ipotesi.
+    """
     trajectory = []
     for msg in messages:
         if not isinstance(msg, AIMessage):
@@ -151,8 +161,9 @@ def crea_grafo_rca_verify(
             "verification_status": report["stato"],
         }
 
-    # Fase 3: ToolNode esegue i controlli deterministici ammessi.
-    # Ogni verifica occupa un round ma non richiede una scelta LLM.
+    # Fase 3: il planner prepara le richieste; ToolNode esegue i controlli.
+    # Ogni verifica consuma un round, ma NON una nuova decisione LLM.
+    # Le tool_call sintetiche servono a riutilizzare la stessa ToolNode.
     def verifica(state: VerifyRCAState):
         plan = state.get("verification_plan", [])
         cursor = state.get("verification_cursor", 0)
