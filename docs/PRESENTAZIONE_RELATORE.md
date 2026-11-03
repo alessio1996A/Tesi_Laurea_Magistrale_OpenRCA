@@ -1,5 +1,17 @@
 # Guida alla presentazione del progetto (2 novembre 2026)
 
+## Aggiornamento integrato — 3 novembre 2026
+
+**Percorso per il colloquio:** [Presentazione integrata e interpretazioni](RELATORE_PRESENTAZIONE_INTEGRATA_2026-11-03.md). Il [nuovo notebook Colab](../notebooks/Colab_Relatore_Risultati_e_Regole_2026_11_03.ipynb) genera **9 grafici** dai due scoring congelati e dai conteggi degli audit di rete, senza nuove chiamate Gemini. Le demo storiche restano intatte.
+
+- **Primo confronto:** A1-R8 vs A1_VERIFY, score medio 0,3850→0,3225, token −45,50%, tempo −15,65%.
+- **Secondo confronto (altra coorte):** A1_VERIFY vs A1_VERIFY_ST, score medio 0,2288→0,2913; 1 miglioramento, 1 peggioramento, 6 pareggi.
+- **R03:** 720/720 coppie TCP allo stesso timestamp, ma solo a livello nodo.
+- **R04:** 720/720 profili di errori e drop tutti zero nel campione GT-free osservato.
+- **R05:** 33.960/33.960 coppie Istio allo stesso timestamp, ma durata RPC ≠ sola latenza di rete.
+
+[Nota di fattibilità R03/R04/R05, audit A/1–A/6](network_r03_r05_feasibility_relatore_2026-11-03.md). Gli script rimangono nel branch di analisi `feature/r03-r05-feasibility-schema-v1` e il codice sperimentale congelato non è stato modificato. A0 e A1_V2 sono rappresentati come architetture, senza punteggi non documentati.
+
 ## Aggiornamento: secondo esperimento A1_VERIFY_ST completato (2 novembre 2026)
 
 **Codice storico primo esperimento:** `6927fcfa18fc29fce64ad65eac98231b2ba42184`.
