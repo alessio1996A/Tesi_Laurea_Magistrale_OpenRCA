@@ -243,7 +243,9 @@ def execute_exactly_one(
     )
 
     # Nessuna chiamata LLM: controllo del caso ufficiale prima del claim.
-    from evaluation.experiment_runner import carica_caso, run_experiment
+    from evaluation.experiment_runner import (
+        carica_caso, prepara_esperimento, run_experiment,
+    )
     original = carica_caso(config)
     for key, value in (
         ("case_id", case["case_id"]),
@@ -254,6 +256,23 @@ def execute_exactly_one(
     ):
         if original.get(key) != value:
             raise ValueError(f"Caso manifest diverso dal freeze: {key}")
+
+    # Preprocessing GT-free PRIMA del claim permanente: errori di
+    # telemetria/strumenti non devono impegnare un run con costo API zero.
+    prepared = prepara_esperimento(config)
+    prepared_case = prepared.get("caso", {})
+    for key, expected in (
+        ("case_id", case["case_id"]),
+        ("cloudbed", case["cloudbed"]),
+        ("task_index", case["task_index"]),
+        ("start_unix", case["start_unix"]),
+        ("end_unix", case["end_unix"]),
+    ):
+        if prepared_case.get(key) != expected:
+            raise ValueError(f"Preprocessing differente dal piano: {key}")
+    evidence_sha = prepared.get("evidence_sha256")
+    if not HEX64.fullmatch(str(evidence_sha)):
+        raise ValueError("SHA delle evidenze preprocessate mancante")
 
     # Controllo status subito prima del marcatore create-only.
     refreshed = preflight_campaign(data_dir, repo_dir)
@@ -268,6 +287,7 @@ def execute_exactly_one(
         "execution_order_index": row["order_index"],
         "git_commit": plan["git_commit"],
         "plan_sha256": plan_sha,
+        "evidence_sha256_before_api": evidence_sha,
         "note": "Se Colab si interrompe, verificare prima di qualsiasi nuovo run.",
     })
     execute = _runner or (
@@ -278,6 +298,8 @@ def execute_exactly_one(
         raise RuntimeError("Runner fallito dopo claim, no retry automatico")
     result = dict(result)
     issues = _integrity_issues(result, case, variant, plan)
+    if result.get("evidence_sha256") != evidence_sha:
+        issues.append("evidence_sha_diverso_dal_preprocessing")
     result["v2_provenance"] = {
         "protocol": PROTOCOL,
         "run_id": run_id,
