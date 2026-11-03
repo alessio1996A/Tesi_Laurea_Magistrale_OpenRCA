@@ -93,6 +93,9 @@ def audit_task_output(
         try:
             parsed = json.loads(
                 raw_response, object_pairs_hook=_no_duplicate_keys,
+                parse_constant=lambda value: (_ for _ in ()).throw(
+                    OutputContractError(f"JSON non finito: {value}")
+                ),
             )
         except (json.JSONDecodeError, TypeError) as exc:
             raise OutputContractError("JSON non analizzabile") from exc
@@ -163,6 +166,33 @@ def audit_task_output(
     except (OutputContractError, ValueError, TypeError) as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
+
+
+def task_output_instruction(*, task_index: str, instruction: str) -> str:
+    """Istruzioni aggiuntive uniformi per le cinque varianti in V2 enforce.
+
+    Si ricavano SOLO da task_index e dalla richiesta GT-free.
+    Da usare in una campagna V2 dichiarata, non nei run storici.
+    """
+    fields = TASK_REQUIRED_FIELDS.get(task_index)
+    if fields is None:
+        raise OutputContractError(f"Task non riconosciuto: {task_index}")
+    n = infer_requested_faults(instruction)
+    if n is None:
+        raise OutputContractError("Numero di guasti mancante nella richiesta")
+    field_names = ", ".join(fields)
+    return (
+        "\n\nV2 TASK-SPECIFIC OUTPUT CONTRACT (takes precedence over the "
+        "generic three-field example above):\n"
+        f"Return exactly {n} numbered root-cause entries, starting at '1'.\n"
+        f"For this task ({task_index}), the required fields are: {field_names}.\n"
+        "Use only these fields unless additional fields are independently "
+        "supported by observed evidence. Never fabricate missing fields.\n"
+        "If a datetime is requested, format it as Asia/Shanghai "
+        "YYYY-MM-DD HH:MM:SS. Do not confuse telemetry search limits "
+        "with certainty about fault onset.\n"
+        "Return only a JSON object, no Markdown or explanations."
+    )
 
 
 def enforce_task_output(
