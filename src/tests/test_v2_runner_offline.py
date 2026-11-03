@@ -1,6 +1,8 @@
 """Test di integrazione V2 nel runner senza LLM, ZIP o filesystem reale."""
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from evaluation.experiment_config import ExperimentConfig
@@ -45,10 +47,11 @@ def fake_run(response):
 
 
 class RunnerV2Tests(unittest.TestCase):
-    def run_fake(self, variant, raw, mode):
+    def run_fake(self, variant, raw, mode, *, salva=False, data_dir=None):
+        options = {"data_dir": data_dir} if data_dir is not None else {}
         config = ExperimentConfig(
             variant=variant, case_id=CASE["case_id"],
-            output_contract_mode=mode,
+            output_contract_mode=mode, **options,
         )
         fixture = {
             "caso": dict(CASE), "tools": [],
@@ -68,7 +71,7 @@ class RunnerV2Tests(unittest.TestCase):
                 return_value={"synthetic_context": True},
             ),
         ):
-            return run_experiment(config, llm=object(), verbose=False, salva=False)
+            return run_experiment(config, llm=object(), verbose=False, salva=salva)
 
     def test_all_five_variants_apply_same_task_contract(self):
         for variant in ("A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST"):
@@ -103,6 +106,32 @@ class RunnerV2Tests(unittest.TestCase):
         result = self.run_fake("A1_VERIFY", TWO, "v2_enforce")
         self.assertTrue(result["output_contract_v2"]["valid"])
         self.assertIsNone(result["output_contract_v2"]["timestamp_in_window"])
+
+    def test_v2_results_save_only_in_separate_folder_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = self.run_fake(
+                "A0", TWO, "v2_enforce", salva=True, data_dir=root,
+            )
+            saved = (
+                root / "data/results/v2/"
+                "a0_unified_cloudbed-1_q001_v2_enforce.json"
+            )
+            self.assertTrue(saved.is_file())
+            self.assertEqual(
+                json.loads(saved.read_text(encoding="utf-8"))["prediction"],
+                first["prediction"],
+            )
+            legacy_folder = root / "data/results/"
+            self.assertFalse(
+                (legacy_folder / "a0_unified_cloudbed-1_q001.json").exists()
+            )
+            before = saved.read_bytes()
+            with self.assertRaises(FileExistsError):
+                self.run_fake(
+                    "A0", TWO, "v2_enforce", salva=True, data_dir=root,
+                )
+            self.assertEqual(saved.read_bytes(), before)
 
     def test_v2_new_prompt_differs_from_legacy(self):
         old = self.run_fake("A1", TWO, "legacy")
