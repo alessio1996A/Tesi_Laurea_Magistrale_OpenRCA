@@ -217,6 +217,15 @@ def enforce_task_output(
     )
     if not audit["valid"]:
         return None, f"invalid_v2_task_output: {audit['error']}", audit
+    # OpenRCA richiede che i guasti multipli siano numerati in ordine
+    # cronologico. Non riordiniamo le risposte originali automaticamente.
+    if (
+        TIME in audit["required_fields"]
+        and audit["chronological_order"] is False
+    ):
+        audit["valid"] = False
+        audit["error"] = "Guasti multipli non in ordine cronologico"
+        return None, "invalid_v2_task_output: ordine cronologico", audit
     parsed = json.loads(raw_response, object_pairs_hook=_no_duplicate_keys)
     return (
         json.dumps(parsed, ensure_ascii=False, allow_nan=False),
