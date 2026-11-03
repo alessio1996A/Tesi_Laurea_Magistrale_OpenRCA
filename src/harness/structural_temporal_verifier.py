@@ -1,12 +1,14 @@
-"""Cross-layer structural/temporal RCA evidence inspection (PAVE-inspired v1).
+"""Controlli strutturali e temporali sulle evidenze RCA (PAVE-inspired v1).
 
-Use *only* node/container labels and observed rule candidates in the
-current OpenRCA evidence report. This is not a service dependency graph:
-a telemetry identifier like node-5.frontend-0 is evidence of a naming
-relationship, not proof of deployment topology or causal propagation.
+Il modulo utilizza soltanto identificativi node/container e candidati
+osservativi del report corrente. Non ricostruisce una topologia applicativa:
+un identificativo come node-5.frontend-0 suggerisce una relazione di
+nomenclatura, NON prova la distribuzione effettiva del servizio o la
+propagazione causale.
 
-The verifier makes no LLM calls, reads no labels and does not modify
-predictions or the report. It is intentionally NOT connected to the runner.
+Non esegue chiamate LLM, non consulta ground truth e non modifica
+predizioni o report. La campagna V3 utilizza la funzione che costruisce
+il contesto PRIMA della risposta finale, non il verificatore a posteriori.
 """
 from __future__ import annotations
 
@@ -17,8 +19,8 @@ from output.openrca_contract import RootCause
 from harness.observational_verifier import verifica_coerenza_osservativa
 
 
-# Whitelist of classes implemented by the existing, unchanged R01-R11 rules.
-# The cross-layer inspection only compares families measured at both levels.
+# Classi ammesse dalle otto regole esistenti, che rimangono invariate.
+# Il confronto fra node e container riguarda solo famiglie misurate a entrambi i livelli.
 _RULES = {
     "R01": ("container", "cpu", "container CPU load"),
     "R02": ("container", "memory", "container memory load"),
@@ -35,7 +37,7 @@ _CONTAINER = re.compile(r"^(node-\d+)\.(.+)$")
 
 
 def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
-    """Fail closed on inconsistent candidate metadata and ordering."""
+    """Rifiuta metadati o finestre incoerenti, senza correggerli silenziosamente."""
     rules = report["regole_diagnostiche_v0"]
     source = rules["candidati_riportati"]
     if not isinstance(source, list):
@@ -87,7 +89,7 @@ def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
 
 
 def _target_hosts(component: str, candidates: list[dict]) -> tuple[list[str], str]:
-    """A suffix may refer to several hosts; do not select one arbitrarily."""
+    """Se un nome breve corrisponde a piu' host, non ne scegliamo uno arbitrariamente."""
     if _NODE.fullmatch(component):
         return [component], "nodo_esplicito"
 
@@ -250,15 +252,15 @@ def costruisci_contesto_strutturale_temporale(
     tolleranza_secondi: int = 60,
     max_relazioni: int = 8,
 ) -> dict[str, Any]:
-    """Estrae relazioni cross-layer PRIMA della diagnosi dell'LLM.
+    """Estrae relazioni fra node e container prima della diagnosi finale.
 
-    A differenza di verifica_relazioni_strutturali_temporali, non richiede
-    una RootCause: percio' e' adatto al contesto della finalizzazione A1_VERIFY_ST.
+    Non richiede una RootCause gia' formulata: il JSON prodotto e' quindi
+    un contesto aggiuntivo per A1_PAVE (ID storico A1_VERIFY_ST).
 
-    I soli collegamenti ammessi sono gli identificativi qualificati
-    node-N.container e i KPI della stessa famiglia su nodo/container.
-    L'ordine dei primi segnali NON e' una dimostrazione di propagazione.
-    Questa funzione non usa ground truth, tool o modelli LLM.
+    Sono ammessi solo identificativi qualificati node-N.container e
+    segnali KPI della stessa famiglia sui due livelli. La precedenza
+    temporale di un segnale non dimostra propagazione o causalita'.
+    Nessuna ground truth e nessun modello LLM vengono consultati.
     """
     if type(start_unix) is not int or type(end_unix) is not int or start_unix >= end_unix:
         raise ValueError("Finestra temporale non valida")
