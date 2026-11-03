@@ -10,9 +10,9 @@
 
 | Gate | Obiettivo | Stato |
 |---|---|---|
-| V2.1 | Contratto JSON uniforme: chiavi, campi, timestamp Asia/Shanghai, cardinalità dalla sola istruzione GT-free | Codice e test sintetici pubblicati; attendono esecuzione PyCharm |
-| V2.2 | Audit integrità delle due coorti V1: split, manifest, durata, overlap tra casi e piloti | Codice e test sintetici pubblicati; attendono PyCharm e Colab |
-| V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Da completare dopo gate V2.1 |
+| V2.1 | Contratto JSON uniforme: chiavi, campi, timestamp Asia/Shanghai, cardinalità dalla sola istruzione GT-free | 12 test sintetici eseguiti in PyCharm: OK |
+| V2.2 | Audit integrità delle due coorti V1: split, manifest, durata, overlap tra casi e piloti | 6 test sintetici eseguiti in PyCharm: OK; audit Colab reale ancora da eseguire |
+| V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Codice audit 32 freeze + 6 test sintetici pubblicati; attendono verifica PyCharm e Colab |
 | V2.4 | Nuova configurazione di esecuzione dei cinque agenti con medesimo contratto e metadata V2, test fake-LLM | Da completare dopo gate V2.3 |
 | V2.5 | Coorte development V2 preregistrata, selezione senza finestre coincidenti con tutte le attività già viste | Da concordare e congelare dopo audit |
 | V2.6 | Nuovi esperimenti reali A0/A1_V2/A1-R8/A1_VERIFY/A1_VERIFY_ST e confronto eventuale 4+2 vs 5+1 | Richiede consenso all'uso delle API, esecuzioni Colab, freeze e solo successivamente scoring |
@@ -37,6 +37,12 @@
 - `src/evaluation/v2_case_window_audit.py`: audit in sola lettura dei due piani di studio originali.
 - `src/tests/test_v2_case_window_audit.py`: test con split, manifest e piani artificiali, incluse finestre sovrapposte.
 
+## Nuovo modulo offline di auditing delle 32 risposte storiche
+
+- `src/evaluation/v2_frozen_prediction_audit.py`: verifica split, manifest, due piani congelati, due freeze SHA-256, tutti i risultati e le evidenze appaiate. Calcola per ciascuna risposta lo stato legacy e la conformità V2 **senza** correggere i JSON e **senza** leggere scoring/GT.
+- `src/tests/test_v2_frozen_prediction_audit.py`: sei test su 32 output artificiali, alterazioni di hash, provenienza e JSON.
+- Risultato sui 32 output **reali ancora da ottenere in Colab**; non attribuire esiti V2 prima di quella esecuzione.
+
 ## Test PyCharm
 
 Da root del repository, sul branch V2:
@@ -45,6 +51,7 @@ Da root del repository, sul branch V2:
 $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_v2_contract.py" -v
 python -m unittest discover -s src/tests -p "test_v2_case_window_audit.py" -v
+python -m unittest discover -s src/tests -p "test_v2_frozen_prediction_audit.py" -v
 ```
 
 ## Colab: audit finestre senza Gemini
