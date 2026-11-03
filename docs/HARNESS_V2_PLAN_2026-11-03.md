@@ -14,7 +14,7 @@
 | V2.2 | Audit integrità delle due coorti V1: split, manifest, durata, overlap tra casi e piloti | 6 test sintetici eseguiti in PyCharm: OK; audit Colab reale ancora da eseguire |
 | V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale eseguito: 30/32 legacy; 28/32 canonico struttura/cardinalità; 20/32 anche entro finestra; controllo temporale separato confermato |
 | V2.4 | Output conforme al task + integrazione nei cinque agenti e test fake-LLM | Audit Colab eseguito: 29/32 task-aware; controllo enforce cronologico e test locali ancora da confermare |
-| V2.5 | Proposta deterministica coorte development V2, escludendo tutte le finestre già note | Selettore GT-free pubblicato; audit A/2 e test PyCharm da confermare; nessuna coorte congelata |
+| V2.5 | Proposta development V2 bilanciata per task, cardinalità e cloudbed | Colab ha confermato 8 ID GT-free; selettore versionato aggiornato; test PyCharm e riesecuzione Colab da confermare; NON congelata |
 | V2.6 | Nuovi esperimenti reali A0/A1_V2/A1-R8/A1_VERIFY/A1_VERIFY_ST e confronto eventuale 4+2 vs 5+1 | Richiede consenso all'uso delle API, esecuzioni Colab, freeze e solo successivamente scoring |
 
 **Il codice testato e il protocollo sono un obiettivo realistico a breve termine. Una campagna completa con API, scoring e repliche non deve essere dichiarata conclusa finché non è stata realmente eseguita e verificata.** Non ci sono operazioni in background.
