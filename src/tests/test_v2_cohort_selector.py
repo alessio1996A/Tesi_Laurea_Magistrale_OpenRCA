@@ -54,7 +54,7 @@ def fixture(root):
                 "case_id": case_id, "cloudbed": cb,
                 "start_unix": row["start_unix"],
                 "end_unix": row["end_unix"],
-                "query_index": str(i), "task_index": "task_6",
+                "query_index": str(i), "task_index": f"task_{i % 7 + 1}",
                 "instruction": "Two failures occurred." if i % 2 else
                                "The system experienced a failure.",
             })
@@ -138,6 +138,11 @@ class V2CohortSelectorTests(unittest.TestCase):
             plan = propose_v2_cohort(**args)
         self.assertEqual(plan["case_count"], 8)
         self.assertEqual(plan["planned_runs"], 40)
+        self.assertEqual(plan["task_coverage"], [f"task_{i}" for i in range(1, 8)])
+        self.assertEqual(
+            set(plan["multi_fault_cases_per_cloudbed"]),
+            {"cloudbed-1", "cloudbed-2"},
+        )
         self.assertEqual(len({x["case_id"] for x in plan["selected_cases"]}), 8)
         self.assertEqual(
             {x["cloudbed"] for x in plan["selected_cases"]},
@@ -204,7 +209,7 @@ class V2CohortSelectorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             args = fixture(Path(tmp))
             args["per_cloudbed"] = 100
-            with self.assertRaisesRegex(ValueError, "insufficienti"):
+            with self.assertRaisesRegex(ValueError, "bilanciata|insufficienti"):
                 propose_v2_cohort(**args)
 
 
