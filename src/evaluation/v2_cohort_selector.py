@@ -62,6 +62,13 @@ def _select_balanced(eligible, manifest, per_cloudbed):
         if info["task_index"] not in {f"task_{i}" for i in range(1, 8)} or n is None:
             raise ValueError("Task o cardinalita' non riconosciuta")
         ranked.append({**row, "task": info["task_index"], "faults": n})
+    for cb in ("cloudbed-1", "cloudbed-2"):
+        if sum(r["cloudbed"] == cb for r in ranked) < per_cloudbed:
+            raise ValueError(f"Finestre development indipendenti insufficienti: {cb}")
+        if not any(
+            r["cloudbed"] == cb and r["faults"] >= 2 for r in ranked
+        ):
+            raise ValueError(f"Guasti multipli development mancanti: {cb}")
     ranked.sort(key=lambda r: (
         hashlib.sha256(
             f"{BALANCED_SEED}|{r['case_id']}".encode()
