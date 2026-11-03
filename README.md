@@ -1,246 +1,119 @@
+# OpenRCA — Tesi Magistrale in Ingegneria Informatica
 
-# Tesi_OpenRCA
+**Harness Engineering per Root Cause Analysis con agenti LLM**  
+**Stato:** campagna sperimentale V3 completata e valutata, 3 novembre 2026.
 
-## Harnessing di agenti LLM per la Root Cause Analysis nei sistemi distribuiti
+Il progetto studia se il supporto deterministico alla raccolta delle evidenze,
+l'applicazione di regole diagnostiche e la pianificazione delle verifiche
+migliorino le diagnosi RCA su OpenRCA 1.0 (Market). L'LLM non viene riaddestrato.
 
-Progetto di tesi magistrale sperimentale in Ingegneria Informatica.
+## 1. Le cinque varianti dell'agente
 
-L'obiettivo è studiare se e in quale misura un harness progettato per la Root
-Cause Analysis (RCA) possa migliorare la qualità diagnostica e l'efficienza
-di un agente basato su Large Language Model (LLM).
+I **nomi di presentazione** sono differenti dagli identificativi storici usati
+nei JSON e nei protocolli congelati:
 
-Il progetto utilizza inizialmente il dataset Market di OpenRCA 1.0.
-
----
-
-## 1. Domanda di ricerca
-
-In che misura la preparazione deterministica e la selezione delle evidenze
-attraverso un harness specifico per RCA migliorano la qualità diagnostica
-e l'efficienza di un agente LLM rispetto a un agente che esplora autonomamente
-la telemetria?
-
-La domanda nasce dall'osservazione che la Root Cause Analysis richiede di
-correlare informazioni eterogenee, come metriche, log, trace e dipendenze
-tra componenti.
-
-L'ipotesi da verificare è che un contesto selezionato, strutturato e supportato
-da evidenze verificabili possa aiutare il modello a formulare diagnosi migliori.
-
-Il miglioramento non viene assunto come garantito: deve essere dimostrato
-attraverso esperimenti controllati.
-
-## 2. Riferimenti scientifici
-
-### OpenRCA 1.0
-
-Viene utilizzato come benchmark principale per la valutazione delle diagnosi.
-Il dataset Market contiene 148 casi, 44 componenti di root cause distinti
-e 15 categorie di guasto.
-
-Il paper originale costituisce il riferimento per comprendere i task
-diagnostici, la struttura dei dati e i criteri di valutazione.
-
-### OpenRCA 2.0 e PAVE
-
-PAVE fornisce principi da studiare per una possibile estensione dell'harness:
-topologia delle dipendenze, deviazioni rispetto a una baseline, compatibilità
-temporale e verifica dei percorsi di propagazione.
-
-L'obiettivo iniziale non è replicare integralmente PAVE.
-Le sue idee saranno adattate soltanto se compatibili con le informazioni
-effettivamente disponibili in OpenRCA 1.0.
-
-### Agent Harnessing e Harness Engineering
-
-Le tecniche di harnessing saranno selezionate in funzione del problema RCA.
-Ogni meccanismo introdotto dovrà avere una responsabilità esplicita e
-un effetto misurabile.
-
-Il progetto seguirà un processo iterativo:
-baseline, osservazione degli errori, modifica dell'harness, test e confronto
-con la versione precedente.
-
-## 3. Architetture sperimentali
-
-### A0 — Agente di riferimento
-
-L'agente riceve una richiesta diagnostica e accede alla telemetria attraverso
-strumenti di consultazione.
-
-L'agente decide quali dati esplorare, come recuperarli e come costruire
-il contesto necessario alla diagnosi.
-
-### A1 — Agente con harness deterministico
-
-Un componente esterno all'LLM recupera e prepara le evidenze necessarie
-alla diagnosi.
-
-L'harness può includere, progressivamente:
-- selezione delle finestre temporali pertinenti;
-- estrazione e sintesi delle metriche, dei log e dei trace;
-- controlli di coerenza e provenienza delle evidenze;
-- rilevamento deterministico delle anomalie;
-- eventuale verifica della compatibilità temporale e topologica.
-
-Il modello riceve quindi un contesto strutturato e formula la diagnosi.
-
-Le funzionalità verranno aggiunte progressivamente, in modo da poter
-valutare il contributo delle singole tecniche.
-
-## 4. Principi di confronto equo
-
-Per confrontare A0 e A1 si cercherà di mantenere costanti:
-- il modello LLM e la sua versione;
-- i casi diagnostici e le richieste;
-- il formato dell'output;
-- le condizioni di valutazione;
-- i budget di esecuzione, per quanto comparabili.
-
-Le differenze inevitabili tra le due architetture saranno documentate.
-Saranno registrate le versioni del codice e dell'harness, le configurazioni
-del modello, gli errori e i costi di esecuzione.
-
-Il modello non viene addestrato durante gli esperimenti iniziali:
-l'oggetto dello studio è il comportamento del sistema a pesi invariati.
-
-## 5. Integrità della valutazione
-
-Le etichette di riferimento contenute in record.csv sono riservate
-alla valutazione finale.
-
-Non devono essere fornite all'agente né utilizzate per costruire il contesto
-diagnostico del caso che si sta valutando.
-
-Le predizioni archiviate del precedente agente possono essere analizzate
-come riferimento storico, ma non saranno considerate automaticamente
-un confronto sperimentale diretto con il nuovo agente.
-
-Gli eventuali errori di caricamento, le righe ignorate, i casi esclusi e
-le trasformazioni applicate ai dati dovranno essere documentati.
-
-## 6. Metriche
-
-Le metriche iniziali da valutare sono:
-
-- Exact Match: tutti i campi richiesti dalla diagnosi sono corretti.
-- Accuratezza per componente e per categoria di guasto.
-- Falsi positivi e altre tipologie di errore diagnostico.
-- Latenza dell'intera esecuzione.
-- Token utilizzati e, quando disponibile, costo delle chiamate LLM.
-
-Le metriche saranno definite in modo coerente con il task OpenRCA selezionato.
-Non verranno confrontati punteggi ottenuti con task o condizioni differenti
-senza esplicitare le differenze.
-
-## 7. Piano di lavoro
-
-### Fase 1 — Fattibilità e conoscenza dei dati
-- Verificare struttura, schema e dimensioni dei file.
-- Comprendere le relazioni tra query, record e telemetria.
-- Selezionare un primo caso diagnostico senza utilizzare le etichette
-  di riferimento durante l'analisi.
-
-### Fase 2 — Baseline
-- Definire il contratto di input e output dell'agente.
-- Implementare ed eseguire la prima versione di riferimento.
-- Registrare diagnosi, errori, latenza e consumo di token.
-
-### Fase 3 — Harness iniziale
-- Implementare la raccolta e la preparazione deterministica delle evidenze.
-- Fornire all'LLM un contesto strutturato.
-- Confrontare A1 con A0 sugli stessi casi.
-
-### Fase 4 — Miglioramenti misurati
-- Analizzare gli errori osservati.
-- Aggiungere una tecnica di harnessing alla volta.
-- Condurre ablation test e test di regressione.
-
-### Fase 5 — Estensioni
-Se i risultati iniziali saranno promettenti, valutare la verifica causale
-ispirata a PAVE e la possibilità di trasformare diagnosi validate
-in regole deterministiche.
-
-L'eventuale generalizzazione a classi di guasto non utilizzate nella fase
-iniziale richiederà una suddivisione documentata dei dati e incidenti
-indipendenti per la verifica.
-
-## 8. Struttura del progetto
-
-- src/agent/: logica dell'agente LLM.
-- src/harness/: raccolta, trasformazione e verifica delle evidenze.
-- src/evaluation/: confronto con le etichette di riferimento e calcolo
-  delle metriche.
-- src/utils/: funzioni di supporto riutilizzabili.
-- data/raw/: dati originali, non modificati.
-- data/processed/: dati derivati e intermedi.
-- notebooks/: notebook per eseguire gli esperimenti su Google Colab.
-- results/: risultati sperimentali e riepiloghi.
-
-I dati originali e le credenziali non devono essere pubblicati nel repository
-del codice.
-
-## 9. Ambiente di sviluppo
-
-PyCharm viene utilizzato per sviluppare, organizzare e verificare il codice.
-
-Google Colab viene utilizzato per l'esecuzione degli esperimenti che richiedono
-risorse computazionali non disponibili sul PC locale.
-
-Google Drive viene utilizzato per conservare dataset, notebook e risultati
-persistenti.
-
-L'elaborazione della telemetria dovrà essere progettata per leggere i dati
-a blocchi e limitare il consumo di memoria.
-
-## 10. Stato del progetto — 2 novembre 2026
-
-> Questa è una versione di presentazione. La coorte sperimentale è **immutabile** e si riferisce al commit `6927fcfa18fc29fce64ad65eac98231b2ba42184`. La documentazione di presentazione **non** cambia i risultati storici.
-
-**Realizzato:** cinque tool per metriche, log e trace; generazione e selezione deterministica delle evidenze; otto regole R01, R02, R06–R11; motore LangGraph per A0/A1/A1_V2/A1_VERIFY; planner di controlli mirati; output contract; test offline; scoring ufficiale e audit.
-
-**Sperimentato:** primo confronto accoppiato `A1-R8` vs `A1_VERIFY`, otto casi development (16 run), `gemini-3.5-flash-lite`. Score OpenRCA medio 0,3850 vs 0,3225; token 474.590 vs 258.649 (−45,50%); tempo 709,365 s vs 598,321 s (−15,65%). Gli output JSON validi sono stati 7/8 vs 8/8. Il vantaggio di efficienza **non** equivale a maggiore accuratezza.
-
-**Non completato:** replica integrale di PAVE; verifica di propagazione causale; integrazione online dei prototipi di verifica strutturale/temporale; knowledge transfer autonomo; test di generalizzazione sugli holdout OOD; provider aggiuntivi. Il codice della factory è predisposto per provider multipli, ma al momento è implementato soltanto Google/Gemini.
-
-### Navigazione rapida
-
-| Area | Percorso | Descrizione |
+| Nome presentazione | ID nei risultati | Descrizione |
 | --- | --- | --- |
-| Agenti e tool | `src/agent/` | Prompt, factory modello, tool, grafi LangGraph |
-| Harness | `src/harness/` | Preprocessing, evidenze, regole e planner |
-| Regole | `src/harness/rules/` | Otto detector deterministici indipendenti |
-| Contratto output | `src/output/` | Parsing, validazione e formato RCA |
-| Valutazione | `src/evaluation/` | Runner, protocollo e controlli di integrità |
-| Test | `src/tests/` | Test automatici offline |
-| Protocollo e roadmap | `docs/` | Metodologia e limiti documentati |
-| Presentazione | `docs/PRESENTAZIONE_RELATORE.md` | Guida alla struttura e al notebook |
-| Dataset e risultati | Google Drive | Non inclusi nel repository per ragioni di dimensione e integrità |
+| **A0** | `A0` | Baseline LangGraph ReAct-style e cinque tool |
+| **A1** | `A1_V2` | A0 + evidenze preparate deterministicamente |
+| **A1_8R** | `A1` | A1 + otto regole diagnostiche (R01, R02, R06–R11) |
+| **A1_8R_Planning** | `A1_VERIFY` | 8 regole + planner e verifiche mirate |
+| **A1_PAVE** | `A1_VERIFY_ST` | Planning + contesto strutturale/temporale PAVE-inspired |
 
-### Artefatti sperimentali immutabili (Drive)
+**Avvertenza:** `A1_PAVE` è una denominazione sintetica per la presentazione:
+la variante non implementa integralmente PAVE e non dimostra causalità.
+Le etichette sono centralizzate in `src/agent/variant_names.py`; gli ID interni
+non sono cambiati, così i risultati rimangono riproducibili.
 
-- Piano: `data/protocols/a1_verify_paired_development_v1_cohort_v1.json`.
-- Risultati: `data/results/paired/a1_verify_paired_development_v1/`.
-- Freeze: `data/protocols/a1_verify_paired_development_v1_results_freeze_v1.json` — SHA-256 `e8c350d3e3372d0e4afb6fd63d60f2f5632394bc7e2a4b996ca0ff864ae2ccf0`.
-- Scoring: `data/results/scoring/a1_verify_paired_development_v1_official_scoring_v1.json` — SHA-256 `2504295d89f49c20c5e14da552ee176e54e52286cc2f86c417755367a814fb5f`.
+## 2. Risultati della campagna V3
 
-Per dimostrare il funzionamento al relatore è disponibile un notebook separato **Colab_Demo_Relatore_OpenRCA.ipynb**. La [versione demo su Drive](https://drive.google.com/file/d/1JIdqEdpvHuUIgDQ96_QCFabBBCf2IGyP/view?usp=drivesdk) e' separata dal notebook storico originale, che resta archiviato su Drive. La dimostrazione usa un replay dei tool già registrati e non richiama API a pagamento.
+Stesso modello e stessa coorte: 8 incidenti development × 5 agenti = 40 run,
+**una replica per caso e variante**; 39/40 output conformi al contratto V3.
+Lo scorer è quello originale Microsoft OpenRCA, fissato al commit
+`2a481ae63cb045c3eadbeca9eddaa10ec1151979`.
 
+| Variante | Score medio OpenRCA | Diagnosi esatte | Token medi | Tempo medio |
+| --- | ---: | ---: | ---: | ---: |
+| A0 | 0,0000 | 0/8 | 35.286 | 157,84 s |
+| A1 | 0,4062 | 2/8 | 48.659 | 170,76 s |
+| **A1_8R** | **0,5000** | **3/8** | 48.177 | 191,14 s |
+| A1_8R_Planning | 0,4375 | 2/8 | **32.144** | **101,67 s** |
+| A1_PAVE | 0,2812 | 1/8 | 36.100 | 109,91 s |
 
-## Esperimento in preparazione — A1_VERIFY_ST
+Sintesi: il report deterministico migliora lo score in cinque casi rispetto
+ad A0; le regole aggiungono due miglioramenti; il planner diminuisce i costi
+computazionali con una lieve perdita di score rispetto a A1_8R; ST non
+ha prodotto ulteriori miglioramenti nella coorte osservata.
 
-Sul branch `feature/a1-verify-st-v1` e' stata implementata una **prima integrazione
-pre-finalizzazione** del verificatore strutturale/temporale, senza introdurre
-nuove classi di regole e senza modificare la ripartizione storica 4+2.
-Il sistema conserva le otto regole R01, R02, R06, R07, R08, R09, R10, R11;
-confronta solo tre coppie cross-layer della stessa famiglia (CPU, memoria,
-read I/O) e non pretende di certificare causalita' o percorsi di propagazione.
+**Limiti:** otto soli casi development, una replica, copertura delle regole
+limitata a otto delle quindici classi di guasto, match testuale esatto per
+le motivazioni, assenza di test OOD e verifica causale completa.
 
-La nuova variante e' distinta da `A1_VERIFY`. La procedura sperimentale e'
-documentata in [docs/a1_verify_st_protocol_v1.md](docs/a1_verify_st_protocol_v1.md).
-Contiene un nuovo generatore GT-free di casi development, runner accoppiato
-con salvataggi esclusivi e test offline. La suite sul branch e i nuovi
-run Gemini devono ancora essere verificati/eseguiti nell'ambiente del progetto:
-**nessun punteggio ST e' stato ancora prodotto**. Gli otto casi gia' valutati
-non vengono riutilizzati per stimare l'effetto della nuova variante.
+## 3. Riproducibilità e isolamento
 
+**Commit originale e immutabile della campagna V3:**
+
+`6747eecc77c1b2fff7d581c7284578b5c574b4f7`
+
+Protocollo: `openrca_harness_v2_five_agents_development_v3`.
+
+- Codice originale: il commit sopra; nessuna modifica retroattiva.
+- Dati e 40 predizioni: `Tesi_OpenRCA/data/results/v2/<protocollo>/` su Drive.
+- Score ufficiali: `Tesi_OpenRCA/data/results/scoring/v2/<protocollo>/`.
+- La ground truth era **esclusa** da tool, report e manifest durante
+  le run; è stata consultata soltanto per lo scoring successivo.
+- Il protocollo non consente retry automatici delle run già reclamate.
+- I nuovi commit su questo branch modificano solo la versione di
+  presentazione/manutenzione, **non l'attribuzione storica degli output**.
+
+## 4. Struttura ordinata del progetto
+
+```text
+src/
+  agent/         Grafi LangGraph, prompt, model factory, cinque tool e alias
+  harness/       Evidenze, otto regole, planner e contesto strutturale/temporale
+  output/        Contratti e validazione JSON specifica per task
+  evaluation/    Configurazione, runner, audit e preregistrazione
+  tests/         Test offline di regressione e integrità
+docs/            Documentazione attuale e protocolli storici
+notebooks/       Istruzioni per la demo su Google Drive
+requirements.txt Dipendenze Python
+```
+
+Il dataset Market e i risultati non sono nel repository: rimangono su Drive.
+
+## 5. Demo Colab per il relatore
+
+**Notebook:** `Tesi_OpenRCA/demo_relatore/Demo_Relatore_OpenRCA_V3.ipynb`
+su Google Drive.
+
+La demo mostra il dataset, i componenti, i KPI, il **replay** delle chiamate ai
+tool delle run effettive, le diagnosi e i risultati ufficiali con due grafici.
+Non invoca Gemini, non altera il freeze e non presenta il replay come una
+nuova esecuzione online.
+
+Vedere anche [notebooks/README.md](notebooks/README.md).
+
+## 6. Sviluppo e test
+
+Ambiente di sviluppo: PyCharm, Google Colab e Google Drive.
+Le chiavi API devono rimanere nei Secrets Colab / variabili d'ambiente.
+
+Da root del progetto:
+
+```bash
+python -m compileall -q src
+PYTHONPATH=src python -m unittest discover -s src/tests -p 'test_*.py' -v
+```
+
+Non dichiarare la suite verde senza eseguirla nell'ambiente provvisto
+delle dipendenze di `requirements.txt`.
+
+## 7. Documentazione
+
+- [Indice e materiali correnti](docs/INDICE_DOCUMENTAZIONE.md)
+- [Architettura, risultati e limiti V3](docs/ARCHITETTURA_E_RISULTATI_V3.md)
+- [Piano di pulizia sicura](docs/PULIZIA_CODICE_V3.md)
+
+I documenti datati prima della V3 rimangono consultabili come **storico
+dello sviluppo**; possono descrivere protocolli e risultati precedenti.
