@@ -46,7 +46,7 @@ class ExperimentConfig:
 
     # Default storico: nessun cambiamento alla validazione delle predizioni.
     # audit: aggiunge una diagnosi della conformita\u0027 senza modificarle.
-    output_contract_mode: Literal["legacy", "audit", "structured"] = "legacy"
+    output_contract_mode: Literal["legacy", "audit", "structured", "v2_audit", "v2_enforce"] = "legacy"
 
     # A1_VERIFY e A1_VERIFY_ST: stesso budget di 4 esplorazioni + 2 verifiche.
     # Posizionato alla fine per preservare le firme storiche.
@@ -72,7 +72,7 @@ class ExperimentConfig:
         if not isinstance(self.model_provider, str) or not self.model_provider.strip():
             raise ValueError("Provider LLM mancante.")
 
-        if self.output_contract_mode not in ("legacy", "audit", "structured"):
+        if self.output_contract_mode not in ("legacy", "audit", "structured", "v2_audit", "v2_enforce"):
             raise ValueError("Modalita\u0027 output contract non valida.")
 
         if self.max_tool_rounds < 1:
