@@ -48,6 +48,69 @@ def _rank(seed: str, case_id: str) -> str:
     return hashlib.sha256(f"{seed}|{case_id}".encode("utf-8")).hexdigest()
 
 
+
+def _select_balanced(eligible, manifest, per_cloudbed):
+    """Selezione GT-free: tutte le sette task, 4+4 e un multi per cloudbed."""
+    from collections import Counter
+
+    if 2 * per_cloudbed < 7:
+        raise ValueError("Campione troppo piccolo per sette task")
+    ranked = []
+    for row in eligible:
+        info = manifest[row["case_id"]]
+        n = infer_requested_faults(info["instruction"])
+        if info["task_index"] not in {f"task_{i}" for i in range(1, 8)} or n is None:
+            raise ValueError("Task o cardinalita' non riconosciuta")
+        ranked.append({**row, "task": info["task_index"], "faults": n})
+    ranked.sort(key=lambda r: (
+        hashlib.sha256(
+            f"{BALANCED_SEED}|{r['case_id']}".encode()
+        ).hexdigest(), r["case_id"]
+    ))
+    tasks = {f"task_{i}" for i in range(1, 8)}
+    groups = {t: [r for r in ranked if r["task"] == t] for t in tasks}
+    if not all(groups.values()):
+        raise ValueError("Sette task non disponibili")
+    order = sorted(tasks, key=lambda t: (len(groups[t]), t))
+    visits = [0]
+
+    def search(chosen, step):
+        visits[0] += 1
+        if visits[0] > 200000:
+            raise ValueError("Limite ricerca coorte: stop senza fallback")
+        counts = Counter(r["cloudbed"] for r in chosen)
+        if len(chosen) == 2 * per_cloudbed:
+            multi = Counter(
+                r["cloudbed"] for r in chosen if r["faults"] >= 2
+            )
+            if step == 7 and all(
+                counts[c] == per_cloudbed and multi[c] >= 1
+                for c in ("cloudbed-1", "cloudbed-2")
+            ):
+                return chosen
+            return None
+        pool = groups[order[step]] if step < 7 else ranked
+        for r in pool:
+            if counts[r["cloudbed"]] >= per_cloudbed:
+                continue
+            if any(r["case_id"] == x["case_id"] or _overlap(r, x)
+                   for x in chosen):
+                continue
+            found = search(chosen + [r], step + (step < 7))
+            if found is not None:
+                return found
+        return None
+
+    selected = search([], 0)
+    if selected is None:
+        raise ValueError("Nessuna coorte bilanciata senza sovrapposizioni")
+    return sorted(selected, key=lambda r: (
+        r["cloudbed"],
+        hashlib.sha256(
+            f"{BALANCED_SEED}|{r['case_id']}".encode()
+        ).hexdigest()
+    ))
+
 def propose_v2_cohort(
     data_dir: Path,
     inventory_path: Path,
