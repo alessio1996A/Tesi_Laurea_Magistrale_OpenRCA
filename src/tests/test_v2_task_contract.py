@@ -137,6 +137,20 @@ class TaskAwareV2Tests(unittest.TestCase):
         self.assertTrue(report["valid"])
         self.assertFalse(report["chronological_order"])
 
+    def test_enforcement_rejects_reverse_order_when_time_requested(self):
+        raw = json.dumps({
+            "1": {TIME: "2022-03-20 10:20:00"},
+            "2": {TIME: "2022-03-20 10:05:00"},
+        })
+        parsed, status, report = enforce_task_output(
+            raw, task_index="task_1", instruction=TWO,
+            start_unix=START, end_unix=END,
+        )
+        self.assertIsNone(parsed)
+        self.assertFalse(report["valid"])
+        self.assertFalse(report["chronological_order"])
+        self.assertIn("ordine cronologico", status)
+
     def test_prompt_is_from_gt_free_task_and_count(self):
         prompt = task_output_instruction(task_index="task_6", instruction=TWO)
         self.assertIn("exactly 2", prompt)
