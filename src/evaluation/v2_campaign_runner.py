@@ -212,7 +212,11 @@ def _integrity_issues(result: dict, case: dict, variant: str, plan: dict):
         issues.append("manca_audit_task_aware")
     if not isinstance(result.get("raw_response"), (str, type(None))):
         issues.append("raw_response_non_serializzabile")
-    if not HEX64.fullmatch(str(result.get("evidence_sha256", ""))):
+    evidence_sha = result.get("evidence_sha256")
+    if variant == "A0":
+        if evidence_sha is not None:
+            issues.append("a0_non_deve_avere_report_evidenze")
+    elif not isinstance(evidence_sha, str) or not HEX64.fullmatch(evidence_sha):
         issues.append("evidence_sha_non_valido")
     return issues
 
@@ -300,7 +304,12 @@ def execute_exactly_one(
         if prepared_case.get(key) != expected:
             raise ValueError(f"Preprocessing differente dal piano: {key}")
     evidence_sha = prepared.get("evidence_sha256")
-    if not HEX64.fullmatch(str(evidence_sha)):
+    # A0 e' baseline priva di report. La mancanza dello SHA e' voluta.
+    # Gli altri quattro agenti devono avere uno SHA-256 verificabile.
+    if variant == "A0":
+        if evidence_sha is not None:
+            raise ValueError("A0 non deve generare report deterministico")
+    elif not isinstance(evidence_sha, str) or not HEX64.fullmatch(evidence_sha):
         raise ValueError("SHA delle evidenze preprocessate mancante")
 
     # Controllo status subito prima del marcatore create-only.
