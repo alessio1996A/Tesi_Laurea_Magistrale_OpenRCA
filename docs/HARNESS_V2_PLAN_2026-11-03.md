@@ -13,7 +13,7 @@
 | V2.1 | Contratto JSON uniforme: chiavi, campi, timestamp Asia/Shanghai, cardinalità dalla sola istruzione GT-free | 12 test sintetici eseguiti in PyCharm: OK |
 | V2.2 | Audit integrità delle due coorti V1: split, manifest, durata, overlap tra casi e piloti | 6 test sintetici eseguiti in PyCharm: OK; audit Colab reale ancora da eseguire |
 | V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale delle 32 predizioni eseguito: 30 legacy, 20 V2 completo, 8 timestamp fuori finestra, 2 cardinalità, 2 schemi; scomposizione nuova da verificare con 7 test PyCharm e Colab |
-| V2.4 | Nuova configurazione di esecuzione dei cinque agenti con medesimo contratto e metadata V2, test fake-LLM | Da completare dopo gate V2.3 |
+| V2.4 | Nuova configurazione di esecuzione dei cinque agenti con contratto per task (7 tipologie), test fake-LLM | Codice pubblicato; test PyCharm e audit Colab task-aware da verificare |
 | V2.5 | Coorte development V2 preregistrata, selezione senza finestre coincidenti con tutte le attività già viste | Da concordare e congelare dopo audit |
 | V2.6 | Nuovi esperimenti reali A0/A1_V2/A1-R8/A1_VERIFY/A1_VERIFY_ST e confronto eventuale 4+2 vs 5+1 | Richiede consenso all'uso delle API, esecuzioni Colab, freeze e solo successivamente scoring |
 
@@ -76,6 +76,10 @@ Questo audit legge soltanto `split_market_v1.csv`, `benchmark_inputs_market.csv`
 ## Criterio di fine progetto V2
 
 Una nuova serie di risultati potrà sostituire **nelle conclusioni** la V1, **non sovrascriverla negli archivi**, soltanto dopo test, freeze, audit e scoring su una coorte documentatamente idonea. Anche uno score più basso rimarrà un risultato valido da riportare.
+
+## V2.4 — Contratto per task e runner comune
+
+[Documentazione dell'integrazione V2.4](V2_4_TASK_AWARE_RUNNER_2026-11-03.md). Le sette task richiedono sottoinsiemi differenti delle tre chiavi RCA. La V2 distingue campi richiesti, ordine, cardinalità e warning sul timestamp fuori dalla finestra; le modalità v2_audit e v2_enforce sono opt-in e il default legacy rimane immutato. Prima di nuovi run: eseguire i test in PyCharm e confermare l'audit task-aware sui freeze V1.
 
 ## Evidenza audit reale e scomposizione multilivello
 
