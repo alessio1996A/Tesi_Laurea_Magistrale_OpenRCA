@@ -1,0 +1,124 @@
+# V2.6 — Preregistrazione e runner dei 40 esperimenti
+
+Data: 3 novembre 2026. **Stato: strumenti implementati, non ancora testati in PyCharm né eseguiti su Colab.**
+
+## Coorte verificata dal notebook (non ancora congelata)
+
+| Caso | Task | Guasti richiesti |
+|---|---|---:|
+| cloudbed-1_q005 | task_2 | 1 |
+| cloudbed-1_q066 | task_6 | 1 |
+| cloudbed-1_q027 | task_7 | 2 |
+| cloudbed-1_q013 | task_5 | 1 |
+| cloudbed-2_q071 | task_4 | 2 |
+| cloudbed-2_q020 | task_6 | 1 |
+| cloudbed-2_q034 | task_1 | 1 |
+| cloudbed-2_q024 | task_3 | 1 |
+
+Criteri: 4+4 cloudbed, 7 task coperte, un multi-guasto per cloudbed, zero overlap con le finestre note di esperimenti precedenti e audit A/2. Solo development; la selezione non usa punteggi o etichette.
+
+## I nuovi moduli
+
+- `src/evaluation/v2_preregister.py`: costruisce il piano con 40 ID univoci; default **dry-run**, `--write` crea una sola volta un piano sotto `data/protocols/v2`, con hash e commit Git.
+- `src/evaluation/v2_campaign_runner.py`: default **preflight** delle 40 run senza inferenza. L'esecuzione richiede **`--execute --run-id ... --confirm-api`** e permette una sola run per invocazione, senza batch/retry automatici.
+- `src/tests/test_v2_preregister.py`: 6 test offline.
+- `src/tests/test_v2_campaign_runner.py`: 5 test offline con runner finto.
+
+Il piano registra modello `gemini-3.5-flash-lite`, 6 round, 4+2 per A1_VERIFY e A1_VERIFY_ST, output `v2_enforce`, nome di ogni caso e suo timestamp ufficiale. Le cinque varianti sono A0, A1_V2, A1-R8 (internamente A1), A1_VERIFY, A1_VERIFY_ST. L'ordine viene ruotato per incidente, senza pretendere una randomizzazione perfetta. **Una replica per agente/caso non permette stime attendibili di variabilità tra run.**
+
+Il runner controlla PRIMA della chiamata API il freeze, il commit Git, il manifest, il caso e il preprocessing GT-free. Crea un `claim` permanente immediatamente prima della chiamata API. Un crash lascia il claim per bloccare retry automatici potenzialmente fatturati. I risultati finiscono solo sotto `data/results/v2/openrca_harness_v2_five_agents_development_v1/`, un file JSON per run in creazione esclusiva, completo di `raw_response`, metriche e provenienza.
+
+## Step A — Test obbligatori PyCharm (zero API)
+
+```powershell
+git fetch origin
+git switch feature/harness-v2-clean-2026-11-03
+git pull --ff-only origin feature/harness-v2-clean-2026-11-03
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_v2*.py" -v
+```
+
+Attesi **66 test**: 55 dei blocchi precedenti + 6 di preregistrazione + 5 del runner campagna. Tutti devono essere `OK`. Eseguire anche `python -m unittest discover -s src/tests -v` se il progetto ha dipendenze installate, ma NON avviare altri script con chiamate modello.
+
+## Step B — Colab: preview del piano, senza scrivere nulla
+
+Dopo l'esito positivo dei test:
+
+```python
+import os, sys, subprocess, json
+from pathlib import Path
+
+repo = Path("/content/Tesi_OpenRCA_V2")
+data_dir = Path("/content/drive/MyDrive/Tesi_OpenRCA")
+inventory = Path("/content/network_kpi_inventory_v1.json")
+
+subprocess.run([
+    "git", "-C", str(repo), "pull", "--ff-only",
+    "origin", "feature/harness-v2-clean-2026-11-03"
+], check=True)
+assert inventory.is_file()
+
+env = os.environ.copy()
+env["PYTHONPATH"] = str(repo / "src")
+p = subprocess.run([
+    sys.executable, "-m", "evaluation.v2_preregister",
+    "--data-dir", str(data_dir),
+    "--inventory", str(inventory),
+    "--repo-dir", str(repo),
+], cwd=repo, env=env, capture_output=True, text=True, check=True)
+
+plan = json.loads(p.stdout)
+print("stato:", plan["status"])
+print("run:", plan["run_count"])
+print("git commit:", plan["git_commit"])
+print("primo ordine:", plan["cases"][0]["ordered_variants"])
+assert plan["run_count"] == 40
+assert plan["status"] == "PREREGISTERED_NOT_EXECUTED"
+```
+
+Questa preview è in sola lettura, non è un freeze.
+
+## Step C — Freeze del piano SOLO DOPO controllo della preview
+
+Una volta confermati test, 40 run, registro storico e commit, eseguire una sola volta:
+
+```python
+p = subprocess.run([
+    sys.executable, "-m", "evaluation.v2_preregister",
+    "--data-dir", str(data_dir),
+    "--inventory", str(inventory),
+    "--repo-dir", str(repo),
+    "--write",
+], cwd=repo, env=env, capture_output=True, text=True, check=True)
+print(p.stdout)
+```
+
+**Non avvia Gemini.** Il file piano è create-only in
+`data/protocols/v2/openrca_harness_v2_five_agents_development_v1_plan_v1.json`.
+Se già esiste, si ferma; non cancellare o sovrascrivere per forzare un nuovo freeze.
+
+## Step D — Preflight di tutti i run, senza API
+
+Dopo il freeze:
+
+```python
+p = subprocess.run([
+    sys.executable, "-m", "evaluation.v2_campaign_runner",
+    "--data-dir", str(data_dir), "--repo-dir", str(repo),
+], cwd=repo, env=env, capture_output=True, text=True, check=True)
+report = json.loads(p.stdout)
+print(report["status_counts"])  # dovrebbe essere {"ready":40}
+print(report["plan_sha256"])
+```
+
+## Step E — Esecuzioni REALI (NON ANCORA AUTORIZZATE)
+
+Richiedono autorizzazione esplicita all'uso delle API e verifica del budget. Ogni run richiede un run ID esatto e flag `--execute --confirm-api`. Non includiamo qui alcuna cella che avvii chiamate per errore. Prima di eseguire la campagna completa, verificare le dipendenze e il preflight in sola lettura, quindi registrare l'approvazione dell'utente al costo.
+
+## Gate scientifici prima dello scoring
+
+- Il contratto `v2_enforce` non fa retry LLM; i fallimenti JSON devono restare contabilizzati.
+- Nessun test di scorers o ground truth durante sviluppo/preregistrazione. `evaluation` e `ood_holdout` non vengono usati.
+- Ogni run ha output e claim separati; i run non ripresi automaticamente.
+- Non si dichiara la campagna conclusa senza 40 output ispezionati, hash congelati e scoring ufficiale successivo al freeze.
+- Il confronto 4+2 contro 5+1 è un esperimento successivo e separato; non fa parte dei 40 run.
