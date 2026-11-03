@@ -221,6 +221,27 @@ def _integrity_issues(result: dict, case: dict, variant: str, plan: dict):
     return issues
 
 
+
+def _ensure_runtime_ready(variant: str) -> None:
+    """Importa dipendenze del modello e dei grafi senza invocare Gemini.
+
+    Se un pacchetto non e' installato, NON creare alcun claim permanente.
+    """
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from agent.graph_engine import crea_grafo_rca, esegui_grafo_rca
+        if variant in ("A1_VERIFY", "A1_VERIFY_ST"):
+            from agent.verify_graph import (
+                crea_grafo_rca_verify, esegui_grafo_rca_verify,
+            )
+    except ImportError as exc:
+        raise RuntimeError(
+            "Dipendenza runtime mancante/incompatibile. "
+            "Installare requirements.txt e ripetere i test offline "
+            "PRIMA di avviare il run: " + str(exc)
+        ) from exc
+
+
 def execute_exactly_one(
     data_dir: Path, repo_dir: Path, *,
     run_id: str, confirm_api: bool = False,
@@ -311,6 +332,11 @@ def execute_exactly_one(
             raise ValueError("A0 non deve generare report deterministico")
     elif not isinstance(evidence_sha, str) or not HEX64.fullmatch(evidence_sha):
         raise ValueError("SHA delle evidenze preprocessate mancante")
+
+    # I test possono iniettare un fake runner; per le esecuzioni REALI
+    # importiamo il modello e i grafi senza rete, PRIMA del claim.
+    if _runner is None:
+        _ensure_runtime_ready(variant)
 
     # Controllo status subito prima del marcatore create-only.
     refreshed = preflight_campaign(data_dir, repo_dir)
