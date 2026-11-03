@@ -15,7 +15,7 @@
 | V2.3 | Audit offline delle predizioni congelate senza ripararle, inclusa conformità canonica | Audit reale eseguito: 30/32 legacy; 28/32 canonico struttura/cardinalità; 20/32 anche entro finestra; controllo temporale separato confermato |
 | V2.4 | Output conforme al task + integrazione nei cinque agenti e test fake-LLM | Audit Colab eseguito: 29/32 task-aware; controllo enforce cronologico e test locali ancora da confermare |
 | V2.5 | Proposta development V2 bilanciata per task, cardinalità e cloudbed | Colab ha confermato 8 ID GT-free; selettore versionato aggiornato; test PyCharm e riesecuzione Colab da confermare; NON congelata |
-| V2.6 | Preregistrazione e runner in sicurezza per cinque agenti (40 run); ablation 5+1 separata | Strumenti dry-run/freeze create-only/runner una run alla volta pubblicati; 66 test attesi, ancora da verificare, nessuna API o freeze eseguito |
+| V2.6 | Preregistrazione e runner in sicurezza per cinque agenti (40 run); ablation 5+1 separata | Strumenti dry-run/freeze create-only/runner una run alla volta pubblicati; 68 test attesi, ancora da verificare, nessuna API o freeze eseguito |
 
 **Il codice testato e il protocollo sono un obiettivo realistico a breve termine. Una campagna completa con API, scoring e repliche non deve essere dichiarata conclusa finché non è stata realmente eseguita e verificata.** Non ci sono operazioni in background.
 
@@ -93,4 +93,6 @@ Il [piano V2.5](V2_5_COHORT_PROPOSAL_2026-11-03.md) introduce una proposta di **
 
 ## V2.6 — Nuovi strumenti preregistrazione e runner
 
-Il [runbook operativo V2.6](V2_6_PREREGISTRATION_RUNBOOK_2026-11-03.md) contiene test, preview senza scritture, freeze create-only e preflight, con esecuzione API disattivata per default. Sono pubblicati `evaluation.v2_preregister` e `evaluation.v2_campaign_runner` con **11 test offline nuovi**, portando il totale atteso a **66**. Il protocollo resta non congelato finché non sono stati superati i test e verificata la preview; non sono stati eseguiti modelli o nuovi score.
+Il [runbook operativo V2.6](V2_6_PREREGISTRATION_RUNBOOK_2026-11-03.md) contiene test, preview senza scritture, freeze create-only e preflight, con esecuzione API disattivata per default. Sono pubblicati `evaluation.v2_preregister` e `evaluation.v2_campaign_runner` con **13 test offline nuovi**, portando il totale atteso a **68**. Il protocollo resta non congelato finché non sono stati superati i test e verificata la preview; non sono stati eseguiti modelli o nuovi score.
+
+Il runner V2.6 ora applica il vincolo sull'ordine dei cinque agenti per incidente: prima della chiamata API verifica i risultati e la provenienza dei predecessori. Una campagna vergine ha 8 run ready e 32 waiting_for_previous_variant. Non congelare anteprime prodotte da commit precedenti a questo aggiornamento: rieseguire test e preview sul commit Git finale.
