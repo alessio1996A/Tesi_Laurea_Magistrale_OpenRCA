@@ -139,6 +139,35 @@ class V2ContractTests(unittest.TestCase):
                 instruction=ONE, start_unix=END, end_unix=START,
             )
 
+    def test_audit_separates_schema_from_temporal_outlier(self):
+        raw = raw_faults("2022-03-20 10:30:20")
+        result = audit_openrca_v2(
+            raw, instruction=ONE, start_unix=START, end_unix=END,
+        )
+        self.assertFalse(result["valid"])
+        self.assertTrue(result["schema_cardinality_valid"])
+        self.assertFalse(result["timestamp_in_window"])
+        self.assertEqual(result["diagnosed_faults"], 1)
+        self.assertEqual(
+            result["temporal_outliers"][0][
+                "signed_seconds_from_nearest_boundary"
+            ], 20,
+        )
+        self.assertEqual(
+            result["temporal_outliers"][0]["position"],
+            "at_or_after_end",
+        )
+
+    def test_audit_structural_failure_has_no_temporal_verdict(self):
+        raw = '{"1":{"root cause component":"x"}}'
+        result = audit_openrca_v2(
+            raw, instruction=ONE, start_unix=START, end_unix=END,
+        )
+        self.assertFalse(result["valid"])
+        self.assertFalse(result["schema_cardinality_valid"])
+        self.assertIsNone(result["timestamp_in_window"])
+        self.assertEqual(result["temporal_outliers"], [])
+
     def test_audit_does_not_repair_or_invent(self):
         raw = raw_faults("2022-03-20 10:15:00")
         original = raw
