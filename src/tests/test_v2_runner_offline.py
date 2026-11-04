@@ -74,7 +74,7 @@ class RunnerV2Tests(unittest.TestCase):
             return run_experiment(config, llm=object(), verbose=False, salva=salva)
 
     def test_all_five_variants_apply_same_task_contract(self):
-        for variant in ("A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST"):
+        for variant in ("A0", "A1", "A1_8R", "A1_8R_Planning", "A1_PAVE"):
             with self.subTest(variant=variant):
                 result = self.run_fake(variant, TWO, "v2_enforce")
                 self.assertEqual(result["json_status"], "valid_json")
@@ -103,7 +103,7 @@ class RunnerV2Tests(unittest.TestCase):
 
     def test_v2_timestamp_extra_is_not_mandatory(self):
         self.assertEqual(CASE["task_index"], "task_6")
-        result = self.run_fake("A1_VERIFY", TWO, "v2_enforce")
+        result = self.run_fake("A1_8R_Planning", TWO, "v2_enforce")
         self.assertTrue(result["output_contract_v2"]["valid"])
         self.assertIsNone(result["output_contract_v2"]["timestamp_in_window"])
 
