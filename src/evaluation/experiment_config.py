@@ -4,9 +4,11 @@ from typing import Literal
 import re
 
 
-# Varianti sperimentali supportate.
-# A1_V2 usa il report unificato senza la sezione delle regole.
-Variant = Literal["A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"]
+# Nomi operativi finali e identificativi legacy dei risultati V3.
+from agent.variant_names import variante_canonica
+
+Variant = Literal["A0", "A1", "A1_8R", "A1_8R_Planning", "A1_PAVE"]
+HistoricalVariant = Literal["A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST"]
 
 
 @dataclass(frozen=True)
@@ -14,7 +16,9 @@ class ExperimentConfig:
     """
     Configurazione di un esperimento OpenRCA.
 
-    La stessa configurazione e i medesimi budget sono usati da A0, A1 e A1_V2.
+    Le cinque varianti condividono modello e budget totale di tool.
+    La nomenclatura 'historic_v3' va dichiarata per leggere i vecchi piani:
+    il vecchio 'A1' include le otto regole; il nuovo 'A1' non le include.
 
     Non contiene:
     - chiavi API;
@@ -23,7 +27,7 @@ class ExperimentConfig:
     - logica specifica di Gemini.
     """
 
-    variant: Variant
+    variant: Variant | HistoricalVariant
     case_id: str
 
     # Parametri condivisi dai due agenti.
@@ -52,13 +56,22 @@ class ExperimentConfig:
     # Posizionato alla fine per preservare le firme storiche.
     max_verification_checks: int = 2
 
+    # Le nuove run utilizzano i nomi finali. I piani già congelati,
+    # che contengono stringhe potenzialmente ambigue, usano historic_v3.
+    variant_scheme: Literal["current", "historic_v3"] = "current"
+
+    @property
+    def canonical_variant(self) -> str:
+        """Etichetta finale utilizzata dalle scelte logiche del runner."""
+        return variante_canonica(self.variant, schema=self.variant_scheme)
+
     def __post_init__(self):
         """
         Verifica la validità della configurazione.
         """
 
-        if self.variant not in ("A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
-            raise ValueError("Variante non valida.")
+        # 'A1' significa cose diverse nei due schemi: niente auto-detection.
+        _ = self.canonical_variant
 
         if not re.fullmatch(
             r"cloudbed-[12]_q\d+",
@@ -80,17 +93,17 @@ class ExperimentConfig:
                 "max_tool_rounds deve essere positivo."
             )
 
-        if self.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
+        if self.canonical_variant in ("A1_8R_Planning", "A1_PAVE"):
             if (
                 type(self.max_verification_checks) is not int
                 or not 0 <= self.max_verification_checks < self.max_tool_rounds
             ):
                 raise ValueError(
-                    "A1_VERIFY richiede 0 <= max_verification_checks < max_tool_rounds"
+                    "Planning/PAVE richiedono 0 <= max_verification_checks < max_tool_rounds"
                 )
             if self.recursion_limit < 2 * self.max_tool_rounds + 5:
                 raise ValueError(
-                    "A1_VERIFY richiede recursion_limit maggiore per il planner"
+                    "Planning/PAVE richiedono recursion_limit maggiore per il planner"
                 )
 
         if self.recursion_limit < 2 * self.max_tool_rounds + 2:
@@ -132,28 +145,27 @@ class ExperimentConfig:
         """
 
         nome = self.variant.lower()
-
-        return (
-            self.results_dir
-            / f"{nome}_pilot_{self.case_id}.json"
+        destinazione = (
+            self.results_dir / "final_names_v1"
+            if self.variant_scheme == "current"
+            else self.results_dir
         )
+        return destinazione / f"{nome}_pilot_{self.case_id}.json"
 
     @property
     def evidence_path(self) -> Path | None:
         """
-        A1 e A1_V2 hanno report deterministici con percorsi distinti.
-
-        A0 non deve ricevere questo report.
+        Le varianti diverse da A0 hanno report deterministici distinti.
+        I file dei nuovi esperimenti restano separati da quelli storici.
         """
 
-        if self.variant == "A0":
+        if self.canonical_variant == "A0":
             return None
 
-        return (
-            self.data_dir
-            / "data/processed"
-            / f"evidence_{self.variant}_v1_{self.case_id}.json"
-        )
+        destinazione = self.data_dir / "data/processed"
+        if self.variant_scheme == "current":
+            destinazione = destinazione / "final_names_v1"
+        return destinazione / f"evidence_{self.variant}_v1_{self.case_id}.json"
 
 
 # ============================================================
