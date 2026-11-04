@@ -78,6 +78,8 @@ class RunnerV2Tests(unittest.TestCase):
             with self.subTest(variant=variant):
                 result = self.run_fake(variant, TWO, "v2_enforce")
                 self.assertEqual(result["json_status"], "valid_json")
+                self.assertEqual(result["variant"], variant)
+                self.assertEqual(result["variant_scheme"], "current")
                 self.assertEqual(json.loads(result["prediction"]), json.loads(TWO))
                 self.assertEqual(result["raw_response"], TWO)
                 self.assertTrue(result["output_contract_v2"]["valid"])
@@ -114,7 +116,7 @@ class RunnerV2Tests(unittest.TestCase):
                 "A0", TWO, "v2_enforce", salva=True, data_dir=root,
             )
             saved = (
-                root / "data/results/v2/"
+                root / "data/results/v2/final_names_v1/"
                 "a0_unified_cloudbed-1_q001_v2_enforce.json"
             )
             self.assertTrue(saved.is_file())
