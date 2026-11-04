@@ -9,8 +9,9 @@ migliorino le diagnosi RCA su OpenRCA 1.0 (Market). L'LLM non viene riaddestrato
 
 ## 1. Le cinque varianti dell'agente
 
-I **nomi di presentazione** sono differenti dagli identificativi storici usati
-nei JSON e nei protocolli congelati:
+I **nuovi nomi operativi** sono ora utilizzati da ExperimentConfig e dal
+runner per le nuove esecuzioni. Gli identificativi storici rimangono
+invariati nei 40 JSON e nei protocolli già congelati:
 
 | Nome presentazione | ID nei risultati | Descrizione |
 | --- | --- | --- |
@@ -22,8 +23,11 @@ nei JSON e nei protocolli congelati:
 
 **Avvertenza:** `A1_PAVE` è una denominazione sintetica per la presentazione:
 la variante non implementa integralmente PAVE e non dimostra causalità.
-Le etichette sono centralizzate in `src/agent/variant_names.py`; gli ID interni
-non sono cambiati, così i risultati rimangono riproducibili.
+Le conversioni sono centralizzate in `src/agent/variant_names.py`:
+`src/evaluation/experiment_runner.py` utilizza direttamente i nuovi nomi
+per scegliere report, regole, planner e contesto ST. I runner storici
+dichiarano esplicitamente `variant_scheme="historic_v3"`, per non
+reinterpretare erroneamente il vecchio `A1` come il nuovo `A1`.
 
 ## 2. Risultati della campagna V3
 
@@ -63,8 +67,11 @@ Protocollo: `openrca_harness_v2_five_agents_development_v3`.
 - La ground truth era **esclusa** da tool, report e manifest durante
   le run; è stata consultata soltanto per lo scoring successivo.
 - Il protocollo non consente retry automatici delle run già reclamate.
-- I nuovi commit su questo branch modificano solo la versione di
-  presentazione/manutenzione, **non l'attribuzione storica degli output**.
+- Il branch corrente usa nuovi ID per le **future** esecuzioni;
+  non modifica l'attribuzione storica degli output già salvati.
+- Per `output_contract_mode="v2_enforce"` i **nuovi** output (se salvati)
+  vanno in `data/results/v2/final_names_v1/` con modalità create-only:
+  non possono sovrascrivere i vecchi `a1_unified_*.json`.
 
 ## 4. Struttura ordinata del progetto
 
@@ -81,6 +88,32 @@ requirements.txt Dipendenze Python
 ```
 
 Il dataset Market e i risultati non sono nel repository: rimangono su Drive.
+
+### Esempio: nomenclatura nel codice Python
+
+Con `src` come Sources Root in PyCharm:
+
+```python
+from evaluation.experiment_config import ExperimentConfig
+
+# Nuovo A1: solo evidenze, SENZA le otto regole
+a1 = ExperimentConfig(variant="A1", case_id="cloudbed-1_q066")
+
+# Nuovo A1_8R: evidenze + otto regole
+a1_8r = ExperimentConfig(variant="A1_8R", case_id="cloudbed-1_q066")
+
+# Lettura del vecchio A1 congelato (storicamente CON otto regole)
+storico = ExperimentConfig(
+    variant="A1",
+    variant_scheme="historic_v3",
+    case_id="cloudbed-1_q066",
+)
+assert storico.canonical_variant == "A1_8R"
+```
+
+Il parametro `variant_scheme` disambigua intenzionalmente il vecchio
+`A1` dal nuovo. Non manipolare direttamente il campo `variant`
+di un JSON originale per rinominarlo.
 
 ## 5. Demo Colab per il relatore
 
