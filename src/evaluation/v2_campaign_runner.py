@@ -14,6 +14,8 @@ from pathlib import Path
 import re
 
 from evaluation.experiment_config import ExperimentConfig
+# Le varianti lette dal piano V3 sono STORICHE e non vanno tradotte
+# prima di verificare run_id, SHA e ordine del protocollo congelato.
 from evaluation.v2_cohort_selector import PROTOCOL, VARIANTS
 from evaluation.v2_preregister import _git_head_clean, _overlap
 from evaluation.v2_case_window_audit import (
