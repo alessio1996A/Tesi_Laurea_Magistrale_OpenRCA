@@ -1,4 +1,4 @@
-"""A1_VERIFY tests: synthetic candidates, local fake tools/model, no API/GT."""
+"""A1_8R_Planning tests: synthetic candidates, local fake tools/model, no API/GT."""
 import json
 import unittest
 from unittest.mock import patch, sentinel
@@ -253,22 +253,22 @@ class TestVerificationGraph(unittest.TestCase):
     def test_config_and_prompt_accept_new_variant(self):
         from agent.prompts import get_system_prompt
         config = ExperimentConfig(
-            variant="A1_VERIFY", case_id="cloudbed-1_q009",
+            variant="A1_8R_Planning", case_id="cloudbed-1_q009",
             max_tool_rounds=6, max_verification_checks=2,
         )
-        self.assertEqual(config.variant, "A1_VERIFY")
+        self.assertEqual(config.variant, "A1_8R_Planning")
         self.assertEqual(
-            get_system_prompt("A1_VERIFY"),
+            get_system_prompt("A1_8R_Planning"),
             get_system_prompt("A1"),
         )
-        self.assertIn("a1_verify", str(config.output_path))
+        self.assertIn("a1_8r_planning", str(config.output_path))
 
     def test_invalid_config_reservation_fails(self):
         for checks in (-1, 6, True):
             with self.subTest(checks=checks):
                 with self.assertRaises(ValueError):
                     ExperimentConfig(
-                        variant="A1_VERIFY",
+                        variant="A1_8R_Planning",
                         case_id="cloudbed-1_q009",
                         max_tool_rounds=6,
                         max_verification_checks=checks,
@@ -276,7 +276,7 @@ class TestVerificationGraph(unittest.TestCase):
 
     def test_new_runner_calls_only_new_graph(self):
         config = ExperimentConfig(
-            variant="A1_VERIFY", case_id="cloudbed-1_q009",
+            variant="A1_8R_Planning", case_id="cloudbed-1_q009",
         )
         prepared = {
             "caso": {
@@ -327,7 +327,7 @@ class TestVerificationGraph(unittest.TestCase):
         executor.assert_called_once()
         old_factory.assert_not_called()
         old_executor.assert_not_called()
-        self.assertEqual(result["variant"], "A1_VERIFY")
+        self.assertEqual(result["variant"], "A1_8R_Planning")
         self.assertEqual(result["json_status"], "valid_json")
         self.assertEqual(result["verification"]["piano"][0]["rule_id"], "R07")
         self.assertEqual(result["exploration_round_limit"], 4)
@@ -335,7 +335,7 @@ class TestVerificationGraph(unittest.TestCase):
 
 
 class TestVerifyStructuralIntegration(unittest.TestCase):
-    """Il confronto A1_VERIFY/ST isola la sola informazione aggiunta."""
+    """Il confronto A1_8R_Planning/ST isola la sola informazione aggiunta."""
 
     def test_same_budget_same_planner_more_structural_context(self):
         from harness.structural_temporal_verifier import (
@@ -378,13 +378,13 @@ class TestVerifyStructuralIntegration(unittest.TestCase):
     def test_new_variant_config_is_4_plus_2(self):
         from agent.prompts import get_system_prompt
         config = ExperimentConfig(
-            variant="A1_VERIFY_ST", case_id="cloudbed-1_q009",
+            variant="A1_PAVE", case_id="cloudbed-1_q009",
             max_tool_rounds=6, max_verification_checks=2,
         )
         self.assertEqual(config.max_tool_rounds - config.max_verification_checks, 4)
         self.assertEqual(
-            get_system_prompt("A1_VERIFY_ST"),
-            get_system_prompt("A1_VERIFY"),
+            get_system_prompt("A1_PAVE"),
+            get_system_prompt("A1_8R_Planning"),
         )
 
 
