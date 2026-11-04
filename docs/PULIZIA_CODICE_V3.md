@@ -19,8 +19,11 @@ cambiare l'algoritmo sperimentale, le predizioni già congelate o lo scoring.
 
 1. Il commit `6747eecc77c1b2fff7d581c7284578b5c574b4f7`
    non viene modificato né sostituito nei metadati sperimentali.
-2. I nomi scientifici interni restano invariati; introdurre soltanto
-   alias di presentazione, senza cambiare import, path o JSON.
+2. Dal 4 novembre i nomi operativi delle nuove esecuzioni sono
+   `A0`, `A1`, `A1_8R`, `A1_8R_Planning`, `A1_PAVE`.
+   I dati storici NON cambiano: `variant_scheme="historic_v3"`
+   disambigua i vecchi piani. I nuovi salvataggi sono isolati nella
+   directory `final_names_v1`, senza sovrascrivere i risultati V3.
 3. Conservare i test anche quando i nomi ricordano esperimenti storici;
    possono verificare compatibilità e correttezza.
 4. Eliminare soltanto gli script di **patch manuale una tantum** che non
@@ -66,6 +69,20 @@ modificati da queste cancellazioni.
 La rimozione e' una semplificazione dell'albero per la presentazione;
 richiede comunque il test completo di regressione prima di considerare
 concluso il refactoring.
+
+## Refactoring della nomenclatura (4 novembre 2026)
+
+Sono stati aggiornati `agent.variant_names`,
+`evaluation.experiment_config`, `evaluation.experiment_runner`,
+`agent.prompts` e alcuni test offline. I runner di protocollo già
+congelato (`v2_campaign_runner.py`, `paired_runner.py` e
+`paired_st_runner.py`) indicano esplicitamente lo schema
+`historic_v3`. Il codice originale dei 40 output è sempre reperibile
+al commit del 3 novembre.
+
+**Queste modifiche non sono ancora qualificate come equivalenti
+sperimentali:** i risultati già pubblicati non vengono ricalcolati
+e prima di nuove run occorre passare tutti i test nell'ambiente PyCharm.
 
 ## Spostamenti rimandati
 
