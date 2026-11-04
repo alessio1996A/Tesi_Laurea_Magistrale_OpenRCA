@@ -26,6 +26,8 @@ from output.v2_contract import infer_requested_faults
 PROTOCOL = "openrca_harness_v2_five_agents_development_v3"
 SEED = "openrca-harness-v2-five-agents-2026-11-03-v1"
 AUDIT_SEED = "network-kpi-inventory-2026-11-03-v1"
+# ORDINE STORICO DEL PROTOCOLLO V3 CONGELATO: NON RINOMINARE.
+# I nuovi esperimenti usano agent.variant_names.VARIANTI_FINALI.
 VARIANTS = ("A0", "A1_V2", "A1", "A1_VERIFY", "A1_VERIFY_ST")
 BALANCED_SEED = "openrca-harness-v2-balanced-seven-tasks-2026-11-03-v1"
 # Snapshot letterale di SEEN_CASE_IDS in src/evaluation/network_kpi_inventory.py
