@@ -293,6 +293,7 @@ def esegui_coppia(
     configs = {
         variant: ExperimentConfig(
             variant=variant,
+            variant_scheme="historic_v3",
             case_id=case_id,
             data_dir=Path(data_dir),
             repo_dir=Path(repo_dir),
