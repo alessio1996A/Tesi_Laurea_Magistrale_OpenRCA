@@ -72,6 +72,7 @@ def esegui_audit_offline(
 
     config = ExperimentConfig(
         variant="A1",
+        variant_scheme="historic_v3",
         case_id=case_id,
         data_dir=data_dir,
     )
