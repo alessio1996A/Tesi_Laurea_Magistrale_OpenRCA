@@ -312,7 +312,7 @@ def prepara_esperimento(
     config: ExperimentConfig
 ) -> dict:
     """
-    Prepara un esperimento A0, A1 (con regole) oppure A1_V2 (senza regole).
+    Prepara A0, A1 (solo evidenze) oppure A1_8R (con otto regole).
 
     A0:
         - recupera il caso dal manifest;
@@ -325,7 +325,8 @@ def prepara_esperimento(
         - genera automaticamente le evidenze;
         - aggiunge il report all'istruzione.
 
-    A1_V2 usa lo stesso report unificato di A1 ma senza le otto regole.
+    A1_8R aggiunge le otto regole alle evidenze di A1.
+    I vecchi piani V3 sono interpretati tramite config.variant_scheme.
     Questa funzione NON chiama Gemini.
     """
 
@@ -394,10 +395,10 @@ def prepara_esperimento(
     preprocessing_seconds = 0.0
 
     # =====================================================
-    # 4. HARNESS DETERMINISTICO: A1 E A1_V2
+    # 4. HARNESS DETERMINISTICO: A1 E VARIANTI SUCCESSIVE
     # =====================================================
 
-    if config.variant in ("A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
+    if config.canonical_variant in ("A1", "A1_8R", "A1_8R_Planning", "A1_PAVE"):
 
         # =====================================================
         # 1. IMPORT DELL'HARNESS UNIFICATO
@@ -561,12 +562,12 @@ def prepara_esperimento(
         # =====================================================
         # 9 BIS. ABLAZIONE DELLE OTTO REGOLE DIAGNOSTICHE
         # =====================================================
-        # A1: report unificato + regole R01, R02, R06-R11.
-        # A1_V2: stesso report unificato, ma senza la sezione delle regole.
+        # A1_8R: report unificato + regole R01, R02, R06-R11.
+        # A1: stesso report unificato, ma senza la sezione delle regole.
         # In questo modo isoliamo l'effetto informativo delle regole,
         # senza cambiare tool, modello, selezione Mesh/Runtime o prompt.
         # Nessuna lettura della ground truth.
-        if config.variant in ("A1", "A1_VERIFY", "A1_VERIFY_ST"):
+        if config.canonical_variant in ("A1_8R", "A1_8R_Planning", "A1_PAVE"):
             from harness.rule_batch import costruisci_evidenze_regole
 
             evidence_report["regole_diagnostiche_v0"] = costruisci_evidenze_regole(
@@ -689,7 +690,7 @@ def run_experiment(
 
     # Il prompt viene recuperato automaticamente
     # in base alla variante sperimentale.
-    system_prompt = get_system_prompt(config.variant)
+    system_prompt = get_system_prompt(config.canonical_variant)
 
     if not system_prompt.strip():
         raise ValueError("Prompt di sistema vuoto.")
@@ -742,11 +743,11 @@ def run_experiment(
     # 4. COSTRUZIONE DEL GRAFO CONDIVISO
     # =====================================================
 
-    # A1_VERIFY_ST: il report ST e' calcolato in assenza di ground truth.
-    # In A1_VERIFY (baseline) rimane None e il codice del grafo si comporta
+    # A1_PAVE: il contesto ST e' calcolato in assenza di ground truth.
+    # In A1_8R_Planning rimane None e il codice del grafo si comporta
     # come nella versione storica, senza aggiungere token al contesto.
     structural_context = None
-    if config.variant == "A1_VERIFY_ST":
+    if config.canonical_variant == "A1_PAVE":
         from harness.structural_temporal_verifier import (
             costruisci_contesto_strutturale_temporale,
         )
@@ -756,7 +757,7 @@ def run_experiment(
             end_unix=int(caso["end_unix"]),
         )
 
-    if config.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
+    if config.canonical_variant in ("A1_8R_Planning", "A1_PAVE"):
         # Nuovo braccio sperimentale, completamente separato dal grafo
         # A0/A1. Budget totale: esplorazione + verifiche pre-finale.
         from agent.verify_graph import (
@@ -1049,14 +1050,14 @@ def run_experiment(
         "tool_trajectory": esecuzione["tool_trajectory"]
     }
 
-    if config.variant in ("A1_VERIFY", "A1_VERIFY_ST"):
+    if config.canonical_variant in ("A1_8R_Planning", "A1_PAVE"):
         risultato["verification"] = esecuzione["verification"]
         risultato["max_verification_checks"] = config.max_verification_checks
         risultato["exploration_round_limit"] = (
             config.max_tool_rounds - config.max_verification_checks
         )
 
-    if config.variant == "A1_VERIFY_ST":
+    if config.canonical_variant == "A1_PAVE":
         # Il report osservativo e' conservato separato dalla diagnosi.
         risultato["structural_temporal_context"] = structural_context
         risultato["structural_temporal_context_sha256"] = hashlib.sha256(
@@ -1068,6 +1069,13 @@ def run_experiment(
 
     # Per i nuovi audit conserviamo separatamente l'esito canonico:
     # la predizione originale e le metriche restano invariate.
+    # Nelle run correnti registriamo il significato dell'etichetta
+    # e la traduzione verso i JSON V3, senza alterare il formato storico.
+    if config.variant_scheme == "current":
+        from agent.variant_names import id_interno
+        risultato["variant_scheme"] = "current"
+        risultato["historical_variant"] = id_interno(config.canonical_variant)
+
     if output_contract_audit is not None:
         risultato["output_contract_audit"] = output_contract_audit
 
@@ -1101,6 +1109,11 @@ def run_experiment(
             if config.output_contract_mode in ("v2_audit", "v2_enforce")
             else config.results_dir
         )
+        # Isolamento dei nuovi ID: "a1" non deve collidere con
+        # il vecchio "a1" (che significava A1 con otto regole).
+        if config.variant_scheme == "current":
+            results_directory = results_directory / "final_names_v1"
+
         destinazione = (
             results_directory
             / f"{config.variant.lower()}_unified_"
