@@ -285,6 +285,7 @@ def execute_exactly_one(
 
     config = ExperimentConfig(
         variant=variant,
+        variant_scheme="historic_v3",
         case_id=case["case_id"],
         repo_dir=Path(repo_dir),
         data_dir=Path(data_dir),
