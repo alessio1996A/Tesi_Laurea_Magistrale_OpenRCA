@@ -38,6 +38,8 @@ def fake_plan():
 
 
 def fake_result(config):
+    # Il protocollo V3 congelato deve usare sempre gli ID originali.
+    assert config.variant_scheme == "historic_v3"
     return {
         "variant": config.variant,
         "case_id": config.case_id,
