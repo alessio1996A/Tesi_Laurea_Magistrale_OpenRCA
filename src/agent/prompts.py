@@ -2,7 +2,7 @@ from typing import Literal
 
 
 # Tutte le cinque varianti condividono il prompt di sistema generale.
-Variant = Literal["A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"]
+Variant = Literal["A0", "A1", "A1_8R", "A1_8R_Planning", "A1_PAVE"]
 
 
 # Prompt generale: lo stesso testo e' utilizzato dalle cinque varianti.
@@ -138,12 +138,12 @@ def get_system_prompt(variant: Variant) -> str:
 
     Tutte le varianti utilizzano lo stesso prompt generale.
     Nel protocollo V3 le istruzioni specifiche del task vengono aggiunte
-    uniformemente dal runner. A1_V2 (nome di presentazione A1) aggiunge
-    il report deterministico; A1 (nome di presentazione A1_8R) aggiunge
-    anche le otto regole; VERIFY e VERIFY_ST hanno un grafo differente.
+    uniformemente dal runner. A1 aggiunge il report deterministico;
+    A1_8R include anche le otto regole; A1_8R_Planning e A1_PAVE
+    usano il grafo con planner e verifiche mirate.
     """
 
-    if variant not in ("A0", "A1", "A1_V2", "A1_VERIFY", "A1_VERIFY_ST"):
+    if variant not in ("A0", "A1", "A1_8R", "A1_8R_Planning", "A1_PAVE"):
         raise ValueError("Variante sperimentale non valida.")
 
     return SYSTEM_PROMPT_COMMON.strip()
