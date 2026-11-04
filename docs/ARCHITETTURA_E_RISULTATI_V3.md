@@ -33,10 +33,17 @@ La pipeline separa l'elaborazione deterministica delle evidenze dal modello LLM.
 | A1_8R_Planning | `A1_VERIFY` | Otto regole + planner di verifiche mirate |
 | A1_PAVE | `A1_VERIFY_ST` | Planning + contesto strutturale/temporale |
 
-**A1_PAVE** è un nome di presentazione: la variante è *ispirata* a principi
-di PAVE, ma **non implementa PAVE nella sua interezza e non certifica causalità**.
-Il modulo `agent.variant_names` centralizza soltanto queste etichette:
-non cambia risultati, protocollo, nomi dei file o runner.
+**A1_PAVE** rimane una denominazione sintetica: la variante è *ispirata*
+a PAVE, ma **non implementa PAVE nella sua interezza e non certifica causalità**.
+
+Dal 4 novembre 2026 i nomi della prima colonna sono anche quelli
+**operativi per le nuove esecuzioni**. La mappa in
+`agent.variant_names` mantiene la conversione con la seconda colonna.
+Il runner usa `ExperimentConfig.variant_scheme="current"` per nuove run;
+i runner dei piani esistenti dichiarano `"historic_v3"` e mantengono
+i valori originali di `variant`, `run_id` e gli hash. Per evitare
+collisioni, nuovi output V2 salvati dal runner finiscono nella
+directory `data/results/v2/final_names_v1/`.
 
 ## Planner e verifica
 
@@ -108,3 +115,14 @@ Mostra telemetria, componenti, replay della tool trajectory, punteggi e grafici
 Gli artefatti di scoring sono su Drive in:
 `data/results/scoring/v2/openrca_harness_v2_five_agents_development_v3/`.
 Il commit congelato del 3 novembre rimane il riferimento degli output.
+
+## Compatibilità della rinomina
+
+- `ExperimentConfig(variant="A1")`: **nuovo** A1 senza otto regole.
+- `ExperimentConfig(variant="A1_8R")`: A1 con le otto regole.
+- `ExperimentConfig(variant="A1", variant_scheme="historic_v3")`:
+  vecchio A1 delle run congelate, interpretato come A1_8R.
+- Lo score già calcolato resta associato agli ID originali. La modifica
+  del codice non equivale a una nuova validazione sperimentale.
+- Eseguire la suite di test prima di impiegare il refactoring per
+  un'eventuale nuova campagna.
