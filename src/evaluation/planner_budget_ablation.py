@@ -282,7 +282,7 @@ def preflight(data_dir: Path, repo_dir: Path) -> dict:
                         ))
                         good = _valid_result(result, claim, plan, case, arm, run_id, plan_sha)
                         status = ("complete" if checksum_ok and good else "REVIEW_INTEGRITY")
-                except (OSError, ValueError, TypeError, KeyError):
+                except (OSError, ValueError, TypeError, KeyError, AttributeError):
                     status = "REVIEW_CORRUPT"
             elif claim_path.exists():
                 status = "CLAIM_PENDING_NO_AUTO_RETRY"
