@@ -107,3 +107,49 @@ con scorer Microsoft OpenRCA al commit congelato
 **Limite metodologico:** questi sono gli 8 development gia' analizzati
 nella V3. Un eventuale miglioramento e' esplorativo, non dimostra
 generalizzazione. La fase 3 dovra' usare una coorte nuova disgiunta.
+
+
+## Orchestratore GEMINI 5+1 — una singola cella di avvio
+
+Per la preparazione immediata della presentazione del 10 novembre, una
+seconda entrypoint esegue soltanto gli 8 run 5+1; i 4+2 restano in piano,
+ma richiedono una decisione successiva.
+
+- src/evaluation/planner_5p1_campaign.py
+- src/tests/test_planner_5p1_campaign.py
+
+Preflight su Colab, in sola lettura (il piano deve prima essere creato
+create-only, dopo test PyCharm e freeze dello SHA):
+
+~~~bash
+PYTHONPATH=src python -m evaluation.planner_5p1_campaign \
+  --data-dir /content/drive/MyDrive/Tesi_OpenRCA \
+  --repo-dir /content/Tesi_OpenRCA
+~~~
+
+Soltanto dopo autorizzazione esplicita dell'utente, la cella di avvio
+potra' invocare questo stesso modulo con --execute --confirm-api,
+--max-new-runs e --approved-budget-usd, con importi definiti nel preflight.
+Sono obbligatori tutti e quattro: senza, il programma non avvia API.
+
+Il loop chiama il runner per **una sola run alla volta**. Il runner crea
+prima un claim, quindi il JSON e un file .sha256.json create-only;
+il preflight deve rileggere e verificare la persistenza e l'hash prima
+di passare a una nuova run. Un'interruzione dopo il claim lascia la run
+bloccata per revisione umana: nessun retry automatico, anche se il modello
+potrebbe non aver addebitato la richiesta.
+
+L'orchestratore **non impone un hard cap di spesa lato Google**: il budget
+serve come consenso esterno e il limite max-new-runs riduce il rischio.
+Senza un limite provider verificato, nessuna garanzia assoluta sul costo.
+
+Test PyCharm aggiuntivi, offline:
+
+~~~powershell
+$env:PYTHONPATH="src"
+python -m unittest discover -s src/tests -p "test_planner_5p1_campaign.py" -v
+python -m unittest discover -s src/tests -p "test_planner_budget_*.py" -v
+~~~
+
+Nota: il modulo e' stato pubblicato nel branch sperimentale, ma non
+dichiarato testato sul PC dell'utente finche' non si vede l'output.
