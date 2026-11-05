@@ -1,6 +1,7 @@
 import zipfile
 import pandas as pd
 import re
+import warnings
 from typing import Literal
 from typing import Optional
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,26 @@ from zoneinfo import ZoneInfo
 DATASET_ZIP_PATH = '/content/drive/MyDrive/Tesi_OpenRCA/Market.zip'
 
 TELEMETRY_TIMEZONE = ZoneInfo("Asia/Shanghai")
+
+
+
+
+
+def _kpi_regex_contains(series: pd.Series, pattern: re.Pattern) -> pd.Series:
+    """Same pandas regex filtering, without its group-warning noise.
+
+    The warning is only about capturing groups in a search-only regex.
+    We do not rewrite the regex (backreferences could depend on groups),
+    drop captures, or change matching semantics.
+    Keep this scoped to one known Pandas UserWarning, never suppress errors.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"^This pattern is interpreted as a regular expression, and has match groups\..*",
+            category=UserWarning,
+        )
+        return series.astype(str).str.contains(pattern, na=False)
 
 
 def _get_telemetry_csv_paths(
@@ -288,11 +309,8 @@ def tool_get_container_metrics(
 
                         # Filtro per nome KPI.
                         if pattern is not None:
-                            mask &= chunk["kpi_name"].astype(
-                                str
-                            ).str.contains(
-                                pattern,
-                                na=False
+                            mask &= _kpi_regex_contains(
+                                chunk["kpi_name"], pattern
                             )
 
                         filtrati = chunk.loc[mask].copy()
@@ -806,8 +824,8 @@ def tool_get_node_metrics(
                             )
 
                         if pattern is not None:
-                            mask &= chunk["kpi_name"].astype(str).str.contains(
-                                pattern, na=False
+                            mask &= _kpi_regex_contains(
+                                chunk["kpi_name"], pattern
                             )
 
                         filtrati = chunk.loc[
