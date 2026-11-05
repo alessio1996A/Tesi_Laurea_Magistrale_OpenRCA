@@ -21,6 +21,7 @@ import re
 import subprocess
 
 from agent.variant_names import VARIANTI_FINALI, nome_presentazione
+from agent.model_factory import ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST
 from evaluation.experiment_config import ExperimentConfig
 from evaluation.v2_cohort_selector import PROTOCOL as V3_PROTOCOL
 from evaluation.v2_preregister import EXPECTED_CASES, _overlap
@@ -197,6 +198,9 @@ def build_plan(data_dir: Path, code_commit: str) -> dict:
         "variants": list(VARIANTS),
         "max_tool_rounds": 6,
         "max_verification_checks": 2,
+        "max_output_tokens_per_llm_request": ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST,
+        "anthropic_max_retries": 0,
+        "reasoning_effort": "provider_default",
         "recursion_limit": 30,
         "output_contract_mode": "v2_enforce",
         "variant_scheme": "current",
@@ -422,7 +426,18 @@ def run_one(data_dir: Path, repo_dir: Path, *,
         if not isinstance(result, dict):
             raise RuntimeError("Runner non ha restituito dict")
         result = dict(result)
+        provider_versions = {"execution": "offline_fake"}
+        if _runner is None:
+            from importlib.metadata import version
+            provider_versions = {
+                name: version(name)
+                for name in ("langchain-anthropic", "anthropic",
+                             "langgraph", "langchain-core")
+            }
         result["claude_provenance"] = {
+            "provider_versions": provider_versions,
+            "max_retries": 0,
+            "max_tokens_per_request": ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST,
             "run_id": run_id, "plan_sha256": plan_sha,
             "git_commit": plan["git_commit"],
             "model_name": run["model_name"],
