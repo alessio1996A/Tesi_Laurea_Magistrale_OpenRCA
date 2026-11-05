@@ -240,7 +240,9 @@ def crea_grafo_rca_verify(
                     "tool durante la finalizzazione senza strumenti."
                 ),
             }
-        if not testo_messaggio(getattr(response, "content", None)).strip():
+        if not testo_messaggio(
+            getattr(response, "content", None), solo_testo=True
+        ).strip():
             return {
                 "messages": [_messaggio_senza_tool(response)],
                 "phase": "done",
@@ -421,7 +423,8 @@ def esegui_grafo_rca_verify(
                                 metrics[key] += usage[key]
                         if error is None:
                             response_text = testo_messaggio(
-                                getattr(message, "content", None)
+                                getattr(message, "content", None),
+                                solo_testo=True,
                             ) or None
 
     except Exception as exc:
