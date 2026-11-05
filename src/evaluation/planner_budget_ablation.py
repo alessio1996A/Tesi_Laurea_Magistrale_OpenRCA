@@ -215,6 +215,10 @@ def _paths(data_dir: Path, run_id: str) -> tuple[Path, Path]:
     return root / (run_id + ".claim.json"), root / (run_id + ".json")
 
 
+def _hash_path(data_dir: Path, run_id: str) -> Path:
+    return _paths(data_dir, run_id)[1].with_suffix(".sha256.json")
+
+
 def _valid_result(result: dict, claim: dict, plan: dict,
                   case: dict, arm: str, run_id: str, plan_sha: str) -> bool:
     """Non confonde file presente e run validata."""
@@ -266,8 +270,18 @@ def preflight(data_dir: Path, repo_dir: Path) -> dict:
                 try:
                     claim = json.loads(claim_path.read_text(encoding="utf-8"))
                     result = json.loads(out_path.read_text(encoding="utf-8"))
-                    good = _valid_result(result, claim, plan, case, arm, run_id, plan_sha)
-                    status = "complete" if good else "REVIEW_INTEGRITY"
+                    digest_path = _hash_path(data_dir, run_id)
+                    if not digest_path.exists():
+                        status = "REVIEW_MISSING_HASH"
+                    else:
+                        digest = json.loads(digest_path.read_text(encoding="utf-8"))
+                        checksum_ok = all((
+                            digest.get("run_id") == run_id,
+                            digest.get("plan_sha256") == plan_sha,
+                            digest.get("output_sha256") == _sha(out_path),
+                        ))
+                        good = _valid_result(result, claim, plan, case, arm, run_id, plan_sha)
+                        status = ("complete" if checksum_ok and good else "REVIEW_INTEGRITY")
                 except (OSError, ValueError, TypeError, KeyError):
                     status = "REVIEW_CORRUPT"
             elif claim_path.exists():
@@ -356,13 +370,23 @@ def run_exactly_one(data_dir: Path, repo_dir: Path, *, run_id: str,
             "provider_library_version": provider_library_version,
         }
         _exclusive_json(out, result)
+        # Sidecar create-only: il preflight rilegge JSON e hash prima
+        # di dichiarare la run completa. Un'interruzione qui resta REVIEW.
+        _exclusive_json(_hash_path(data_dir, run_id), {
+            "run_id": run_id,
+            "plan_sha256": plan_sha,
+            "output_sha256": _sha(out),
+        })
     except Exception:
         # Claim lasciato intenzionalmente: un crash puo' avere gia' fatturato.
         raise
     good = _valid_result(result, json.loads(claim.read_text(encoding="utf-8")),
                          plan, case, arm, run_id, plan_sha)
+    persisted = preflight(data_dir, repo_dir)
+    state = next(row["status"] for row in persisted["runs"]
+                 if row["run_id"] == run_id)
     return {"run_id": run_id, "saved": str(out),
-            "integrity": "complete" if good else "REVIEW_INTEGRITY",
+            "integrity": "complete" if good and state == "complete" else state,
             "api_calls_rerun": False, "scoring_performed": False}
 
 
