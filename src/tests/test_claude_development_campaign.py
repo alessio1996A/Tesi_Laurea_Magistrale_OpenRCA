@@ -268,6 +268,38 @@ class ClaudeCampaignTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "40 output"):
             freeze.build_freeze(self.data, self.repo, "haiku")
 
+    def test_v2_does_not_touch_v1_plan_or_interrupted_claim(self):
+        old_plan = (
+            self.data / "data/protocols/v2"
+            / f"{a.PREVIOUS_PROTOCOL}_plan_v1.json"
+        )
+        old_plan.write_text("V1 ORIGINAL PLAN SENTINEL", encoding="utf-8")
+        v1_result_dir = (
+            self.data / "data/results/v2" / a.PREVIOUS_PROTOCOL
+        )
+        v1_result_dir.mkdir(parents=True, exist_ok=True)
+        old_claim = v1_result_dir / (a.PREVIOUS_INTERRUPTED_RUN + ".claim.json")
+        old_claim.write_text("V1 CLAIM SENTINEL", encoding="utf-8")
+
+        plan_v1_bytes = old_plan.read_bytes()
+        claim_v1_bytes = old_claim.read_bytes()
+
+        new_path = a.write_plan(self.data, self.repo)
+        self.assertIn("development_v2", str(new_path))
+        self.assertEqual(old_plan.read_bytes(), plan_v1_bytes)
+        self.assertEqual(old_claim.read_bytes(), claim_v1_bytes)
+        self.assertFalse(
+            (v1_result_dir / (a.PREVIOUS_INTERRUPTED_RUN + ".json")).exists()
+        )
+        plan, _ = a.load_plan(self.data, self.repo)
+        self.assertEqual(
+            plan["recovery_provenance"]["previous_plan_sha256"],
+            a.PREVIOUS_PLAN_SHA,
+        )
+        self.assertFalse(
+            plan["recovery_provenance"]["previous_results_reused"]
+        )
+
     def test_source_rejects_ground_truth_column(self):
         manifest = self.data / "data/processed/benchmark_inputs_market.csv"
         text = manifest.read_text(encoding="utf-8")
