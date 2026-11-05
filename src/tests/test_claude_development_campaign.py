@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from evaluation import claude_development_campaign as a
+from evaluation import claude_development_freeze as freeze
 from evaluation.v2_preregister import EXPECTED_CASES
 
 GIT = "a" * 40
@@ -238,6 +239,34 @@ class ClaudeCampaignTest(unittest.TestCase):
             a.preflight(self.data, self.repo)["runs"][0]["status"],
             "REVIEW_INTEGRITY",
         )
+
+    def test_freeze_sonnet_after_40_complete_offline(self):
+        a.write_plan(self.data, self.repo)
+        with self.assertRaisesRegex(ValueError, "40 output"):
+            freeze.build_freeze(self.data, self.repo, "sonnet")
+        with patch("evaluation.experiment_runner.carica_caso",
+                   side_effect=self._load_case), patch(
+                       "evaluation.experiment_runner.prepara_esperimento",
+                       side_effect=self._prepared):
+            for _ in range(5):
+                result = a.run_batch(
+                    self.data, self.repo, model_key="sonnet",
+                    max_new_runs=8, confirm_api=True,
+                    approved_budget_usd=2.0, _runner=self._result,
+                )
+                self.assertEqual(result["new_run_count"], 8)
+        statement = freeze.build_freeze(self.data, self.repo, "sonnet")
+        self.assertEqual(statement["run_count"], 40)
+        self.assertEqual(statement["complete"], 40)
+        self.assertEqual(statement["model_errors"], 0)
+        self.assertFalse(statement["scoring_performed"])
+        self.assertFalse(statement["read_query_csv"])
+        path = freeze.freeze_path(self.data, "sonnet")
+        a._write_only_new(path, statement)
+        with self.assertRaises(FileExistsError):
+            a._write_only_new(path, statement)
+        with self.assertRaisesRegex(ValueError, "40 output"):
+            freeze.build_freeze(self.data, self.repo, "haiku")
 
     def test_source_rejects_ground_truth_column(self):
         manifest = self.data / "data/processed/benchmark_inputs_market.csv"
