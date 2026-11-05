@@ -1,4 +1,4 @@
-"""Claude V2 recovery campaign: 80 runs (40 Sonnet + 40 Haiku), GT-free.
+"""Claude V3 content-block recovery: 80 runs (40 Sonnet + 40 Haiku), GT-free.
 
 DEFAULT: offline preview/preflight. --write-plan: create-only plan.
 --execute: exactly one model and at most N *new* runs (N <= 8),
@@ -26,8 +26,17 @@ from evaluation.experiment_config import ExperimentConfig
 from evaluation.v2_cohort_selector import PROTOCOL as V3_PROTOCOL
 from evaluation.v2_preregister import EXPECTED_CASES, _overlap
 
-PROTOCOL = "openrca_claude_five_agents_development_v2"
-BRANCH = "feature/claude-clean-recovery-v2-2026-11-05"
+PROTOCOL = "openrca_claude_five_agents_development_v3"
+BRANCH = "feature/claude-content-block-v3-2026-11-05"
+V2_PROTOCOL = "openrca_claude_five_agents_development_v2"
+V2_PLAN_SHA = "33c6f4f20f6d0462d215c83e6ae81c8344ba4332937801fae4ce98d5ba10cd7b"
+V2_CODE_COMMIT = "e2229ce3a33c37f2066c842332c34b8ff7624e28"
+V2_INVALID_JSON_RUN = (
+    "openrca_claude_five_agents_development_v2__sonnet__cloudbed-1_q005__a0__r01"
+)
+V2_INVALID_JSON_OUTPUT_SHA = (
+    "fe639ca801d82111e23b0928b4dd48828f4533311a9439475e7e54b44eef6a1f"
+)
 PREVIOUS_PROTOCOL = "openrca_claude_five_agents_development_v1"
 PREVIOUS_PLAN_SHA = "fb828dfcd7f2ac9e07b6d916ffd51e61b6a23052c1edbf7a06e965acb5a26158"
 PREVIOUS_INTERRUPTED_RUN = (
@@ -203,7 +212,18 @@ def build_plan(data_dir: Path, code_commit: str) -> dict:
             "reason": "KeyboardInterrupt during ToolNode; warning-only fix in tools.py",
             "previous_results_reused": False,
             "previous_claim_or_results_modified": False,
+            "v2_protocol": V2_PROTOCOL,
+            "v2_code_commit": V2_CODE_COMMIT,
+            "v2_plan_sha256": V2_PLAN_SHA,
+            "v2_infrastructure_run_id": V2_INVALID_JSON_RUN,
+            "v2_infrastructure_output_sha256": V2_INVALID_JSON_OUTPUT_SHA,
+            "v2_infrastructure_execution_status": "complete",
+            "v2_infrastructure_contract_status": "invalid_v2_task_output: JSON non analizzabile",
+            "v2_infrastructure_result_reused": False,
+            "v3_fix": "text-only LangChain AIMessage content extraction; exclude Anthropic thinking/signature metadata",
+            "v3_prompt_or_tools_changed": False,
         },
+        "response_text_extraction": "text_blocks_only_v1",
         "split_sha256": source["split_sha256"],
         "manifest_sha256": source["manifest_sha256"],
         "case_count": 8, "variant_count": 5, "run_count": 80,
