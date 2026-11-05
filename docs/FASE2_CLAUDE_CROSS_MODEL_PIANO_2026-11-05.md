@@ -61,41 +61,60 @@ uno smoke test a pagamento solo dopo approvazione esplicita.
 
 ## Studio di sviluppo prima dell'incontro col relatore
 
-Coorte development: otto incidenti gia' usati V3. Quattro varianti
-principali: A0, A1, A1_8R, A1_8R_Planning (budget 4+2, per la
-comparabilita' con V3). Su due modelli Claude:
+**Decisione del 5 novembre 2026:** includere tutte le cinque varianti,
+compresa A1_PAVE. Gli 8 incidenti sono quelli development congelati V3.
 
-8 incidenti * 4 varianti * 2 modelli = 64 nuove run Claude.
+- 8 incidenti x 5 varianti x Sonnet 5.5 = **40 run Sonnet**.
+- 8 incidenti x 5 varianti x Haiku 5.5 = **40 run Haiku**.
+- Totale: **80 nuove run Claude**, su un nuovo piano create-only.
+- Le 40 run Gemini V3 restano una campagna storica separata:
+  120 run registrate complessivamente, non 120 casi indipendenti.
 
-A1_PAVE resta analisi secondaria opzionale: 8 * 1 * 2 = 16
-run aggiuntive, totale Claude 80. Le 40 run Gemini V3 pregresse
-restano una campagna storica a parte (39/40 formalmente valide);
-non vanno sommate alle nuove per sostenere un test indipendente.
+I due planner A1_8R_Planning e A1_PAVE mantengono **4+2**.
+Non si mescola la configurazione Gemini 5+1 (rimasta in pausa e con un
+503 tracciato) alla campagna Claude. Gli altri tre agenti non hanno
+planner; budget massimo tool condiviso = 6. Stesso task contract V2.
 
-Per ridurre l'effort iniziale, smoke test minimo 1 caso per modello
-e progressione batch 1 -> 4 -> 8, dopo approvazione del budget.
+Il modulo dedicato e' src/evaluation/claude_development_campaign.py.
+Costruisce il piano da quello V3 congelato e controlla SHA/source cases,
+split e manifest GT-free, senza leggere score o predizioni V3.
+La campagna e' organizzata prima su Sonnet (40), poi Haiku (40).
+Avvio batch al massimo 8 **nuove run** per chiamata, sequenziali,
+con verifica di claim, output JSON e SHA-256 dopo ogni tentativo.
+Un errore provider interrompe il batch senza retry automatico.
+Un successivo avvio salta le run gia' completate.
 
-## Coorte indipendente per una conclusione piu' credibile
+Prima delle API:
+1. Verificare nel notebook di preflight la suite offline completa.
+2. Calcolare costo storico usando esclusivamente contatori token V3.
+3. Congelare su Drive il piano di 80 run in create-only.
+4. Verificare il Secret ANTHROPIC_API_KEY senza mostrarne il contenuto.
+5. Ottenere una conferma esplicita del preventivo e del primo smoke test.
+6. Solo dopo il primo smoke, autorizzare la campagna per blocchi.
 
-Prima selezione GT-free di 16 incidenti Market nuovi, non usati
-ne' per sviluppo ne' per calibrare l'harness. Quindi:
+## Valutazione con lo scorer ufficiale (solo dopo freeze)
 
-16 nuovi incidenti * 4 varianti * 2 Claude = 128 run.
+Il calcolo di score, partial e exact usa i file ufficiali OpenRCA
+(query.csv e ground truth) **solo in una procedura separata, offline,
+dopo aver congelato tutti gli output previsti**, usando lo stesso
+scorer Microsoft della V3 e lo SHA gia' fissato
+2a481ae63cb045c3eadbeca9eddaa10ec1151979.
+Non usare query.csv o score per pianificare, scegliere o correggere
+le run. Non modificare il JSON dopo scoring. Tenere le run con errori
+provider e gli output non conformi nel denominatore/report operativo
+e discutere separatamente il loro trattamento nei punteggi.
+Misurare accuratezza, exact match, token, latenza e fallimenti;
+riportare intervalli di incertezza per 8 casi e limiti della coorte
+development gia' conosciuta.
 
-Totale proposto: 64 development + 128 indipendenti = 192 nuove
-run Claude (oppure 208 includendo A1_PAVE nello sviluppo).
-Aggiungendo le 40 run Gemini V3 storiche si hanno 232 run registrate
-complessivamente, ma di coorti/tempi diversi; non sono 232 repliche
-indipendenti e non autorizzano percentuali generalizzabili.
+## Ulteriore coorte: solo dopo decisione col relatore
 
-Se una terza famiglia di modello (Gemini) torna stabile e si vuole
-confrontarla *sugli stessi 16 nuovi incidenti*, aggiungere
-16 * 4 = 64 run, portando la nuova coorte cross-model a 192.
-Questo NON e' nel piano operativo immediato.
-
-Nessuna run a pagamento prima di preregistrazione indipendente,
-dry-run offline, verifica provider e approvazione esplicita del
-numero di run e del budget in USD.
+Una valutazione disgiunta su **16 nuovi incidenti Market x 5 varianti
+x 2 modelli Claude = 160 nuove run**. Da validare prima con
+selezione GT-free, disgiunzione di casi e finestre, stabilita' dei
+modelli, disponibilita' del budget. Non rientra nel batch di oggi.
+Non assommarla impropriamente ai development per stimare la
+generalizzazione.
 
 ## Criteri di stop e sicurezza
 
