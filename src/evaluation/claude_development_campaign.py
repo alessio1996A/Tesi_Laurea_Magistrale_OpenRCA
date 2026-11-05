@@ -1,4 +1,4 @@
-"""Preregistring Claude development 80 (40 Sonnet + 40 Haiku), GT-free.
+"""Claude V2 recovery campaign: 80 runs (40 Sonnet + 40 Haiku), GT-free.
 
 DEFAULT: offline preview/preflight. --write-plan: create-only plan.
 --execute: exactly one model and at most N *new* runs (N <= 8),
@@ -26,8 +26,13 @@ from evaluation.experiment_config import ExperimentConfig
 from evaluation.v2_cohort_selector import PROTOCOL as V3_PROTOCOL
 from evaluation.v2_preregister import EXPECTED_CASES, _overlap
 
-PROTOCOL = "openrca_claude_five_agents_development_v1"
-BRANCH = "feature/claude-cross-model-2026-11-05"
+PROTOCOL = "openrca_claude_five_agents_development_v2"
+BRANCH = "feature/claude-clean-recovery-v2-2026-11-05"
+PREVIOUS_PROTOCOL = "openrca_claude_five_agents_development_v1"
+PREVIOUS_PLAN_SHA = "fb828dfcd7f2ac9e07b6d916ffd51e61b6a23052c1edbf7a06e965acb5a26158"
+PREVIOUS_INTERRUPTED_RUN = (
+    "openrca_claude_five_agents_development_v1__sonnet__cloudbed-1_q005__a0__r01"
+)
 V3_SHA = "6747eecc77c1b2fff7d581c7284578b5c574b4f7"
 V3_PLAN_SHA = "002aadbee9cf5339ffb2ed36d90eaa492ca3c0900cbf32b3682629beb5610d68"
 BASE_SHA = "1cdd223e74baa9d48ba057b5d5c719acd915d989"
@@ -190,6 +195,15 @@ def build_plan(data_dir: Path, code_commit: str) -> dict:
         "base_git_commit": BASE_SHA,
         "source_v3_commit": V3_SHA,
         "source_v3_plan_sha256": source_sha,
+        "recovery_provenance": {
+            "previous_protocol": PREVIOUS_PROTOCOL,
+            "previous_plan_sha256": PREVIOUS_PLAN_SHA,
+            "interrupted_run_id": PREVIOUS_INTERRUPTED_RUN,
+            "previous_run_status": "CLAIM_PENDING_NO_AUTO_RETRY",
+            "reason": "KeyboardInterrupt during ToolNode; warning-only fix in tools.py",
+            "previous_results_reused": False,
+            "previous_claim_or_results_modified": False,
+        },
         "split_sha256": source["split_sha256"],
         "manifest_sha256": source["manifest_sha256"],
         "case_count": 8, "variant_count": 5, "run_count": 80,
