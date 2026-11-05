@@ -19,7 +19,10 @@ fermarsi prima e il planner puo' avere meno candidati.
 
 Gli 8 casi provengono dal piano V3 in Drive; il codice verifica
 l'identita' del piano e gli SHA di manifest/split GT-free.
-Il piano alterna l'ordine dei bracci per caso e prevede 16 run.
+Il piano prevede 16 run, con **5+1 eseguito per primo su tutti gli 8 casi**.
+Il 4+2 appaiato e' opzionale in un secondo momento: l'ordine non e'
+controbilanciato ed eventuali cambi di modello o condizioni API nel
+tempo devono essere registrati come limite del confronto.
 Risultati: **development/tuning**, non test indipendente.
 
 ## File
