@@ -135,8 +135,10 @@ def build_plan(data_dir: Path, repo_sha: str) -> dict:
     source, source_sha, manifest = _source(data_dir)
     planned = []
     for i, case in enumerate(source["cases"]):
-        # Rotazione contro un bias fisso d'ordine dei due bracci.
-        order = ["4p2", "5p1"] if i % 2 == 0 else ["5p1", "4p2"]
+        # Priorita operativa: eseguire prima 5+1 su tutti gli 8 development.
+        # Il successivo 4+2 appaiato richiede nuova decisione di budget.
+        # L'ordine non e' controbilanciato: dichiararlo come limite.
+        order = ["5p1", "4p2"]
         planned.append({
             "case_id": case["case_id"],
             "cloudbed": case["cloudbed"],
