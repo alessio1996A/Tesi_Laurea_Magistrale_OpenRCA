@@ -4,3 +4,4 @@ pandas
 python-dotenv
 networkx
 pydantic>=2,<3
+langchain-anthropic
