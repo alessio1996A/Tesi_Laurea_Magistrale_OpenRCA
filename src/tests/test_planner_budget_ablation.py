@@ -165,6 +165,23 @@ class TestPlannerBudgetAblation(unittest.TestCase):
             )
         self.assertEqual(len(calls), 1)
 
+    def test_modified_output_hash_forces_manual_review(self):
+        self.make_plan()
+        first = a.preflight(self.data, self.repo)["runs"][0]
+        with patch("evaluation.experiment_runner.prepara_esperimento",
+                   side_effect=self._fake_preparation):
+            a.run_exactly_one(
+                self.data, self.repo, run_id=first["run_id"],
+                confirm_api=True, approved_budget_usd=1.0,
+                _runner=self._fake_runner,
+            )
+        _, output = a._paths(self.data, first["run_id"])
+        self.assertTrue(a._hash_path(self.data, first["run_id"]).exists())
+        with output.open("a", encoding="utf-8") as stream:
+            stream.write(" ")
+        status = a.preflight(self.data, self.repo)["runs"][0]["status"]
+        self.assertEqual(status, "REVIEW_INTEGRITY")
+
     def test_orphan_and_claim_are_never_retried(self):
         self.make_plan()
         state = a.preflight(self.data, self.repo)
