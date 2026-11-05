@@ -300,6 +300,36 @@ class ClaudeCampaignTest(unittest.TestCase):
             plan["recovery_provenance"]["previous_results_reused"]
         )
 
+    def test_v3_preserves_v2_result_and_plan_exactly(self):
+        v2_plan = (
+            self.data / "data/protocols/v2"
+            / f"{a.V2_PROTOCOL}_plan_v1.json"
+        )
+        v2_plan.write_text("V2 FROZEN PLAN SENTINEL", encoding="utf-8")
+        v2_results = self.data / "data/results/v2" / a.V2_PROTOCOL
+        v2_results.mkdir(parents=True, exist_ok=True)
+        v2_result = v2_results / (a.V2_INVALID_JSON_RUN + ".json")
+        v2_result.write_text("V2 FROZEN RESULT SENTINEL", encoding="utf-8")
+        expected_plan = v2_plan.read_bytes()
+        expected_output = v2_result.read_bytes()
+
+        new_plan = a.write_plan(self.data, self.repo)
+        self.assertIn("development_v3", str(new_plan))
+        self.assertEqual(v2_plan.read_bytes(), expected_plan)
+        self.assertEqual(v2_result.read_bytes(), expected_output)
+        plan, _ = a.load_plan(self.data, self.repo)
+        self.assertEqual(plan["recovery_provenance"]["v2_plan_sha256"], a.V2_PLAN_SHA)
+        self.assertEqual(
+            plan["recovery_provenance"]["v2_infrastructure_output_sha256"],
+            a.V2_INVALID_JSON_OUTPUT_SHA,
+        )
+        self.assertFalse(
+            plan["recovery_provenance"]["v2_infrastructure_result_reused"]
+        )
+        self.assertEqual(
+            plan["response_text_extraction"], "text_blocks_only_v1"
+        )
+
     def test_source_rejects_ground_truth_column(self):
         manifest = self.data / "data/processed/benchmark_inputs_market.csv"
         text = manifest.read_text(encoding="utf-8")
