@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 
+ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST = 4096
+
 ANTHROPIC_MODELS = frozenset({
     "claude-sonnet-5-5",
     "claude-haiku-5-5",
@@ -38,7 +40,11 @@ def _crea_modello_anthropic(model_name: str):
         )
 
     from langchain_anthropic import ChatAnthropic
-    return ChatAnthropic(model=model_name, max_retries=0)
+    return ChatAnthropic(
+        model=model_name,
+        max_retries=0,
+        max_tokens=ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST,
+    )
 
 
 def crea_modello(provider: str, model_name: str):
