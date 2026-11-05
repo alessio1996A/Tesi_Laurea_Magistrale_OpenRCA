@@ -35,9 +35,16 @@ class RCAState(TypedDict):
     finalization_error: str | None
 
 
-def testo_messaggio(contenuto) -> str:
-    """Converte il contenuto di un messaggio LangChain in testo leggibile."""
+def testo_messaggio(contenuto, *, solo_testo: bool = False) -> str:
+    """Testo di contenuti LangChain, escludendo i metadati LLM se richiesto.
 
+    Alcuni provider (es. Anthropic) restituiscono AIMessage.content come
+    lista di blocchi: thinking/signature + text. La risposta finale da
+    validare deve contenere SOLO i blocchi testuali, mai str(dict) dei
+    blocchi di reasoning, firme o tool-use. Per default si mantiene la
+    rappresentazione storica utilizzata dalle osservazioni dei tool.
+    Non cambia i messaggi originali restituiti al modello.
+    """
     if contenuto is None:
         return ""
     if isinstance(contenuto, str):
@@ -49,14 +56,17 @@ def testo_messaggio(contenuto) -> str:
                 parti.append(elemento)
             elif isinstance(elemento, dict):
                 testo = elemento.get("text")
-                if isinstance(testo, str):
+                tipo = elemento.get("type")
+                if isinstance(testo, str) and (
+                    not solo_testo or tipo in (None, "text", "text_delta")
+                ):
                     parti.append(testo)
-                else:
+                elif not solo_testo:
                     parti.append(str(elemento))
-            else:
+            elif not solo_testo:
                 parti.append(str(elemento))
         return "\n".join(parti)
-    return str(contenuto)
+    return "" if solo_testo else str(contenuto)
 
 
 def _messaggio_senza_tool(risposta) -> AIMessage:
@@ -215,7 +225,9 @@ def crea_grafo_rca(llm, tools, system_prompt: str, max_tool_rounds: int):
                     ),
                 }
 
-            if not testo_messaggio(getattr(risposta, "content", None)).strip():
+            if not testo_messaggio(
+                getattr(risposta, "content", None), solo_testo=True
+            ).strip():
                 return {
                     "messages": [_messaggio_senza_tool(risposta)],
                     "tool_rounds": rounds,
@@ -343,7 +355,8 @@ def esegui_grafo_rca(
 
                         if not calls and not aggiornamento.get("finalization_error"):
                             contenuto = testo_messaggio(
-                                getattr(msg, "content", None)
+                                getattr(msg, "content", None),
+                                solo_testo=True,
                             )
                             if contenuto.strip():
                                 risposta_finale = contenuto
