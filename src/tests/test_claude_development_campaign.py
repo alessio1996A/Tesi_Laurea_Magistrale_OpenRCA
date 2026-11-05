@@ -285,7 +285,7 @@ class ClaudeCampaignTest(unittest.TestCase):
         claim_v1_bytes = old_claim.read_bytes()
 
         new_path = a.write_plan(self.data, self.repo)
-        self.assertIn("development_v2", str(new_path))
+        self.assertIn("development_v3", str(new_path))
         self.assertEqual(old_plan.read_bytes(), plan_v1_bytes)
         self.assertEqual(old_claim.read_bytes(), claim_v1_bytes)
         self.assertFalse(
