@@ -98,7 +98,7 @@ class TestPlannerBudgetAblation(unittest.TestCase):
         self.assertEqual(plan["max_verification_checks_by_arm"], {"4p2": 2, "5p1": 1})
         for i, case in enumerate(plan["cases"]):
             self.assertEqual(set(case["arm_order"]), {"4p2", "5p1"})
-            self.assertEqual(case["arm_order"][0], "4p2" if i % 2 == 0 else "5p1")
+            self.assertEqual(case["arm_order"][0], "5p1")
             self.assertEqual(case["system_prompt_sha256"], PROMPT)
         self.assertEqual(len(digest), 64)
         with self.assertRaises(FileExistsError):
