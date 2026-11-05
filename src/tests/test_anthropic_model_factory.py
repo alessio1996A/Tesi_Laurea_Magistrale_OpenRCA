@@ -56,7 +56,7 @@ class TestAnthropicModelFactory(unittest.TestCase):
                         llm = crea_modello("anthropic", name)
                 self.assertIs(llm, sentinel.llm)
                 self.assertEqual(constructor_calls, [
-                    {"model": name, "max_retries": 0}
+                    {"model": name, "max_retries": 0, "max_tokens": 4096}
                 ])
                 self.assertNotIn("temperature", constructor_calls[0])
                 self.assertNotIn("top_p", constructor_calls[0])
