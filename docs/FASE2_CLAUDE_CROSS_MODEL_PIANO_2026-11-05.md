@@ -96,11 +96,13 @@ Prima delle API:
 
 Il calcolo di score, partial e exact usa i file ufficiali OpenRCA
 (query.csv e ground truth) **solo in una procedura separata, offline,
-dopo aver congelato tutti gli output previsti**, usando lo stesso
+dopo aver congelato i 40 output del singolo modello (Sonnet prima,
+Haiku successivamente)**, usando lo stesso
 scorer Microsoft della V3 e lo SHA gia' fissato
 2a481ae63cb045c3eadbeca9eddaa10ec1151979.
 Non usare query.csv o score per pianificare, scegliere o correggere
-le run. Non modificare il JSON dopo scoring. Tenere le run con errori
+le run. Se si valuta Sonnet prima di Haiku, NON modificare la
+configurazione o l'ordine delle 40 Haiku gia' preregistrate. Non modificare il JSON dopo scoring. Tenere le run con errori
 provider e gli output non conformi nel denominatore/report operativo
 e discutere separatamente il loro trattamento nei punteggi.
 Misurare accuratezza, exact match, token, latenza e fallimenti;
@@ -127,3 +129,25 @@ generalizzazione.
   token, latenza, failure rate e differenza rispetto alla baseline,
   considerando gli effetti del modello e del task.
 - Il budget informativo non e' un hard cap della fatturazione.
+
+## Freeze create-only dei 40 risultati Sonnet prima dello scoring
+
+Dopo che tutte le 40 run Sonnet sono state tentate, e senza alcuna run
+in stato di integrita' ambiguo, il seguente comando in sola lettura
+restituisce una preview del manifest di freeze:
+
+~~~bash
+PYTHONPATH=src python -m evaluation.claude_development_freeze \
+  --data-dir /content/drive/MyDrive/Tesi_OpenRCA \
+  --repo-dir /content/Tesi_OpenRCA_Claude --model sonnet
+~~~
+
+Con --write il freeze viene creato in modalita' create-only. Non legge
+query.csv, ground truth o scorer. In caso di fallimento 503/429 il
+manifest include anche le run con errore provider e non le inventa come
+successi; non ripete chiamate. Dopo il freeze si puo' applicare lo
+scorer ufficiale OpenRCA **offline** sulle predizioni congelate,
+includendo un resoconto di invalidita' e fallimenti infrastrutturali.
+
+Il piano con gli 80 ID rimane immutabile; Haiku si esegue successivamente
+senza calibrarla guardando i risultati Sonnet.
