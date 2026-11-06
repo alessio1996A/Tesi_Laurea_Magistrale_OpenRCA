@@ -25,3 +25,24 @@ Prima di autorizzare API a pagamento: test unitari e fake LLM, pianificazione cr
 Usare lo scorer ufficiale Microsoft sulla raw_response originale, separandolo da conformità JSON e score della predizione accettata. Ipotesi principale: differenza appaiata A1-A0 entro ciascun modello; altre ablation come confronti secondari, riportando win/tie/loss, score medio, strict, incertezza e compromessi di efficienza. La baseline storica Microsoft sui medesimi casi è solo un confronto retrospettivo, non controllato a parità di modello. Rendicontare development ed evaluation **separatamente**.
 
 La domanda sulla conoscenza non codificata nelle otto regole rimane un secondo studio da discutere con il relatore, senza assumere apprendimento automatico implementato.
+
+## Esito audit GT-free in Colab (6 novembre 2026)
+
+L'utente ha eseguito l'audit nel proprio Colab; output riportato:
+status PROPOSED_GT_FREE_NOT_FROZEN_NOT_EXECUTED, evaluation_rows_checked=23,
+strict_candidate_count=23, cloudbed-1=12, cloudbed-2=11. Tutti i sette
+task rappresentati: task_1=3, task_2=3, task_3=1, task_4=3,
+task_5=4, task_6=7, task_7=2.
+
+La proposta seleziona 10+10 casi e **tre istruzioni multi-guasto**
+(q006, q023 cloudbed-1; q031 cloudbed-2). Elenco dei 20 ID, vincolato
+anche nel modulo di preregistrazione:
+
+- cloudbed-1_q000, q003, q006, q012, q015, q019, q023, q026, q058, q062.
+- cloudbed-2_q028, q031, q036, q039, q044, q047, q054, q064, q069, q074.
+
+Nessuna API chiamata, nessuna scrittura e nessuna lettura di ground truth
+durante la selezione. I 20 casi non sono ancora stati eseguiti né
+valutati. **Prima di creare il piano create-only e autorizzare API,
+finalizzare il runner, collaudarlo e congelare il commit definitivo**:
+il piano registra il commit e deve corrispondere al codice di esecuzione.
