@@ -305,6 +305,8 @@ def esegui_grafo_rca(
         "input_tokens": 0,
         "output_tokens": 0,
         "total_tokens": 0,
+        # A0/A1/A1_8R: segnala dati token mancanti senza mascherarli.
+        "token_usage_complete": True,
     }
     traiettoria = []
     risposta_finale = None
@@ -330,10 +332,21 @@ def esegui_grafo_rca(
 
                     for msg in aggiornamento.get("messages", []):
                         metriche["llm_calls"] += 1
-                        usage = getattr(msg, "usage_metadata", None) or {}
-                        for chiave in (
+                        original_usage = getattr(msg, "usage_metadata", None)
+                        token_fields = (
                             "input_tokens", "output_tokens", "total_tokens"
+                        )
+                        if (
+                            not isinstance(original_usage, dict)
+                            or not all(
+                                type(original_usage.get(key)) is int
+                                and original_usage[key] >= 0
+                                for key in token_fields
+                            )
                         ):
+                            metriche["token_usage_complete"] = False
+                        usage = original_usage if isinstance(original_usage, dict) else {}
+                        for chiave in token_fields:
                             metriche[chiave] += int(usage.get(chiave, 0) or 0)
 
                         calls = getattr(msg, "tool_calls", None) or []
@@ -383,6 +396,8 @@ def esegui_grafo_rca(
     except Exception as exc:
         errore = f"{type(exc).__name__}: {exc}"
         risposta_finale = None
+        # Un'invocazione incompleta puo' aver consumato token non osservati.
+        metriche["token_usage_complete"] = False
         if verbose:
             print("ERRORE ESECUZIONE:", errore)
 
