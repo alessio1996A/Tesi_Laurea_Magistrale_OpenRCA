@@ -25,7 +25,7 @@ def fake_prepare(cfg, case):
         "task_index": case["task_index"],
         "start_unix": case["start_unix"],
         "end_unix": case["end_unix"],
-        "instruction": "Mock RCA instruction without labels or ground truth.",
+        "instruction": "The cloud service experienced one failure in the observed time window.",
         "query_index": 0,
     }
     return loaded, (None if cfg.canonical_variant == "A0" else "f" * 64)
