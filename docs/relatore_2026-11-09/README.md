@@ -9,7 +9,7 @@ Questo branch deriva dal commit sperimentale immutato `e4845e7fe9a399e10dd2db6f3
 - [RELAZIONE_EVALUATION20.md](RELAZIONE_EVALUATION20.md) — relazione e tabelle complete: coorte, score Microsoft, ablazioni appaiate, conformità V2, risorse, limiti e domande per il professore.
 - [confronto_openrca1.svg](confronto_openrca1.svg) — grafico dello score medio, baseline storica Microsoft vs tre modelli su cinque harness.
 
-**Altri allegati disponibili nella conversazione ChatGPT (non ancora pubblicati su GitHub):** PDF con grafici, immagini PNG, notebook Colab di validazione comparativa e script Python. Non assumere che il `git pull` recuperi tali allegati.
+**Notebook e script ora inclusi nel branch:** [notebook Colab](../../notebooks/EVALUATION20_Relazione_Relatore_Colab_2026_11_09.ipynb) e [script di verifica](../../tools/Colab_EVALUATION20_Relazione_Relatore_2026_11_09.py). Il PDF e i grafici PNG ad alta risoluzione restano disponibili come allegati della conversazione; il grafico SVG è incluso qui.
 
 ## Aggiornare PyCharm senza alterare i risultati
 
