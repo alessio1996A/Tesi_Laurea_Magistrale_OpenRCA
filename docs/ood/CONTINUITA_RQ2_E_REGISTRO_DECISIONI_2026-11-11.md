@@ -123,3 +123,18 @@ Questo modulo consulta GT nel ramo di **audit**, non esporta mapping etichette/c
 **Report completo:** `docs/ood/REPORT_SENSIBILITA_DIPENDENZE_OOD_2026-11-11.md` (commit di creazione `42673476c8b44bbf69c5f3d52bfa8930e96f7068`).
 
 **Prossima decisione:** progettare il protocollo separando diagnosi OOD e validazione di pseudoregole, mantenendo sempre unite le query con finestra in comune; scegliere harness e split con criteri preregistrati, riconoscendo i piccoli numeri per classe. Solo dopo autorizzazione API.
+
+## 13. 11 novembre 2026 — bozza protocollo RQ2 e prototipo selettore (NON frozen)
+
+**Progettazione predisposta, non approvazione del protocollo sperimentale:**
+- Documento `docs/ood/PROTOCOLLO_RQ2_BOZZA_V0_2026-11-11.md`: confronto A1 vs A1_8R, A0 solo controllo opzionale; Gemini/Claude Sonnet/Claude Haiku; separazione fra diagnosi task originale D, probe uniforme di `predicted_fault_type` C, e proposta pseudoregola K **solo su discovery**. Documento contiene controllo negativo multi-fault a livello di finestra, criteri di qualità/verificabilità, astensioni, errori, costi da autorizzare, invarianti e piano di espansione E1/E2. **Non approvato né congelato**: niente API o modifiche all'agente.
+- Proposta di coorte: 1 singleton discovery per classe, selezionato con hash fisso/GT isolato; resto test; **4 query discovery + 11 test**, con la coppia `cloudbed-1_q014` / `cloudbed-1_q030` **insieme nel test**. In base ai conteggi aggregati già verificati, il target sarebbe 2/2/3/4 query positive di test per classe, a condizione che l'anteprima venga confermata. Non è prova di indipendenza di fault injection; campione troppo piccolo per generalizzazione robusta.
+- **Nuovo codice** `src/evaluation/rq2_partition_preview.py`: prototipo eval-only, legge il GT per stratificare in memoria, ma non emette il mapping case ID→classe; output include solo ID, gruppi, phase e **conteggi aggregati per classe**. Risposta marcata `DRAFT_NOT_EXECUTABLE`, nessun file scritto, nessuna API, nessuna inferenza.
+- **Nuovi test** `src/tests/test_rq2_partition_preview.py`: sei test sintetici per determinismo, coerenza gruppi, nessuna fuga di mapping, assenza di singleton, etichette sconosciute e archivio mancante. **NON ancora eseguiti dall'utente**.
+- **Nuovo notebook** `notebooks/Colab_RQ2_Partition_Preview_2026_11_11.ipynb`: una sola cella, da eseguire sul Market reale solo dopo PyCharm OK; stampa bozza del piano e ne controlla i vincoli. Non salva un piano runnable.
+
+**Stime non autorizzate:** con due harness × tre modelli × 15 query, 90 run diagnostici D + 90 probe C e, per quattro discovery × due harness × tre modelli, 24 chiamate K di proposta. Queste cifre **non** sono stime USD o massimo di chiamate LLM: ogni run D include ulteriori chiamate LLM/tool.
+
+**Scelta ampliamento:** E1 (15 query, studio esplorativo) consigliato **se non esistono altre coorti indipendenti documentate**; E2 prevede ricerca e validazione di nuovi episodi esterni ai due cloudbed già completamente ripartiti, senza rifare retroattivamente la RQ1. È una decisione ancora aperta e da documentare prima del freeze.
+
+**Prossimo passo operativo:** test PyCharm del selettore su dati sintetici; poi Colab anteprima e discussione/freeze del protocollo. **Nessuna nuova run LLM deve partire da questa bozza.**
