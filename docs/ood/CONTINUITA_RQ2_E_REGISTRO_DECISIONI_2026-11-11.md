@@ -265,3 +265,11 @@ La transizione test richiede che tutti i **24 K discovery mock** siano completat
 - `docs/ood/RQ2_MOCK_JOURNAL_PREPARAZIONE_2026-11-11.md`: design e limitazioni.
 
 **Passo successivo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_mock_journal.py" -v`, attesi 18 test. Non avviare Colab o modelli per questi test. Protocollo V1 e run plan restano non congelati; dopo verifica bisognerà aggiungere un runner RQ2 reale separato, con guardie GT e budget autorizzato, non promuovere il journal mock a runner.
+
+## 26. Journal mock: 18 test completati correttamente (11 novembre 2026)
+
+L'utente ha eseguito in PyCharm il file `test_rq2_mock_journal.py`, riportando **`Ran 18 tests in 8.944s — OK`**. Risultato: tutte le 18 verifiche sintetiche superate, comprese le transizioni D/C/K simulate, il create-only, i riavvii, gli hash, il blocco del test prima del freeze **mock** e l'assenza di invocazioni provider. L'esito non equivale a un vero freeze delle regole né a un test sul Market con modelli reali.
+
+Controllo successivo sul codice già esistente del repository: `src/evaluation/experiment_runner.py` espone `prepara_esperimento(config)` (preprocessing GT-free), `run_experiment(config, llm=None, verbose=True, salva=False)` con creazione eventuale di un modello **se llm è None** e ritorna `raw_response`, `prediction`, `metrics`, `tool_trajectory`, `error`. La configurazione `src/evaluation/experiment_config.py` distingue `variant_scheme="current"` da `historic_v3`. La factory `src/agent/tool_factory.py` offre cinque tool: `tool_get_service_metrics`, `tool_get_container_metrics`, `tool_get_node_metrics`, `tool_get_logs`, `tool_get_traces`.
+
+**Vincolo per la futura integrazione:** la sola creazione di `ExperimentConfig` e la preparazione dei messaggi C/K devono restare offline; **non chiamare `run_experiment` né `crea_modello` finché non esistono protocollo/piano/richiesta di spesa congelati e consenso esplicito**. Se un test richiede la risposta D, iniettarla come dizionario sintetico, non eseguire il runner storico. Il journal mock è una verifica di persistenza, non una funzione di provider dispatch.
