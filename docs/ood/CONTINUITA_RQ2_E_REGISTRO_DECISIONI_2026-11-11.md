@@ -199,3 +199,15 @@ Correzione di sola organizzazione della suite al commit `7584086dfee55619d67a96a
 ## 19. 11 novembre 2026 — Bundle evidenze: test PyCharm superati
 
 Output riportato dall'utente dopo aggiornamento branch e riesecuzione del comando corretto: `Ran 14 tests in 0.009s — OK` per `python -m unittest discover -s src/tests -p "test_rq2_evidence_bundle.py" -v`. Il precedente `Ran 0 tests` era dovuto a mancata individuazione del file nella copia locale, non a un fallimento del modulo. **Quattordici test sintetici superati** sul bundle; non significa che la telemetria reale o il percorso LLM end-to-end siano già stati verificati. Nessuna chiamata API e nessun nuovo esperimento OOD eseguito.
+
+## 20. Test bundle riusciti e primo adapter D→C/K offline (11 novembre 2026)
+
+**Output PyCharm dell'utente:** `Ran 14 tests in 0.009s — OK` con `test_rq2_evidence_bundle.py`; le 14 verifiche sintetiche **sono passate**, non costituiscono prove su telemetria Market o run end-to-end. Registrazione del risultato al commit `c95242a6782fb94e11049de23c3a1fae70a9b657`.
+
+**Nuovo adapter preparato, non ancora testato dall'utente:**
+- `src/evaluation/rq2_probe_adapter.py`: funzioni pure per assemblare input uniformi C e K da output D esistente (istruzione originale + bundle evidence), senza inoltrare `raw_response` D, senza lettura di GT, database o dataset, senza provider né file write. Contratti C/K già predisposti. `phase=discovery` obbligatorio per K, ma **il futuro runner deve confrontare la fase con un piano congelato**: questo adapter da solo non autentica l'allocazione.
+- `src/tests/test_rq2_probe_adapter.py`: **14 test sintetici preparati**, NON ancora eseguiti. Verifiche su provenienza, errore D, K solo in discovery, C valida, astensione, content segregation (non garanzia totale anti-injection), assenza di label GT, determinismo hash.
+- `docs/ood/ADAPTER_RQ2_D_C_K_BOZZA_V0_2026-11-11.md`: design, proprietà e limitazioni.
+- I pacchetti generati sono **offline** con `model_api_calls=0`, `ready_for_api=false`; nessun LLM è stato chiamato. I runner di RQ1 restano invariati.
+
+**Prossimo passo:** `python -m unittest discover -s src/tests -p "test_rq2_probe_adapter.py" -v` in PyCharm dopo pull del branch; attesi **14 test**. Successivamente integrare soltanto in un nuovo runner RQ2 con piano create-only/frozen, policy anti-GT, pilot mock, budget e consenso API.
