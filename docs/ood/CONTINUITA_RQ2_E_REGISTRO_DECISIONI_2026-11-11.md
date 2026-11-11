@@ -166,3 +166,19 @@ L'utente ha riportato `Ran 13 tests in 0.491s — OK` eseguendo la discovery `te
 Correzione di sola organizzazione della suite al commit `7584086dfee55619d67a96ac7f257a2df92ef8cc`: la classe di fixture V0 ora viene raggiunta attraverso un import di modulo, così la discovery di `unittest` non dovrebbe più includere i sei test V0 quando si cerca il file V1. **Non modifica il selettore V1 né la partizione, né le sorgenti Market.** La conferma dei 7 test dopo la correzione resta da eseguire se si desidera il conteggio pulito.
 
 **Prossimo passo:** anteprima reale `notebooks/Colab_RQ2_Balanced_Partition_Preview_2026_11_11.ipynb`; verificare che i vincoli V1 siano fattibili su Market, senza creare file o eseguire chiamate LLM. **Nessuna selezione congelata.**
+
+## 17. Anteprima V1 reale e prima bozza dei contratti diagnostici (11 novembre 2026)
+
+**Colab V1 eseguita dall'utente** al commit `f3382d43d80bd82d400749fbf5315ccc8b63ea89`: `rq2_partition_preview_balanced_v1`, `status=DRAFT_NOT_EXECUTABLE`, `source_verified=true`; 11 singleton eleggibili, 24 partizioni candidate valide, **4 discovery/11 test**, **4/10 gruppi temporali**, discovery distribuite **2 cloudbed-1 / 2 cloudbed-2**. Test distribuiti 4/7. `cross_phase_near_pairs_3600s=0`, distanza minima fra finestre di fasi diverse nello stesso cloudbed `5400` secondi. Distribuzione target per classe: discovery `1/1/1/1`; test `2/2/3/4`. `container write I/O load` solo cloudbed-2. Coppia multi-fault sempre insieme nel test. Nessuna API, file scritto o esposizione mapping case→classe.
+
+**Discovery candidate V1:** `cloudbed-1_q032`, `cloudbed-1_q050`, `cloudbed-2_q026`, `cloudbed-2_q045`. **Test V1:** `cloudbed-1_q014`, `cloudbed-1_q021`, `cloudbed-1_q030`, `cloudbed-1_q059`, `cloudbed-2_q014`, `cloudbed-2_q021`, `cloudbed-2_q040`, `cloudbed-2_q041`, `cloudbed-2_q058`, `cloudbed-2_q076`, `cloudbed-2_q077`. Questi elenchi **NON sono un piano eseguibile congelato**; V0 archiviata separatamente.
+
+**Nuovo report:** `docs/ood/REPORT_ANTEPRIMA_PARTIZIONE_RQ2_V1_2026-11-11.md`, con tutti i dati aggregati e le limitazioni.
+
+**Implementazione preliminare dei contratti senza GT**:
+- Documento `docs/ood/CONTRATTI_RQ2_DIAGNOSI_E_PSEUDOREGOLA_V0_2026-11-11.md`: D = RCA originale; C = schema JSON per causa/astensione uniforme senza elenco delle quattro classi; K = schema JSON per proposta pseudoregola solo su discovery, con evidenze verificate, condizioni finite, controlli negativi/astensione. Non equivale allo scorer Microsoft.
+- Modulo `src/evaluation/rq2_output_contracts.py`: parsing JSON stretto, chiavi chiuse, ID evidenza allowlisted, `candidate/insufficient_evidence`; pseudocode trattato solo come testo. **Nessuna importazione del GT o API**.
+- Test `src/tests/test_rq2_output_contracts.py`: 16 casi sintetici predisposti, **NON ancora eseguiti dall'utente**.
+- Protocollo `docs/ood/PROTOCOLLO_RQ2_BOZZA_V0_2026-11-11.md` aggiornato con report V1 e contratti.
+
+**Prossimo passo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_output_contracts.py" -v`; poi progettare il bundle di evidenze C/K e relativi test, valutare la fattibilità degli input che userà davvero l'agente, fissare prompt e metriche prima del freeze. Il gap temporale e il bilanciamento non provano indipendenza fisica; con 2 positivi di test per due classi non vantare generalizzazione robusta. **Nessuna chiamata Gemini/Claude autorizzata.**
