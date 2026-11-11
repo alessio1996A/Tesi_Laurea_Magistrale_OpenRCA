@@ -232,3 +232,11 @@ L'utente ha fornito il log completo della suite `test_rq2_dryrun_plan.py`: `Ran 
 **Correzione mirata** al commit `9997d0adf38bc42260ca5db3f440126e42ebc1a4`, esclusivamente `src/tests/test_rq2_dryrun_plan.py`: sostituito il controllo testuale indiscriminato con verifica della flag `reads_ground_truth=False` e delle allowlist strutturali chiuse delle chiavi di `entries` e `partition`, con controllo dei marcatori GT nei valori testuali degli stage. Non cambia `src/evaluation/rq2_dryrun_plan.py`, non cambia la partizione V1, né uno scorer, un prompt, una run o il freeze RQ1.
 
 **Da rifare in PyCharm:** `git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10`; poi `PYTHONPATH=src python -m unittest discover -s src/tests -p "test_rq2_dryrun_plan.py" -v`. Attesi 15 test, da considerare PASS solo dopo nuovo output dell'utente. Il notebook Colab preflight resta bloccato fino alla verifica. Nessuna API autorizzata.
+
+## 23. Test dry-run RQ2 superati in PyCharm dopo correzione del falso positivo (11 novembre 2026)
+
+Output effettivamente inviato dall'utente: `Ran 15 tests in 0.067s — OK` dopo pull della correzione mirata al test `test_no_label_mapping_or_scoring_leak_in_plan` e nuovo avvio della suite `test_rq2_dryrun_plan.py`. Tutti i **15 test sintetici** risultano quindi superati. Il precedente failure su `reads_ground_truth=False` era un falso positivo della ricerca di sottostringa; l'assert ora controlla strutture/chiavi permesse e il valore booleano senza confondere una proprietà di audit con un'etichetta.
+
+**Stato:** il generatore `src/evaluation/rq2_dryrun_plan.py` e il protocollo RQ2 restano `DRAFT_NOT_EXECUTABLE`; nessuna chiamata modello, piano create-only, risultato D/C/K reale o modifica RQ1.
+
+**Prossimo passo autorizzato come controllo offline:** notebook `notebooks/Colab_RQ2_DryRun_Workflow_Preflight_2026_11_11.ipynb`, una cella, verifica SHA reali e metadati della coorte GT-free, attesi 4 discovery + 11 test in 4+10 gruppi, 90 D + 90 C + 24 K = **204 stage logici**, `can_execute_api=false` e `model_api_calls=0`. Non sono 204 chiamate API. L'esito su Market reale non è ancora stato ottenuto; richiedere l'output Colab per audit. Nessuna chiamata Gemini o Claude autorizzata.
