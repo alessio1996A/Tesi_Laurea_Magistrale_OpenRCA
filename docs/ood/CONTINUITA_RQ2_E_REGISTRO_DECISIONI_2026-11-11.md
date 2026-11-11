@@ -273,3 +273,20 @@ L'utente ha eseguito in PyCharm il file `test_rq2_mock_journal.py`, riportando *
 Controllo successivo sul codice già esistente del repository: `src/evaluation/experiment_runner.py` espone `prepara_esperimento(config)` (preprocessing GT-free), `run_experiment(config, llm=None, verbose=True, salva=False)` con creazione eventuale di un modello **se llm è None** e ritorna `raw_response`, `prediction`, `metrics`, `tool_trajectory`, `error`. La configurazione `src/evaluation/experiment_config.py` distingue `variant_scheme="current"` da `historic_v3`. La factory `src/agent/tool_factory.py` offre cinque tool: `tool_get_service_metrics`, `tool_get_container_metrics`, `tool_get_node_metrics`, `tool_get_logs`, `tool_get_traces`.
 
 **Vincolo per la futura integrazione:** la sola creazione di `ExperimentConfig` e la preparazione dei messaggi C/K devono restare offline; **non chiamare `run_experiment` né `crea_modello` finché non esistono protocollo/piano/richiesta di spesa congelati e consenso esplicito**. Se un test richiede la risposta D, iniettarla come dizionario sintetico, non eseguire il runner storico. Il journal mock è una verifica di persistenza, non una funzione di provider dispatch.
+
+## 27. Preflight di compatibilità su traiettorie RQ1 V3 reali — predisposto, non ancora eseguito (11 novembre 2026)
+
+Per evitare un'integrazione RQ2 che fallisca su traiettorie reali, dopo **18 test mock journal superati** si è esaminato il codice storico:
+- `src/evaluation/experiment_runner.py`: `run_experiment(config,llm=None,verbose=True,salva=False)` può chiamare API **se `llm=None`**; non invocare per audit. Ritorna `tool_trajectory`, `raw_response`, `error` e metriche. Il preprocessing `prepara_esperimento` legge solo telemetria GT-free. Non va modificato il codice RQ1 congelato.
+- `src/agent/tool_factory.py`: esattamente cinque strumenti: `tool_get_service_metrics`, `tool_get_container_metrics`, `tool_get_node_metrics`, `tool_get_logs`, `tool_get_traces`.
+- La cartella dati congelati V3 è `data/results/v2/openrca_harness_v2_five_agents_development_v3`, come da README. I risultati di scoring sono in directory separata e non vanno letti.
+
+**Nuovi artefatti preparati:**
+- `src/evaluation/rq2_historical_trajectory_audit.py`: ispezione **solo aggregata e di sola lettura** delle traiettorie JSON storiche V3 per misurare percentuale di bundle ricostruibili e ambiguità dell'associazione call-result, senza stampare ID casi, telemetria, predizioni, score o classi. Non apre Market.zip, CSV né casi OOD, non scrive o chiama provider.
+- `src/tests/test_rq2_historical_trajectory_audit.py`: **12 test sintetici** preparati, non ancora eseguiti. **Non riportarli come riusciti finché non arriva l'output PyCharm**.
+- `notebooks/Colab_RQ2_Historical_Trajectory_Feasibility_2026_11_11.ipynb`: preflight Colab a una cella (da eseguire soltanto dopo i 12 test).
+- `docs/ood/AUDIT_TRAIETTORIE_V3_PER_RUNNER_RQ2_2026-11-11.md`: motivazioni e limiti.
+
+**Razionale:** usare risultati V3 soltanto per audit di formato, **non** per progettare o adattare pseudoregole OOD o conoscere le risposte della coorte di test. Prima di implementare il runner provider occorre risolvere o registrare come non disponibile la provenienza di tool-result associati ambiguamente. L'uso di `run_experiment` con `salva=False` **non** elimina le chiamate API: serve ancora autorizzazione esplicita, budget e freeze. La partizione V1 resta candidata, non si è avviato alcun esperimento OOD.
+
+**Prossimo comando in PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_historical_trajectory_audit.py" -v` dopo pull; attesi **12 test**. Poi Colab di lettura della sola cartella V3 se la directory è presente.
