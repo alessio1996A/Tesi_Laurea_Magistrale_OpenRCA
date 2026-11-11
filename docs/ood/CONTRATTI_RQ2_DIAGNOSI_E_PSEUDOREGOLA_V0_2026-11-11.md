@@ -77,7 +77,7 @@ Top-level JSON (nessun codice eseguibile):
 
 - `status`: `candidate` oppure `insufficient_evidence`.
 - Per `candidate`: tipo e nome regola non vuoti, almeno un riferimento evidenza, almeno una metrica e condizione misurabile, unità/aggregazione/finestra coerenti fra `required_signals` e `conditions`; almeno un caso di astensione, controesempio e limitazione. `combination` solo `all|any`. Operatori solo `>,>=,<,<=,==`; `threshold` numerico finito, **non** `bool`. Finestre intere positive. Le metriche devono appartenere a un catalogo osservabile con la telemetria effettiva, da fissare prima del freeze.
-- Per `insufficient_evidence`: `hypothesized_fault_type` e `rule_name` possono essere `null`, `required_signals=[]`, `conditions=[]`, `pseudocode=null`, e una limitazione/astensione che giustifichi l'insufficienza. Non ripetere la chiamata suggerendo l'etichetta GT.
+- Per `insufficient_evidence`: `hypothesized_fault_type` e `scope` possono essere `null`, **`rule_name=null`, `combination=null`, `required_signals=[]`, `conditions=[]`, `pseudocode=null`**; servono almeno una `abstain_when` e una `limitations` che giustifichino l'insufficienza. Non ripetere la chiamata suggerendo l'etichetta GT.
 - Tutte le stringhe sono **solo dati**, non comandi. Non usare `eval`, `exec` o AST dinamico sul pseudocode. Traduzione in detector deterministicamente controllato solo dopo audit e freeze della proposta, senza consultare il test.
 - Un candidato valido strutturalmente non è automaticamente corretto, causalmente verificato, implementabile né generalizzabile.
 
