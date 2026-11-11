@@ -332,3 +332,11 @@ Dopo l'audit V3 reale registrato al §30 (**40/40 traiettorie compatibili, 209 o
 **Rimane aperto per la vera inferenza:** `source_verified_in_this_function=false`; i nomi dei provider sono solo associati alle famiglie logiche `gemini`/`sonnet`/`haiku`, non sono congelati gli ID esatti del modello o i parametri; il nuovo modulo non legge i byte del manifest per verificare `original_instruction`. Un futuro runner deve validare sorgenti, modello, prompt, temperature e budget, piano create-only, integrità/ripresa, e consenso API prima di qualsiasi chiamata reale. I 20 test di binding sono la prossima verifica locale; non avviare ancora Colab.
 
 **Comando PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_stage_binding.py" -v` dopo pull, attesi 20 test. Nessun esperimento OOD già lanciato. Nessuna modifica RQ1.
+
+## 32. Binding offline D→C/K: 20 test sintetici superati in PyCharm (11 novembre 2026)
+
+**Output effettivo dell'utente:** `Ran 20 tests in 0.339s — OK`, per la suite `src/tests/test_rq2_stage_binding.py`. I **20 test sintetici** sono quindi superati; confermano controlli preliminari di associazione fra caso/modello/harness, provenienza D→C/K, blocco K sul test, schema GT-free chiuso e assenza di autorizzazione API. Non dimostrano integrità dei dati Market reali, precisione della diagnosi né efficacia di pseudoregole.
+
+Il report della coorte storica V3 rimane: **40/40 bundle strutturalmente ricostruibili**, **209 osservazioni**, **71 troncate**, zero incompatibilità; per i casi RQ2 resta obbligatorio verificare provenance e troncamento run per run.
+
+**Prossimo punto scientifico prioritario prima di chiamate provider:** definire e preregistrare la differenza tra RQ2-B (generazione della specifica K) e RQ2-C (implementazione offline controllata, senza eseguire pseudocode LLM, congelata prima del test, e valutazione su positivi/negativi con particolarità multi-fault). Questo richiede anche scelta ex ante della regola principale, criteri di implementabilità e astensione; le 24 K proposte non sono di per sé evidenza di trasferimento. La partizione V1 e il piano rimangono `DRAFT_NOT_EXECUTABLE`. Nessuna inferenza OOD o chiamata API ancora autorizzata.
