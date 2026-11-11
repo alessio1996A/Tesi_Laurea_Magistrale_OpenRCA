@@ -121,3 +121,19 @@ L'archivio Market attualmente analizzato comprende già tutti i 148 record dei d
 **Questa è una BOZZA V0, NON un protocollo approvato o congelato.** Sono ancora da approvare: quantità/criteri delle discovery; modello e harness per i detector eseguibili primari; strategia E1/E2; modalità esatta della probe C (input, token, contratto) e griglia K; budget. Nessun nuovo codice dell'agente, piano di run, selezione per-caso, invocazione API o scrittura di output sperimentale è stato eseguito.
 
 **Prossimo passo implementativo:** predisporre un **selettore deterministico di partizione** in modulo `src/evaluation/` isolato, inizialmente `dry-run` sui 15 casi; test sintetici PyCharm, poi Colab offline, e discutere con l'utente il risultato PRIMA di congelare. La partizione deve mantenere la coppia con finestra condivisa e verificare 1 discovery per classe + tutti gli altri test, senza divulgare l'etichetta di alcun caso.
+
+## 9. Emendamento V1 alla proposta di partizione — dopo la preview V0, prima di qualsiasi run (11 novembre 2026)
+
+La preview V0 è **realmente riuscita**, ma tutte le quattro query discovery sono risultate su `cloudbed-2` (`q021`, `q040`, `q041`, `q076`), e le due `q040`/`q041` hanno finestre contigue. Si conservano esattamente la V0 e il suo stdout nel report `docs/ood/REPORT_ANTEPRIMA_PARTIZIONE_RQ2_V0_2026-11-11.md`, **senza congelarne la selezione**. La revisione nasce da criteri di bilanciamento/robustezza dell'allocazione, **non da predizioni di un modello (mai eseguite)**.
+
+Il prototipo V1 `src/evaluation/rq2_partition_preview_v1.py`, con `src/tests/test_rq2_partition_preview_v1.py` e `notebooks/Colab_RQ2_Balanced_Partition_Preview_2026_11_11.ipynb`, propone un criterio **lessicografico fisso**:
+1. una sola discovery per classe OOD, su gruppo di finestra singleton;
+2. una finestra che **tocca** temporalmente un'altra finestra OOD nello stesso cloudbed **non è ammissibile come discovery**; la coppia multi-fault sovrapposta rimane tutta in test;
+3. ogni classe deve mantenere in test almeno una query per ognuno dei cloudbed in cui quella classe è presente;
+4. minimizzare lo sbilanciamento fra cloudbed sulle 4 discovery (target 2+2 ove possibile);
+5. minimizzare il numero di coppie discovery–test con finestre distanti al massimo un'ora nello stesso cloudbed;
+6. sciogliere i pareggi per SHA256 con sale versionato `openrca-rq2-ood-balanced-group-safe-v1-2026-11-11`.
+
+Le classi corrette sono consultate **soltanto in memoria dal selettore offline** per lo stratified sampling; gli output espongono fase/ID e balance **aggregato**, non il mapping per caso. Non usa risposte, score, telemetria o token LLM. La V1 rimane `DRAFT_NOT_EXECUTABLE`, senza file di piano persistiti o chiamate API. **Non affermare che i vincoli sono fattibili sui dati reali fino a test PyCharm e Colab eseguiti con successo**.
+
+La scelta è comunque metodologicamente fragile con pochi esempi per classe; non attribuire potenza statistica a 4/11. Qualunque futura revisione dovrà essere documentata **prima** di usare performance del test.
