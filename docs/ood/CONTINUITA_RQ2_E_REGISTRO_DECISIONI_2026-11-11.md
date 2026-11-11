@@ -158,3 +158,11 @@ Prossimo passo: eseguire in Colab `notebooks/Colab_RQ2_Partition_Preview_2026_11
 - `docs/ood/PROTOCOLLO_RQ2_BOZZA_V0_2026-11-11.md` aggiornato con emendamento di metodo. La proposta non è un protocollo congelato.
 
 **Passo immediato:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_partition_preview_v1.py" -v`; se i test passano, anteprima reale Colab V1. Non avviare Gemini/Claude né alterare V0/RQ1 prima di rivedere la selezione risultante.
+
+## 16. Test PyCharm V1 superati (11 novembre 2026)
+
+L'utente ha riportato `Ran 13 tests in 0.491s — OK` eseguendo la discovery `test_rq2_partition_preview_v1.py`. Le 13 esecuzioni includono **7 test nuovi della V1** e **6 test della V0 reimportati** a causa dell'importazione a livello di modulo della classe `unittest.TestCase` V0. Non significa che siano stati aggiunti sei nuovi test V1.
+
+Correzione di sola organizzazione della suite al commit `7584086dfee55619d67a96ac7f257a2df92ef8cc`: la classe di fixture V0 ora viene raggiunta attraverso un import di modulo, così la discovery di `unittest` non dovrebbe più includere i sei test V0 quando si cerca il file V1. **Non modifica il selettore V1 né la partizione, né le sorgenti Market.** La conferma dei 7 test dopo la correzione resta da eseguire se si desidera il conteggio pulito.
+
+**Prossimo passo:** anteprima reale `notebooks/Colab_RQ2_Balanced_Partition_Preview_2026_11_11.ipynb`; verificare che i vincoli V1 siano fattibili su Market, senza creare file o eseguire chiamate LLM. **Nessuna selezione congelata.**
