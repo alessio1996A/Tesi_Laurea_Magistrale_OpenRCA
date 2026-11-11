@@ -105,3 +105,11 @@ Creati sul branch corrente:
 - `notebooks/Colab_OOD_Dependency_Sensitivity_2026_11_11.ipynb`: una cella, da eseguire **solo dopo test PyCharm OK**.
 
 Questo modulo consulta GT nel ramo di **audit**, non esporta mapping etichette/case_id, non vede telemetria, non chiama modelli e non scrive. **ATTENZIONE: cluster per vicinanza+component+classe sono solo proxy di rischio, NON prova di dipendenza/indipendenza causale.** Nessun campione discovery/test né nuovo protocollo è stato selezionato.
+
+## 11. Verifica PyCharm del controllo dipendenze (11 novembre 2026)
+
+**Output test trascritto dall'utente; nessun test aggiuntivo eseguito dall'assistente:**
+- `python -m unittest discover -s src/tests -p "test_ood_class_inventory.py" -v`: cinque test nominativi `test_aggregate_only_and_shared_window`, `test_missing_original_archive_is_error`, `test_record_timestamp_mismatch_rejected`, `test_task_mismatch_rejected`, `test_unknown_reason_requires_review`; **Ran 5 tests in 0.337s — OK**.
+- `python -m unittest discover -s src/tests -p "test_ood_dependency_sensitivity.py" -v`: `test_base_four_ood_queries_three_disjoint_windows`, `test_missing_archive_fails`, `test_nearby_same_cause_component_disjoint_window`, `test_transitive_cluster`, `test_unknown_reason_blocks_sensitivity_audit`; **Ran 5 tests in 0.125s — OK**.
+
+**Totale 10/10 su dati sintetici**. Non equivalgono a validazione scientifica del proxy di dipendenza su fault injection reali. **Prossima azione autorizzata:** esecuzione dell'unica cella `notebooks/Colab_OOD_Dependency_Sensitivity_2026_11_11.ipynb` sul dataset Market per ottenere aggregati di sensibilità, senza inferenze LLM, senza modifica al freeze e senza assegnare casi a discovery/test. Attendere output reale.
