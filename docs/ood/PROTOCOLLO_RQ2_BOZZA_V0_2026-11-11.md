@@ -137,3 +137,19 @@ Il prototipo V1 `src/evaluation/rq2_partition_preview_v1.py`, con `src/tests/tes
 Le classi corrette sono consultate **soltanto in memoria dal selettore offline** per lo stratified sampling; gli output espongono fase/ID e balance **aggregato**, non il mapping per caso. Non usa risposte, score, telemetria o token LLM. La V1 rimane `DRAFT_NOT_EXECUTABLE`, senza file di piano persistiti o chiamate API. **Non affermare che i vincoli sono fattibili sui dati reali fino a test PyCharm e Colab eseguiti con successo**.
 
 La scelta è comunque metodologicamente fragile con pochi esempi per classe; non attribuire potenza statistica a 4/11. Qualunque futura revisione dovrà essere documentata **prima** di usare performance del test.
+
+## 10. Esito reale della partizione V1 e contratti C/K predisposti (11 novembre 2026)
+
+**Anteprima V1 realmente eseguita in Colab** al commit `f3382d43d80bd82d400749fbf5315ccc8b63ea89`, `rq2_partition_preview_balanced_v1`, `source_verified=true` e `DRAFT_NOT_EXECUTABLE`. Risultato: **4 discovery + 11 test**, rispettivamente 4 e 10 gruppi; discovery **2 cloudbed-1 + 2 cloudbed-2**; test **4 cloudbed-1 + 7 cloudbed-2**; 24 candidate partitions ammissibili, selezionate deterministicamente secondo le priorità dichiarate. Zero coppie cross-phase fino a un'ora, gap minimo fra finestre `5400 s`; la finestra condivisa è interamente nel test. Positivi per classe su test: **2/2/3/4**, con classe write I/O soltanto cloudbed-2. **Nessuna API, nessun piano congelato, nessuna valutazione LLM.** Fonte completa: `docs/ood/REPORT_ANTEPRIMA_PARTIZIONE_RQ2_V1_2026-11-11.md`.
+
+**Partizione candidata (non ancora freeze):**
+- Discovery: `cloudbed-1_q032`, `cloudbed-1_q050`, `cloudbed-2_q026`, `cloudbed-2_q045`.
+- Test: `cloudbed-1_q014`, `cloudbed-1_q021`, `cloudbed-1_q030`, `cloudbed-1_q059`, `cloudbed-2_q014`, `cloudbed-2_q021`, `cloudbed-2_q040`, `cloudbed-2_q041`, `cloudbed-2_q058`, `cloudbed-2_q076`, `cloudbed-2_q077`.
+
+**Contratti V0 per due output distinti** documentati in `docs/ood/CONTRATTI_RQ2_DIAGNOSI_E_PSEUDOREGOLA_V0_2026-11-11.md`:
+- D: risposta al task OpenRCA originale da valutare con scorer Microsoft solo dopo freeze.
+- C: probe uniforme `rq2_cause_probe_v0`, senza tool, senza elenco classi, risposta diagnosi o astensione con ID evidence osservati. I sette task che non richiedono esplicitamente reason non vanno automaticamente considerati corretti in RQ2-A.
+- K: `rq2_candidate_rule_v0` sulle **sole discovery**; candidate/insufficient_evidence, telemetry/soglie/unità/precondizioni/falsificatori/astensione. Codice generato **non eseguibile**. Validatore strutturale con allowlist di evidence IDs, non controllo di accuratezza.
+- Preparati `src/evaluation/rq2_output_contracts.py` e `src/tests/test_rq2_output_contracts.py` (**16 test sintetici, ancora da eseguire dall'utente in PyCharm**).
+
+**Non congelare ancora il protocollo:** il bundle deterministico delle evidenze, il formato esatto dei prompt C/K, lo scorer di classe e la procedura per falsi positivi multi-fault, la scelta della regola principale e le guardie anti-GT del runner richiedono verifiche ulteriori. L'esistenza dei file non equivale a una run né ad autorizzazione API.
