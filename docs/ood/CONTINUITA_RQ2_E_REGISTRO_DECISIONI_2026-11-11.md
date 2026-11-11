@@ -340,3 +340,16 @@ Dopo l'audit V3 reale registrato al §30 (**40/40 traiettorie compatibili, 209 o
 Il report della coorte storica V3 rimane: **40/40 bundle strutturalmente ricostruibili**, **209 osservazioni**, **71 troncate**, zero incompatibilità; per i casi RQ2 resta obbligatorio verificare provenance e troncamento run per run.
 
 **Prossimo punto scientifico prioritario prima di chiamate provider:** definire e preregistrare la differenza tra RQ2-B (generazione della specifica K) e RQ2-C (implementazione offline controllata, senza eseguire pseudocode LLM, congelata prima del test, e valutazione su positivi/negativi con particolarità multi-fault). Questo richiede anche scelta ex ante della regola principale, criteri di implementabilità e astensione; le 24 K proposte non sono di per sé evidenza di trasferimento. La partizione V1 e il piano rimangono `DRAFT_NOT_EXECUTABLE`. Nessuna inferenza OOD o chiamata API ancora autorizzata.
+
+## 33. Predisposto scorer offline RQ2-C per gruppi temporali multi-fault (11 novembre 2026)
+
+**Base verificata:** suite PyCharm `test_rq2_stage_binding.py` completata dall'utente, `Ran 20 tests in 0.339s — OK` (§32). Nessuna API/LLM per RQ2.
+
+**Nuovi artefatti predisposti, NON ancora eseguiti dall'utente:**
+- `src/evaluation/rq2_rule_group_scorer.py`: valutatore *offline, in memoria* per gli esiti di una **regola già congelata e applicata altrove**. Non produce né interpreta pseudocodice di un LLM, non apre dataset e non chiama provider. Richiede che il **solo processo di valutazione isolato** fornisca i riferimenti completi per ogni gruppo di finestra. Un gruppo con due classi è positivo per **entrambe**; uno con reference incompleta non è mai negativo per default. Output solo aggregati TP/FP/TN/FN, astensioni, errori, gruppi unscorable, coverage e tassi condizionati. **Questo modulo riceve intenzionalmente etichette dal chiamante dello scorer: non importarlo nell'agente, nel runner GT-free o nei prompt!**
+- `src/tests/test_rq2_rule_group_scorer.py`: **20 test sintetici preparati**, mai su vero Market; **ancora da verificare in PyCharm**. Controllano multi-fault, deduplicazione gruppo/caso, KPI di copertura, gestione delle astensioni/errori, tassi senza denominatore, dati sconosciuti, output privo di mapping di classi per caso.
+- `docs/ood/RQ2_C_VALUTAZIONE_OFFLINE_REGOLE_PROPOSTA_V0_2026-11-11.md`: propone griglia di formalizzabilità prima del test, distinzione fra `RQ2-B` (generazione di K) e `RQ2-C` (applicazione cieca di regole fisse), metriche, negativi one-vs-rest, gestione finestra multi-fault e decisioni da preregistrare.
+
+**Non congelare ancora:** manca catalogo KPI/unità realmente disponibili, criteri meccanici di formalizzabilità, criterio ex ante di selezione del braccio/regola principale e implementazione offline del detector, ID modello/budget API/persistenza reale. Lo scorer è un pezzo di valutazione, **non** dimostra conoscenza trasferita in questa fase. Non applicarlo alle 10 finestre reali di test prima che protocolli e regole siano congelati, e non inserire GT nel runner.
+
+**Prossimo comando PyCharm** dopo `git pull --ff-only`: `python -m unittest discover -s src/tests -p "test_rq2_rule_group_scorer.py" -v`. Attesi 20 test sintetici.
