@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
-from test_rq2_partition_preview import RQ2PartitionPreviewTests
+import test_rq2_partition_preview as fixture_module
 from evaluation.rq2_partition_preview_v1 import (
     _gap, propose_partition_v1,
 )
@@ -15,7 +15,7 @@ from evaluation.rq2_partition_preview_v1 import (
 class BalancedRQ2PartitionTests(unittest.TestCase):
     @staticmethod
     def fixture(root: Path, mode=None):
-        RQ2PartitionPreviewTests().fixture(root, mode=mode)
+        fixture_module.RQ2PartitionPreviewTests().fixture(root, mode=mode)
 
     @staticmethod
     def move_record_and_window(root, bed, index, timestamp):
@@ -30,7 +30,7 @@ class BalancedRQ2PartitionTests(unittest.TestCase):
             if name == member:
                 rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8"))))
                 rows[index]["timestamp"] = str(timestamp)
-                raw = RQ2PartitionPreviewTests._csv_bytes(
+                raw = fixture_module.RQ2PartitionPreviewTests._csv_bytes(
                     ["timestamp", "level", "component", "reason", "datetime"], rows
                 )
             out.append((name, raw))
@@ -48,7 +48,7 @@ class BalancedRQ2PartitionTests(unittest.TestCase):
                 if row["case_id"] == cid:
                     row["start_unix"] = str(timestamp // 1800 * 1800)
                     row["end_unix"] = str(timestamp // 1800 * 1800 + 1800)
-            p.write_bytes(RQ2PartitionPreviewTests._csv_bytes(columns, rows))
+            p.write_bytes(fixture_module.RQ2PartitionPreviewTests._csv_bytes(columns, rows))
 
     def test_balanced_discovery_and_preserve_test_beds(self):
         with tempfile.TemporaryDirectory() as td:
