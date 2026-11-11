@@ -240,3 +240,15 @@ Output effettivamente inviato dall'utente: `Ran 15 tests in 0.067s — OK` dopo 
 **Stato:** il generatore `src/evaluation/rq2_dryrun_plan.py` e il protocollo RQ2 restano `DRAFT_NOT_EXECUTABLE`; nessuna chiamata modello, piano create-only, risultato D/C/K reale o modifica RQ1.
 
 **Prossimo passo autorizzato come controllo offline:** notebook `notebooks/Colab_RQ2_DryRun_Workflow_Preflight_2026_11_11.ipynb`, una cella, verifica SHA reali e metadati della coorte GT-free, attesi 4 discovery + 11 test in 4+10 gruppi, 90 D + 90 C + 24 K = **204 stage logici**, `can_execute_api=false` e `model_api_calls=0`. Non sono 204 chiamate API. L'esito su Market reale non è ancora stato ottenuto; richiedere l'output Colab per audit. Nessuna chiamata Gemini o Claude autorizzata.
+
+## 24. Preflight dry-run sul Market reale superato (11 novembre 2026)
+
+**Output completo Colab fornito dall'utente**, branch `feature/ood-knowledge-transfer-audit-2026-11-10`, commit eseguito `5a254dc6f5cbf6a03f89aa2ce12df251553e388a`. Preflight `rq2_dryrun_workflow_preview_v0`, `status=DRAFT_NOT_EXECUTABLE`, `preview_only=true`, `source_verified=true`.
+- Hash originali verificati: split `c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724`; manifest `5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13`.
+- Partizione candidata V1 confermata esattamente: discovery `cloudbed-1_q032`, `cloudbed-1_q050`, `cloudbed-2_q026`, `cloudbed-2_q045`; test `cloudbed-1_q014`, `cloudbed-1_q021`, `cloudbed-1_q030`, `cloudbed-1_q059`, `cloudbed-2_q014`, `cloudbed-2_q021`, `cloudbed-2_q040`, `cloudbed-2_q041`, `cloudbed-2_q058`, `cloudbed-2_q076`, `cloudbed-2_q077`.
+- 4 discovery e 11 test su 4+10 gruppi temporali; discovery 2+2 per cloudbed, test 4+7; gap cross-phase minimo nello stesso cloudbed 5400 s.
+- 3 modelli **logici**: gemini, sonnet, haiku; 2 harness: `A1`, `A1_8R`. **90 stage D + 90 C + 24 K = 204 stage logici**, *non* 204 invocazioni API, poiché D può richiedere più chiamate LLM.
+- Blocco: `provider_model_versions_frozen=false`, `api_budget_approved=false`, `can_execute_api=false`, `cross_phase_gate=TEST_BLOCKED_UNTIL_DISCOVERY_RULES_FREEZE`. `model_api_calls=0`, `files_written=false`, `reads_ground_truth=false`, `reads_predictions=false`, `reads_telemetry=false`. `preview_sha256=ecd6d926933a5ad056ad1a581fa7e490c0a13eee18070c7dac8627c1b19c062e`.
+- La suite PyCharm di 15 test del generatore era già stata superata dopo il fix del falso positivo. Il notebook non ha scritto piani o risultati né modificato RQ1.
+
+**Decisione:** accettare questo output come **preflight GT-free riuscito**, conservando `DRAFT_NOT_EXECUTABLE`. Non autorizza run, salvataggi sperimentali, scoring o congelamento del protocollo. Step seguente: verifica isolata create-only/restart/mock (senza provider) e controlli del freeze discovery→test; solo poi implementazione di runner RQ2 separato con autorizzazione API esplicita.
