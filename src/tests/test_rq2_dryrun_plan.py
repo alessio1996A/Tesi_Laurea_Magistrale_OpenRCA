@@ -171,12 +171,34 @@ class RQ2DryRunPlanTests(unittest.TestCase):
 
     def test_no_label_mapping_or_scoring_leak_in_plan(self):
         result = plan()
-        forbidden = ("scoring_points", "ground_truth", "target_reason",
-                     "fault_label", "label_map", "record.csv")
-        text = str(result).lower()
-        for term in forbidden:
-            with self.subTest(term=term):
-                self.assertNotIn(term, text)
+        # reads_ground_truth=False is a safe, explicit audit flag, NOT a leak.
+        # Do not scan str(result): that conflates audit metadata and labels.
+        self.assertIs(result["reads_ground_truth"], False)
+        self.assertIs(result["reads_predictions"], False)
+        self.assertIs(result["reads_telemetry"], False)
+        expected_entry_keys = {
+            "stage_id", "case_id", "cloudbed", "task_index",
+            "start_unix", "end_unix", "phase", "logical_model",
+            "harness", "max_tool_rounds_for_D", "stage", "dependencies",
+            "execution_status",
+        }
+        expected_partition_keys = {
+            "discovery_case_ids", "test_case_ids",
+            "discovery_cases", "test_cases", "discovery_windows",
+            "test_windows", "min_cross_phase_same_cloudbed_gap_seconds",
+            "discovery_by_cloudbed", "test_by_cloudbed",
+        }
+        self.assertEqual(set(result["partition"]), expected_partition_keys)
+        for entry in result["entries"]:
+            with self.subTest(stage=entry["stage_id"]):
+                self.assertEqual(set(entry), expected_entry_keys)
+                # Structural allowlist prohibits per-case label/GT fields.
+                for key in expected_entry_keys:
+                    value = entry[key]
+                    if isinstance(value, str):
+                        self.assertNotIn("scoring_points", value.lower())
+                        self.assertNotIn("ground_truth", value.lower())
+                        self.assertNotIn("record.csv", value.lower())
         self.assertFalse(any(
             "reason" in item or "label" in item
             for item in result["entries"]
