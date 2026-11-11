@@ -211,3 +211,16 @@ Output riportato dall'utente dopo aggiornamento branch e riesecuzione del comand
 - I pacchetti generati sono **offline** con `model_api_calls=0`, `ready_for_api=false`; nessun LLM è stato chiamato. I runner di RQ1 restano invariati.
 
 **Prossimo passo:** `python -m unittest discover -s src/tests -p "test_rq2_probe_adapter.py" -v` in PyCharm dopo pull del branch; attesi **14 test**. Successivamente integrare soltanto in un nuovo runner RQ2 con piano create-only/frozen, policy anti-GT, pilot mock, budget e consenso API.
+
+## 21. Adapter verificato e dry-run GT-free del piano D/C/K (11 novembre 2026)
+
+**Output PyCharm dell'utente:** `Ran 14 tests in 0.009s — OK` con `test_rq2_probe_adapter.py`. **Quattordici test sintetici dell'adapter D→C/K superati.** Non costituiscono inferenze OOD o validazione di pseudoregole su dati reali.
+
+**Nuovo passo preparatorio, non ancora testato dall'utente:**
+- `src/evaluation/rq2_dryrun_plan.py`: solo `inventory_ood`/CSV GT-free con hash congelati e selezione V1 candidata già verificata in Colab; genera in memoria **90 stage D + 90 C + 24 K = 204 passaggi logici** per 15 query × 2 harness × 3 modelli logici. Queste **NON sono 204 chiamate API**. K solo discovery. Blocca test prima di freeze dei candidati come requisito da imporre nel futuro runner; qui non esiste dispatch. `status=DRAFT_NOT_EXECUTABLE`, `can_execute_api=false`, `api_budget_approved=false`, nessuna API e nessun file scritto.
+- `src/tests/test_rq2_dryrun_plan.py`: **15 test sintetici** predisposti, non ancora eseguiti dall'utente. Validano vincoli sulla fase, dipendenze e separazione gruppi, SHA, mancato accesso al GT, dati fuori schema, ID duplicati, blocco API.
+- `notebooks/Colab_RQ2_DryRun_Workflow_Preflight_2026_11_11.ipynb`: una cella, *solo dopo test PyCharm*; controlla realmente SHA dei due CSV e stampa soltanto riepilogo GT-free.
+- `docs/ood/DRYRUN_PIANO_ESECUZIONI_RQ2_V0_2026-11-11.md`: dettagli e distinzione tra conteggi logici e costo inferenziale.
+- Attenzione: versione/modello provider, budget API, runner autonomo create-only, policy test post-freeze e metrica qualità delle regole restano **non fissati**. Non avviare API o scoring e non modificare RQ1.
+
+**Passo immediato:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_dryrun_plan.py" -v`; attesi 15 test. Solo dopo preflight Colab GT-free del piano dry-run e revisione del protocollo prima di qualunque run.
