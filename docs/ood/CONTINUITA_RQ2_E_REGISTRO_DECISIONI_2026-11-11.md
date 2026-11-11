@@ -182,3 +182,16 @@ Correzione di sola organizzazione della suite al commit `7584086dfee55619d67a96a
 - Protocollo `docs/ood/PROTOCOLLO_RQ2_BOZZA_V0_2026-11-11.md` aggiornato con report V1 e contratti.
 
 **Prossimo passo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_output_contracts.py" -v`; poi progettare il bundle di evidenze C/K e relativi test, valutare la fattibilità degli input che userà davvero l'agente, fissare prompt e metriche prima del freeze. Il gap temporale e il bilanciamento non provano indipendenza fisica; con 2 positivi di test per due classi non vantare generalizzazione robusta. **Nessuna chiamata Gemini/Claude autorizzata.**
+
+## 18. Test contratti C/K completati e bundle di evidenze predisposto (11 novembre 2026)
+
+**Verifica PyCharm riferita dall'utente:** `Ran 16 tests in 0.034s — OK` per `test_rq2_output_contracts.py`. Sono **16 test sintetici superati**, non una valutazione su risposte LLM reali. Validano le strutture C (`rq2_cause_probe_v0`) e K (`rq2_candidate_rule_v0`), astensioni, evidenze allowlisted, soglie numeriche finite, JSON rigoroso, ma non accertano validità scientifica delle diagnosi.
+
+**Nuovo lavoro preparato (NON ancora testato dall'utente):**
+- `src/evaluation/rq2_evidence_bundle.py`: costruzione **deterministica senza GT** di evidenze numerate da `tool_trajectory` realmente registrato, con argomenti/provenienza, SHA256, troncamento dichiarato, blocco di nomi tool non autorizzati e marcatori GT.
+- `src/tests/test_rq2_evidence_bundle.py`: **14 test sintetici** da eseguire in PyCharm.
+- `docs/ood/BUNDLE_EVIDENZE_RQ2_PROGETTAZIONE_V0_2026-11-11.md`: motivazioni tecniche, formato, limiti, compatibilità con runner RQ1 ed evidenze.
+- Rilevazione importante dal codice GitHub: in `src/agent/graph_engine.py` (A0, A1, A1_8R) le traiettorie storiche **non** conservano `tool_call_id`, mentre in `src/agent/verify_graph.py` esistono `tool_call_id` e `origine`. Perciò il nuovo bundle associa i risultati legacy ai parametri soltanto se c'è **una sola chiamata pendente dello stesso tool**; in presenza di ambiguità rifiuta anziché inventare provenienza. Per l'integrazione operativa RQ2 potrà essere necessario aggiornare un **nuovo runner dedicato** per preservare gli ID, lasciando RQ1 intatta.
+- Il bundler non legge Market.zip o altri file, non modifica tool, non accede a scoring, non chiama LLM e non scrive. Le osservazioni dei tool restano dati potenzialmente non attendibili e il riferimento a un evidence ID **non** certifica supporto causale.
+
+**Prossimo passo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_evidence_bundle.py" -v`. Solo dopo esito verificato si procederà alla creazione di adapter e test mock, alla definizione dei prompt e poi al protocollo congelato. V1 split resta candidata, non è stato autorizzato alcun pilot API.
