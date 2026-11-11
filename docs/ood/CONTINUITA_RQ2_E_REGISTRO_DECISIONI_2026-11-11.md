@@ -113,3 +113,13 @@ Questo modulo consulta GT nel ramo di **audit**, non esporta mapping etichette/c
 - `python -m unittest discover -s src/tests -p "test_ood_dependency_sensitivity.py" -v`: `test_base_four_ood_queries_three_disjoint_windows`, `test_missing_archive_fails`, `test_nearby_same_cause_component_disjoint_window`, `test_transitive_cluster`, `test_unknown_reason_blocks_sensitivity_audit`; **Ran 5 tests in 0.125s — OK**.
 
 **Totale 10/10 su dati sintetici**. Non equivalgono a validazione scientifica del proxy di dipendenza su fault injection reali. **Prossima azione autorizzata:** esecuzione dell'unica cella `notebooks/Colab_OOD_Dependency_Sensitivity_2026_11_11.ipynb` sul dataset Market per ottenere aggregati di sensibilità, senza inferenze LLM, senza modifica al freeze e senza assegnare casi a discovery/test. Attendere output reale.
+
+## 12. Esito reale dell'audit dipendenze (11 novembre 2026)
+
+**Risultato Colab ricevuto dall'utente:** `ood_dependency_sensitivity_controlled_gt_v1` con `source_verified=true`, esecuzione al commit `a732773dcee3bfd2152c3d79432c5a56fb9e982d`. 15 query OOD, una coppia di finestre sovrapposte, 14 gruppi. **Nessuna ulteriore coppia con stesso cloudbed+classe+componente e timestamp vicino** alle soglie di 0, 1800, 3600, 7200 e 14400 s. A ogni soglia, 14 gruppi, istogramma `{1:13,2:1}`, coppie aggiuntive `0`. Gruppi contenenti ciascuna classe: node CPU spike 3; container write I/O load 3; container process termination 4; container packet loss 5.
+
+**Attenzione:** questo **NON prova** 14 injection causalmente indipendenti. Nessun `case_id → classe` stampato, ground truth consultato soltanto dal modulo offline di audit; nessuna telemetria, API o scrittura. **Non è stata selezionata alcuna coorte discovery/test.**
+
+**Report completo:** `docs/ood/REPORT_SENSIBILITA_DIPENDENZE_OOD_2026-11-11.md` (commit di creazione `42673476c8b44bbf69c5f3d52bfa8930e96f7068`).
+
+**Prossima decisione:** progettare il protocollo separando diagnosi OOD e validazione di pseudoregole, mantenendo sempre unite le query con finestra in comune; scegliere harness e split con criteri preregistrati, riconoscendo i piccoli numeri per classe. Solo dopo autorizzazione API.
