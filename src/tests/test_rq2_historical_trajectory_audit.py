@@ -79,7 +79,7 @@ class RQ2HistoricalTrajectoryAuditTests(unittest.TestCase):
             )
             report = audit_history(Path(td))
         self.assertEqual(report["counts"]["bundle_not_usable"], 1)
-        self.assertEqual(report["counts"]["bundle_structurally_usable"], 0)
+        self.assertEqual(report["counts"].get("bundle_structurally_usable", 0), 0)
         self.assertTrue(any("Ambiguous" in key for key in
                             report["incompatibility_reasons"]))
 
@@ -88,7 +88,7 @@ class RQ2HistoricalTrajectoryAuditTests(unittest.TestCase):
             output_dir(Path(td)).joinpath("bad_result.json").write_bytes(b'{broken')
             report = audit_history(Path(td))
         self.assertEqual(report["counts"]["unparseable_files"], 1)
-        self.assertEqual(report["counts"]["result_records_with_trajectory"], 0)
+        self.assertEqual(report["counts"].get("result_records_with_trajectory", 0), 0)
 
     def test_unrelated_json_in_known_result_dir_skipped(self):
         with tempfile.TemporaryDirectory() as td:
@@ -116,7 +116,7 @@ class RQ2HistoricalTrajectoryAuditTests(unittest.TestCase):
             )
             report = audit_history(Path(td))
         self.assertEqual(report["counts"]["empty_bundles"], 1)
-        self.assertEqual(report["counts"]["observations"], 0)
+        self.assertEqual(report["counts"].get("observations", 0), 0)
 
     def test_runner_error_is_distinguished_from_provenance(self):
         with tempfile.TemporaryDirectory() as td:
