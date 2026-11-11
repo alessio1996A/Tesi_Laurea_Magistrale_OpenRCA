@@ -182,6 +182,8 @@ class RQ2MockJournal:
 
     def _completed(self, stage_id: str) -> dict | None:
         path = self._path(stage_id)
+        if path.is_symlink():
+            raise MockJournalError("Symlink in mock stage receipt")
         if not path.exists():
             return None
         data = _read_json(path)
@@ -210,6 +212,8 @@ class RQ2MockJournal:
 
     def _freeze(self) -> dict | None:
         path = self.root / FREEZE_NAME
+        if path.is_symlink():
+            raise MockJournalError("Symlink in mock freeze receipt")
         if not path.exists():
             return None
         data = _read_json(path)
