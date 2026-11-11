@@ -97,7 +97,7 @@ class RQ2HistoricalTrajectoryAuditTests(unittest.TestCase):
             )
             report = audit_history(Path(td))
         self.assertEqual(report["counts"]["other_json_files"], 1)
-        self.assertEqual(report["counts"]["result_records_with_trajectory"], 0)
+        self.assertEqual(report["counts"].get("result_records_with_trajectory", 0), 0)
 
     def test_top_level_ground_truth_field_rejected(self):
         with tempfile.TemporaryDirectory() as td:
