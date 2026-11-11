@@ -144,3 +144,17 @@ Questo modulo consulta GT nel ramo di **audit**, non esporta mapping etichette/c
 Output dell'utente: `Ran 6 tests in 1.059s — OK`, comando `python -m unittest discover -s src/tests -p "test_rq2_partition_preview.py" -v` (sei test sintetici). I sei test sono passati in PyCharm nell'ambiente dell'utente. **Non costituiscono ancora conferma della partizione sui dati Market reali.**
 
 Prossimo passo: eseguire in Colab `notebooks/Colab_RQ2_Partition_Preview_2026_11_11.ipynb` su `Market.zip` originale, osservare il JSON con status `DRAFT_NOT_EXECUTABLE` e verificare quantità 4 discovery / 11 test, 4 / 10 gruppi, coppia di finestra condivisa non separata, nessun `case_id→reason` nel report. Non effettuare chiamate ai modelli; non scrivere un piano runnable; non modificare freeze EVALUATION20.
+
+## 15. Preview V0 reale e revisione metodologica V1 (11 novembre 2026)
+
+**Output Colab V0 ricevuto dall'utente** al commit `ce7463fcbe19046399f6a6186a73aa40885a6f6c`: `rq2_stratified_partition_preview_v0`, `DRAFT_NOT_EXECUTABLE`, sorgenti verificate, **4 discovery / 11 test** su **4 / 10 gruppi**, distribuzione aggregata delle quattro classi **discovery 1/1/1/1; test 2/2/3/4**. La coppia multi-fault `cloudbed-1_q014`/`cloudbed-1_q030` resta tutta nel test. Nessuna API o scrittura; etichette lette soltanto per partizionamento offline, mai esposte come mapping per caso.
+
+**ID discovery V0**: `cloudbed-2_q021`, `cloudbed-2_q040`, `cloudbed-2_q041`, `cloudbed-2_q076`. **Tutte quattro discovery su cloudbed-2**. Inoltre le finestre di `cloudbed-2_q040` e `cloudbed-2_q041` sono contigue, anche se non sovrapposte. Nessun dato del modello è stato ancora osservato. **Decisione: NON congelare la V0**; archiviare integralmente stdout e motivazione in `docs/ood/REPORT_ANTEPRIMA_PARTIZIONE_RQ2_V0_2026-11-11.md`.
+
+**Perché V1:** prima delle inferenze, correggere sbilanciamento ambientale e potenziali dipendenze di finestre contigue. **Preparati e caricati su GitHub, non ancora testati in PyCharm né Colab**:
+- `src/evaluation/rq2_partition_preview_v1.py`: selezione deterministica per classe su finestre singleton non contigue ad altre, preservando esempi test di ogni classe per cloudbed, preferenza 2+2 discovery fra i due cloudbed e minimizzazione dei vicini discovery/test, tie-break SHA fissato.
+- `src/tests/test_rq2_partition_preview_v1.py`: **7 test sintetici** previsti per bilanciamento, coerenza del gruppo condiviso, determinismo, protezione GT, adiacenze, cause sconosciute/archivio mancante, metrica gap.
+- `notebooks/Colab_RQ2_Balanced_Partition_Preview_2026_11_11.ipynb`: unica cella che recupera il branch, verifica gli input, esegue il selettore **senza chiamate ai modelli e senza scritture**. Status `DRAFT_NOT_EXECUTABLE`.
+- `docs/ood/PROTOCOLLO_RQ2_BOZZA_V0_2026-11-11.md` aggiornato con emendamento di metodo. La proposta non è un protocollo congelato.
+
+**Passo immediato:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_partition_preview_v1.py" -v`; se i test passano, anteprima reale Colab V1. Non avviare Gemini/Claude né alterare V0/RQ1 prima di rivedere la selezione risultante.
