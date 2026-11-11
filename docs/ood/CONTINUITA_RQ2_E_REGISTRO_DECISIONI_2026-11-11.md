@@ -304,3 +304,20 @@ L'utente ha eseguito `python -m unittest discover -s src/tests -p "test_rq2_hist
 **Verifica PyCharm comunicata dall'utente:** `Ran 12 tests in 0.236s — OK`, dopo la correzione mirata del test `test_unrelated_json_in_known_result_dir_skipped` al commit `be63e41403521b6469432743494810999368842c`. Tutti i 12 test sintetici dell'audit `src/evaluation/rq2_historical_trajectory_audit.py` sono ora superati: si controllano assenza della directory, parser di risultati, associazione ambigua tool-call↔tool-result, esclusione della directory scoring, assenza di modifica dei file originali, ecc. **Non** è ancora una verifica delle traiettorie V3 reali.
 
 **Prossimo passaggio previsto:** eseguire la **sola cella** del notebook `notebooks/Colab_RQ2_Historical_Trajectory_Feasibility_2026_11_11.ipynb`, che ispeziona in sola lettura i JSON dei risultati V3 già congelati nella directory `data/results/v2/openrca_harness_v2_five_agents_development_v3`. Controllare nel riepilogo aggregato `counts` e `incompatibility_reasons` per decidere se occorre una raccolta RQ2 che mantenga `tool_call_id` o una gestione di indisponibilità del bundle. **Non** aprire score, GT, Market.zip o le 15 query OOD; nessuna API o file di risultati nuovi. La partizione RQ2 V1 resta `DRAFT_NOT_EXECUTABLE`, non congelata.
+
+## 30. Audit reale compatibilità V3: 40/40 bundle ricostruibili e 71/209 osservazioni troncate (11 novembre 2026)
+
+**Output Colab riportato dall'utente**, eseguito sul commit `57002748bdb44ad04a3fe15d48a7f4687df796fe`: `rq2_historical_trajectory_feasibility_v0`, `status=HISTORICAL_COMPATIBILITY_ONLY`, `read_only=true`, `read_ground_truth=false`, `read_scoring=false`, `read_ood_cases=false`, `model_api_calls=0`, `files_written=false`.
+
+Aggregati osservati realmente dalla cartella congelata `data/results/v2/openrca_harness_v2_five_agents_development_v3`:
+- `json_files=80`: 40 JSON con `tool_trajectory` + 40 JSON non di risultato;
+- `result_records_with_trajectory=40`;
+- `bundle_structurally_usable=40` — **40/40**, nessuna incompatibilità strutturale nell'audit di questa coorte;
+- `observations=209`; `truncated_observations=71`, cioè **33.97%** delle osservazioni;
+- `incompatibility_reasons={}`.
+
+**Interpretazione**: il bundler attuale supporta tutte le 40 traiettorie storiche V3 esaminate, dunque gli identificativi di tool-call mancanti nel runner legacy non impediscono la ricostruzione dei *dati osservati* su questa coorte; non è necessario alterare retroattivamente il grafo RQ1. L'assenza di ambiguità su V3 **non garantisce** che nuovi run RQ2 non generino chiamate parallele e non dimostra validità causale. L'alto troncamento di 71/209 è un rischio di **sufficienza semantica** delle evidenze C/K, pur non invalidando gli hash delle osservazioni; rilevare e riportare sempre `truncated` e trattare ogni possibile perdita come limitazione.
+
+**Decisione scientifica da fissare prima del freeze**: RQ2-B (generazione della pseudoregola) e RQ2-C (sua applicazione deterministica offline cieca sul test con positivi/negativi e controllo multi-fault) sono risultati distinti. Generare 24 candidati K e poi eseguire solo D/C sui test non dimostra trasferimento della conoscenza; occorre predefinire criterio di scelta/formalizzabilità e la verifica della regola **senza guardare il test**, non implementare codice suggerito dal modello in automatico né introdurre nuovi detector nel freeze RQ1. Se nessun candidato è implementabile, dichiarare esito negativo/non valutabile per RQ2-C.
+
+**Prossimo passo tecnico**: binding in memoria delle richieste C/K al piano GT-free, allo stage ID, al D originale e alla C precedente; nessuna API e nessuna persistenza. Poi progettare runner RQ2 con budget+autorizzazione, e protocollo scientifico congelato prima dei casi OOD. L'audit V3 non utilizza output storici per formulare o tarare regole RQ2.
