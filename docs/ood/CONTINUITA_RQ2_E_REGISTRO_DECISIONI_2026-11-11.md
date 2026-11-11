@@ -353,3 +353,13 @@ Il report della coorte storica V3 rimane: **40/40 bundle strutturalmente ricostr
 **Non congelare ancora:** manca catalogo KPI/unità realmente disponibili, criteri meccanici di formalizzabilità, criterio ex ante di selezione del braccio/regola principale e implementazione offline del detector, ID modello/budget API/persistenza reale. Lo scorer è un pezzo di valutazione, **non** dimostra conoscenza trasferita in questa fase. Non applicarlo alle 10 finestre reali di test prima che protocolli e regole siano congelati, e non inserire GT nel runner.
 
 **Prossimo comando PyCharm** dopo `git pull --ff-only`: `python -m unittest discover -s src/tests -p "test_rq2_rule_group_scorer.py" -v`. Attesi 20 test sintetici.
+
+## 34. Scorer RQ2-C: 20/20 test superati; audit semantica KPI e priorità pre-freeze (11 novembre 2026)
+
+**Output effettivo dell'utente:** `Ran 20 tests in 0.006s — OK` della suite `src/tests/test_rq2_rule_group_scorer.py`. Tutti i **20 test sintetici** del valutatore offline group-level sono superati: multietichetta per la finestra condivisa, TP/FP/TN/FN, astensioni/errori, denominatori, reference incompleta. Non è stata effettuata **alcuna valutazione su telemetria OOD test o su pseudoregole reali**.
+
+**Ispezione ulteriore di codice RQ1 (sola lettura):** `src/agent/tool_factory.py` conferma cinque strumenti e filtro di finestra; `src/evaluation/experiment_runner.py` legge node/container usando colonne `timestamp,cmdb_id,kpi_name,value`, senza unità fisica esplicita. `src/harness/signal_catalog.py` usa `gauge_candidato`, `non_verificato`, `semantica_verificata=False` per varie famiglie. Le regole R01/R06 descrivono esplicitamente ambiguità della semantica di `container_cpu_usage_seconds` e `container_fs_reads_MB./dev/vda`; MB nel nome non prova throughput MB/s.
+
+**Nuovo documento di decisione:** `docs/ood/RQ2_DECISIONI_PRE_FREEZE_E_CATALOGO_KPI_2026-11-11.md`, commit `26ca39a10e8a2520c98d4f96cfcd097c4704a69d`. PROPONE uno specifico percorso di freeze: catalogo KPI/versione con unità e semantica verificate prima di aprire il test, gate deterministico delle K, separazione RQ2-A/B/C, designazione ex ante di confronto primario, budget, piano create-only e autorizzazione API. La proposta **non** congela le scelte, né autorizza nuovi esperimenti.
+
+**Decisione operativa attuale:** non accumulare nuove suite senza chiarire l'eseguibilità delle K. Priorità: catalogo KPI basato su codice/documentazione e sviluppo GT-free soltanto (mai OOD test), mock provider D/C/K con persistenza reale create-only, stima API e freeze del protocollo. Poi richiesta esplicita dell'utente per eventuali chiamate a pagamento. RQ1 invariata e RQ2 ancora `DRAFT_NOT_EXECUTABLE`.
