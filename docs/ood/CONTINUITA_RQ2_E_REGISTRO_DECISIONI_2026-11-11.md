@@ -290,3 +290,11 @@ Per evitare un'integrazione RQ2 che fallisca su traiettorie reali, dopo **18 tes
 **Razionale:** usare risultati V3 soltanto per audit di formato, **non** per progettare o adattare pseudoregole OOD o conoscere le risposte della coorte di test. Prima di implementare il runner provider occorre risolvere o registrare come non disponibile la provenienza di tool-result associati ambiguamente. L'uso di `run_experiment` con `salva=False` **non** elimina le chiamate API: serve ancora autorizzazione esplicita, budget e freeze. La partizione V1 resta candidata, non si è avviato alcun esperimento OOD.
 
 **Prossimo comando in PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_historical_trajectory_audit.py" -v` dopo pull; attesi **12 test**. Poi Colab di lettura della sola cartella V3 se la directory è presente.
+
+## 28. Test audit traiettorie V3: errore in una sola asserzione di conteggio (11 novembre 2026)
+
+L'utente ha eseguito `python -m unittest discover -s src/tests -p "test_rq2_historical_trajectory_audit.py" -v`; output: **12 test, 11 OK, 1 ERROR**, nel test `test_unrelated_json_in_known_result_dir_skipped`. Il report usa `Counter` ma restituisce una normale `dict` con sole categorie osservate: quando il file sintetico `claim.json` non contiene `tool_trajectory`, il contatore `result_records_with_trajectory` non è presente e l'asserzione diretta causa `KeyError`. Questo **non** implica un difetto di lettura GT, di protezione di scorer o del bundler.
+
+**Correzione limitata alla suite** al commit `be63e41403521b6469432743494810999368842c`: sostituita in `src/tests/test_rq2_historical_trajectory_audit.py` la singola lettura del contatore con `report["counts"].get("result_records_with_trajectory", 0)`. Nessuna modifica al modulo audit, runner, dati o codice congelato RQ1.
+
+**Da verificare in PyCharm:** `git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10` e rieseguire i 12 test. Il Colab `Colab_RQ2_Historical_Trajectory_Feasibility_2026_11_11.ipynb` resta da eseguire solo dopo successo completo; nessuna inferenza API consentita.
