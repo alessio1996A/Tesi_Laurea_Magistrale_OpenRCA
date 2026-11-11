@@ -62,6 +62,8 @@ class RQ2DryRunPlanTests(unittest.TestCase):
         result = plan()
         self.assertEqual(result["status"], "DRAFT_NOT_EXECUTABLE")
         self.assertFalse(result["can_execute_api"])
+        # Synthetic callers supply hash strings without checking source bytes.
+        self.assertFalse(result["source_verified"])
         self.assertFalse(result["api_budget_approved"])
         self.assertFalse(result["provider_model_versions_frozen"])
         self.assertFalse(result["files_written"])
