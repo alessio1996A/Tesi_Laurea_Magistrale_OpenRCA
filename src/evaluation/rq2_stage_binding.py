@@ -37,6 +37,27 @@ REQUIRED_RUN_KEYS = {
     "model_provider", "max_tool_rounds", "raw_response",
     "tool_trajectory", "error",
 }
+PLAN_KEYS = {
+    "protocol", "status", "preview_only", "source_verified",
+    "split_sha256", "manifest_sha256", "partition",
+    "logical_models", "harnesses", "provider_model_versions_frozen",
+    "api_budget_approved", "can_execute_api", "cross_phase_gate",
+    "stages", "total_stage_entries", "model_api_calls",
+    "files_written", "reads_ground_truth", "reads_predictions",
+    "reads_telemetry", "limitations", "preview_sha256", "entries",
+}
+ENTRY_KEYS = {
+    "stage_id", "case_id", "cloudbed", "task_index",
+    "start_unix", "end_unix", "phase", "logical_model",
+    "harness", "max_tool_rounds_for_D", "stage", "dependencies",
+    "execution_status",
+}
+PARTITION_KEYS = {
+    "discovery_case_ids", "test_case_ids", "discovery_cases",
+    "test_cases", "discovery_windows", "test_windows",
+    "min_cross_phase_same_cloudbed_gap_seconds",
+    "discovery_by_cloudbed", "test_by_cloudbed",
+}
 
 
 class StageBindingError(ValueError):
@@ -58,13 +79,22 @@ def _sha(value: object) -> str:
 
 
 def _validate_plan(plan: dict) -> dict[str, dict]:
-    if type(plan) is not dict or (
+    if type(plan) is not dict or set(plan) != PLAN_KEYS or (
         plan.get("protocol") != VERSION
         or plan.get("status") != PLAN_STATUS
         or plan.get("preview_only") is not True
         or plan.get("can_execute_api") is not False
         or plan.get("api_budget_approved") is not False
         or plan.get("model_api_calls") != 0
+        or plan.get("files_written") is not False
+        or plan.get("reads_ground_truth") is not False
+        or plan.get("reads_predictions") is not False
+        or plan.get("reads_telemetry") is not False
+        or plan.get("provider_model_versions_frozen") is not False
+        or plan.get("total_stage_entries") != 204
+        or plan.get("stages") != {"D": 90, "C": 90, "K": 24}
+        or plan.get("logical_models") != list(MODELS)
+        or plan.get("harnesses") != list(HARNESSES)
         or plan.get("cross_phase_gate")
         != "TEST_BLOCKED_UNTIL_DISCOVERY_RULES_FREEZE"
     ):
@@ -80,8 +110,8 @@ def _validate_plan(plan: dict) -> dict[str, dict]:
     if plan.get("preview_sha256") != expected:
         raise StageBindingError("Plan preview SHA256 mismatch")
     partitions = plan.get("partition")
-    if type(partitions) is not dict:
-        raise StageBindingError("Missing discovery/test partition")
+    if type(partitions) is not dict or set(partitions) != PARTITION_KEYS:
+        raise StageBindingError("Missing/unknown discovery/test partition fields")
     discovery = partitions.get("discovery_case_ids")
     test = partitions.get("test_case_ids")
     if (type(discovery) is not list or type(test) is not list
@@ -96,8 +126,8 @@ def _validate_plan(plan: dict) -> dict[str, dict]:
     by_id = {}
     observed = set()
     for item in entries:
-        if type(item) is not dict:
-            raise StageBindingError("Stage must be a dictionary")
+        if type(item) is not dict or set(item) != ENTRY_KEYS:
+            raise StageBindingError("Stage must contain only GT-free fields")
         sid = item.get("stage_id")
         cid = item.get("case_id")
         phase = item.get("phase")
