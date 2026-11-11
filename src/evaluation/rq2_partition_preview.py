@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from collections import Counter
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -66,7 +65,8 @@ def propose_partition(
             labels[case_id] = reason
 
     groups = audit["ood_window_groups"]
-    assert len(groups) == audit["ood_window_groups_count"]
+    if len(groups) != audit["ood_window_groups_count"]:
+        raise ValueError("Inconsistent OOD window-group count")
     if set(labels) != {cid for group in groups for cid in group}:
         raise ValueError("GT group and split case IDs do not match")
     eligible = {name: [] for name in TARGETS}
