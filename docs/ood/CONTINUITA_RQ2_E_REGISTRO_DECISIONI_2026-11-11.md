@@ -252,3 +252,16 @@ Output effettivamente inviato dall'utente: `Ran 15 tests in 0.067s — OK` dopo 
 - La suite PyCharm di 15 test del generatore era già stata superata dopo il fix del falso positivo. Il notebook non ha scritto piani o risultati né modificato RQ1.
 
 **Decisione:** accettare questo output come **preflight GT-free riuscito**, conservando `DRAFT_NOT_EXECUTABLE`. Non autorizza run, salvataggi sperimentali, scoring o congelamento del protocollo. Step seguente: verifica isolata create-only/restart/mock (senza provider) e controlli del freeze discovery→test; solo poi implementazione di runner RQ2 separato con autorizzazione API esplicita.
+
+## 25. Preparato test isolato di journal create-only e blocco discovery→test (11 novembre 2026)
+
+In seguito all'output Colab GT-free riuscito (vedere §24), è stato predisposto un **mock journal** in `src/evaluation/rq2_mock_journal.py`, completamente distinto dal futuro runner API. **Non importa provider né tool, non accede a dataset/scoring, non esegue diagnosi, prompt, classificazioni o pseudoregole**. Accetta esclusivamente il piano `DRAFT_NOT_EXECUTABLE` con `can_execute_api=false`, 204 stage e hash coerenti. Produce **solo ricevute sintetiche in cartelle temporanee**, con scrittura create-only `O_EXCL`, gestione fail-closed di file parziali, hash, restart/resume e dipendenze.
+
+La transizione test richiede che tutti i **24 K discovery mock** siano completati e un file `MOCK_DISCOVERY_FREEZE.json` sia creato una sola volta. **Questo non è un freeze scientifico di regole** e non può autorizzare le chiamate reali. Eventuali modifiche alle ricevute dopo freeze falliscono in audit. Anche senza freeze mock, lo stage di test non può essere simulato.
+
+**Nuovi file preparati (NON ancora testati dall'utente):**
+- `src/evaluation/rq2_mock_journal.py`: transizioni e persistenza simulata, non esecuzione.
+- `src/tests/test_rq2_mock_journal.py`: **18 test sintetici** su `tempfile.TemporaryDirectory()` per create-only, doppio invio, corrupt restart, 204 stage mock, blocco test, tampering, no API.
+- `docs/ood/RQ2_MOCK_JOURNAL_PREPARAZIONE_2026-11-11.md`: design e limitazioni.
+
+**Passo successivo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_mock_journal.py" -v`, attesi 18 test. Non avviare Colab o modelli per questi test. Protocollo V1 e run plan restano non congelati; dopo verifica bisognerà aggiungere un runner RQ2 reale separato, con guardie GT e budget autorizzato, non promuovere il journal mock a runner.
