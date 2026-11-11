@@ -195,3 +195,7 @@ Correzione di sola organizzazione della suite al commit `7584086dfee55619d67a96a
 - Il bundler non legge Market.zip o altri file, non modifica tool, non accede a scoring, non chiama LLM e non scrive. Le osservazioni dei tool restano dati potenzialmente non attendibili e il riferimento a un evidence ID **non** certifica supporto causale.
 
 **Prossimo passo:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_evidence_bundle.py" -v`. Solo dopo esito verificato si procederà alla creazione di adapter e test mock, alla definizione dei prompt e poi al protocollo congelato. V1 split resta candidata, non è stato autorizzato alcun pilot API.
+
+## 19. 11 novembre 2026 — Bundle evidenze: test PyCharm superati
+
+Output riportato dall'utente dopo aggiornamento branch e riesecuzione del comando corretto: `Ran 14 tests in 0.009s — OK` per `python -m unittest discover -s src/tests -p "test_rq2_evidence_bundle.py" -v`. Il precedente `Ran 0 tests` era dovuto a mancata individuazione del file nella copia locale, non a un fallimento del modulo. **Quattordici test sintetici superati** sul bundle; non significa che la telemetria reale o il percorso LLM end-to-end siano già stati verificati. Nessuna chiamata API e nessun nuovo esperimento OOD eseguito.
