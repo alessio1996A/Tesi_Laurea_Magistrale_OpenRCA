@@ -139,7 +139,8 @@ class RQ2DryRunPlanTests(unittest.TestCase):
         metadata, groups, discovery, test = synthetic_cohort()
         with self.assertRaisesRegex(RQ2PlanError, "exactly"):
             verify_candidate_allocation(
-                metadata, groups, discovery=discovery, test=test[:-1]
+                metadata, groups, discovery=discovery, test=test[:-1],
+                enforce_real_size=False,
             )
 
     def test_duplicate_discovery_rejected(self):
