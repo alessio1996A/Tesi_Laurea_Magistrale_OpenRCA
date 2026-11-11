@@ -156,8 +156,13 @@ def make_workflow_preview(
     split_sha256: str, manifest_sha256: str,
     discovery=DISCOVERY, test=TEST,
     enforce_real_size: bool = True,
+    _source_sha_checked: bool = False,
 ) -> dict:
-    """Build D/C/K dependency graph, never execution permissions."""
+    """Build D/C/K dependency graph, never execution permissions.
+
+    Source is considered verified ONLY by the trusted preview_market wrapper.
+    Plain callers can supply matching hash strings without file verification.
+    """
     if (split_sha256 != EXPECTED_SPLIT_SHA256
             or manifest_sha256 != EXPECTED_MANIFEST_SHA256):
         raise RQ2PlanError("Frozen GT-free data hash mismatch")
@@ -217,7 +222,7 @@ def make_workflow_preview(
         "protocol": VERSION,
         "status": PLAN_STATUS,
         "preview_only": True,
-        "source_verified": True,
+        "source_verified": _source_sha_checked,
         "split_sha256": split_sha256,
         "manifest_sha256": manifest_sha256,
         "partition": audit,
@@ -260,6 +265,7 @@ def preview_market(data_dir: Path) -> dict:
         audit["ood_window_groups"],
         split_sha256=audit["split_sha256"],
         manifest_sha256=audit["manifest_sha256"],
+        _source_sha_checked=True,
     )
 
 
