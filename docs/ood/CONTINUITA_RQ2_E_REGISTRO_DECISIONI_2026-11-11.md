@@ -224,3 +224,11 @@ Output riportato dall'utente dopo aggiornamento branch e riesecuzione del comand
 - Attenzione: versione/modello provider, budget API, runner autonomo create-only, policy test post-freeze e metrica qualità delle regole restano **non fissati**. Non avviare API o scoring e non modificare RQ1.
 
 **Passo immediato:** PyCharm `python -m unittest discover -s src/tests -p "test_rq2_dryrun_plan.py" -v`; attesi 15 test. Solo dopo preflight Colab GT-free del piano dry-run e revisione del protocollo prima di qualunque run.
+
+## 22. Test dry-run PyCharm: 14/15 superati, corretto falso positivo del controllo anti-GT (11 novembre 2026)
+
+L'utente ha fornito il log completo della suite `test_rq2_dryrun_plan.py`: `Ran 15 tests in 0.025s — FAILED (failures=1)`. Il **solo** test fallito era `test_no_label_mapping_or_scoring_leak_in_plan` (`term='ground_truth'`): il test cercava `ground_truth` nell'intera rappresentazione testuale del dizionario `plan()` e trovava la **chiave di audit lecita** `reads_ground_truth: False`. L'indicatore dichiara esplicitamente che il generatore non ha letto GT; **il log non evidenzia un mapping caso→etichetta né una perdita di ground truth**. Gli altri 14 test della suite erano superati.
+
+**Correzione mirata** al commit `9997d0adf38bc42260ca5db3f440126e42ebc1a4`, esclusivamente `src/tests/test_rq2_dryrun_plan.py`: sostituito il controllo testuale indiscriminato con verifica della flag `reads_ground_truth=False` e delle allowlist strutturali chiuse delle chiavi di `entries` e `partition`, con controllo dei marcatori GT nei valori testuali degli stage. Non cambia `src/evaluation/rq2_dryrun_plan.py`, non cambia la partizione V1, né uno scorer, un prompt, una run o il freeze RQ1.
+
+**Da rifare in PyCharm:** `git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10`; poi `PYTHONPATH=src python -m unittest discover -s src/tests -p "test_rq2_dryrun_plan.py" -v`. Attesi 15 test, da considerare PASS solo dopo nuovo output dell'utente. Il notebook Colab preflight resta bloccato fino alla verifica. Nessuna API autorizzata.
