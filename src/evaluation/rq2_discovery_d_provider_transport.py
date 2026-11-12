@@ -5,8 +5,9 @@ release SHA in rq2_ck_provider_transport.py is still None. This module does
 not import an SDK or make requests at import. No RQ1 file is changed.
 
 After an authentic source/freeze preflight and an exclusive persisted claim,
-the only runtime executor is the original run_experiment(config, salva=False)
-from RQ1. Any raised runner error or identity mismatch after claiming leaves
+the only runtime executor is original RQ1 run_experiment(config, llm=..., salva=False),
+with explicit RQ2-only provider transport injected through the runner's existing
+optional llm parameter. The RQ1 graph, tools and harness code are unchanged. Any raised runner error or identity mismatch after claiming leaves
 the claim unresolved for human *operations audit*, NOT an automatic retry.
 The human-in-the-loop *diagnosis* feature remains out of scope.
 
@@ -19,6 +20,7 @@ from pathlib import Path
 from evaluation.experiment_config import ExperimentConfig
 from evaluation.experiment_runner import run_experiment
 from evaluation.rq2_budget_preflight import CANDIDATE_MODELS
+from evaluation.rq2_model_factory import crea_modello_rq2
 from evaluation.rq2_ck_provider_transport import (
     RQ2LiveCKBlocked, _read_release,
 )
@@ -29,7 +31,7 @@ from evaluation.rq2_source_bound_d_preflight import (
     preview_discovery_d_config,
 )
 
-VERSION = "rq2_discovery_d_provider_transport_v0"
+VERSION = "rq2_discovery_d_provider_transport_v1_rq2_only_factory"
 
 
 class RQ2LiveDBlocked(RuntimeError):
@@ -131,7 +133,9 @@ def run_one_claimed_discovery_d(
 
     # DO NOT catch and rerun exceptions. If this raises, claim remains
     # CLAIM_WITHOUT_ARTIFACT and requires operational audit.
-    result = run_experiment(config, verbose=False, salva=False)
+    # RQ1 runner already accepts an optional model; no source change in RQ1.
+    llm = crea_modello_rq2(model["provider"], model["model_id"])
+    result = run_experiment(config, llm=llm, verbose=False, salva=False)
 
     # If the runner returns with unrecognized/malformed provenance, do NOT
     # create a fictitious result: retain unresolved claim for audit.
