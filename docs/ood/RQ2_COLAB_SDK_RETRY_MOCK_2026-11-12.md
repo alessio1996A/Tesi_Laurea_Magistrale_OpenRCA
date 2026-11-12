@@ -22,7 +22,7 @@ di Anthropic, Google e integrazioni LangChain. **Non è una chiamata a LLM**.
   prima della firma del release, eventualmente con wrapper RQ2-only.
 - Nessuna chiave real-world, nessun accesso a Market/GT/predizioni,
   nessun rilascio di stage o attività a pagamento. `RELEASE_SHA256=None`
-  resta invariato. **8 test sintetici PyCharm non ancora attestati.**
+  resta invariato. **8 test sintetici attestati in Colab dall'utente il 12 novembre 2026 (`Ran 8 tests in 0.003s — OK`); esito PyCharm specifico non comunicato.**
 
 ## Prima parte: PyCharm Windows
 
@@ -126,3 +126,29 @@ impliciti e timeout.
 Riferimenti upstream esatti: Google `python-genai/v2.34.0`
 `google/genai/_api_client.py`; Anthropic
 `anthropic-sdk-python/v2.6.0` `src/anthropic/_base_client.py`.
+
+
+## Esito Colab reale — 12 novembre 2026 (attestazione utente)
+
+- Git checkout `e32d572d32240d895ffac49b59834f49a2c2e3e2`.
+- `Ran 8 tests in 0.003s — OK`.
+- `status=SDK_LOCAL_MOCK_CHECKED_LANGCHAIN_NETWORK_POLICY_NOT_FROZEN`.
+- Google, tentativi in memoria: `default_no_options=1`,
+  `explicit_attempts_1=1`, `explicit_attempts_2=2`.
+- Anthropic, HTTP 503 sintetico con `httpx2.MockTransport` e
+  `max_retries=0`: **un solo** tentativo al mock.
+- Digest sorgenti provati: `source_snapshot_sha256=79d209cd7678b9ca036699cfa572579a20c2a62c4fd021042adf9d5b90f5ee98`.
+- `real_provider_requests=0`, credenziali reali non usate,
+  niente accesso GT/Market/predizioni né file scritti.
+- Test preliminare: `langchain_google_forwarding_verified=false`,
+  `langchain_anthropic_forwarding_verified=false`,
+  `google_async_streaming_retry_verified=false`,
+  `google_internal_aiohttp_implicit_retry_verified=false`,
+  `timeout_enforcement_under_network_stall_verified=false`.
+- `scientific_release_signed=false`; `can_execute_D/CK/test=false`.
+
+**Interpretazione vincolante:** questo risultato certifica soltanto il
+comportamento delle funzioni SDK provate con callback finti; non certifica
+`LangGraph → LangChain → SDK` o la reale policy RQ2. Non usare
+`default_no_options=1` come prova che Gemini `invoke` non ritenti.
+Non modificare factory RQ1 o firmare la release dopo questo solo risultato.
