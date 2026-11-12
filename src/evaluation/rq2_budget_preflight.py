@@ -21,7 +21,7 @@ IMPORTANT:
 """
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_UP
+from decimal import Decimal, ROUND_HALF_UP, ROUND_UP
 
 from agent.model_factory import ANTHROPIC_MODELS
 from evaluation.experiment_config import ExperimentConfig
@@ -67,7 +67,7 @@ def _token_count(token: object, label: str) -> int:
 
 
 def _usd(amount: Decimal) -> str:
-    return str(amount.quantize(SIX_DECIMALS))
+    return str(amount.quantize(SIX_DECIMALS, rounding=ROUND_HALF_UP))
 
 
 def _price(tokens: int, per_million: Decimal) -> Decimal:
