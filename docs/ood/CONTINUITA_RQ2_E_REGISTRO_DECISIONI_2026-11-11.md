@@ -837,8 +837,10 @@ solo oggetti locali e osserva:
 
 Il parametro `300s` è **solo per la prova**, non già una scelta
 scientifica. Nessuna inferenza, nessun Market/GT, nessun file persistente
-nel modulo, test OOD chiusi. **Il probe è preparato ma non ancora
-eseguito dall'utente in PyCharm/Colab**: non dichiarare output verde.
+nel modulo, test OOD chiusi. **Conferma dall'utente:** gli 8 test unitari PyCharm hanno restituito
+`Ran 8 tests in 0.005s — OK` il 12/11/2026. **La prova dinamica nel
+runtime Colab rimane da eseguire**: non attribuire esito verde al
+forwarding reale, né ai timeout/retry di rete.
 Sorgenti originali RQ1, `RELEASE_SHA256=None` e
 `PLAN_STATUS=DRAFT_NOT_EXECUTABLE` invariati.
 L'esito positivo del probe dimostrerebbe il forwarding locale, **non**
