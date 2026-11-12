@@ -19,6 +19,10 @@ import test_rq2_claim_recorder_end_to_end as fixtures
 import test_rq2_output_contracts as contract_fixtures
 import test_rq2_stage_binding as binding_fixtures
 from evaluation.rq2_budget_preflight import CANDIDATE_MODELS
+from evaluation.rq2_dryrun_plan import DISCOVERY, TEST, HARNESSES, MAX_TOOL_ROUNDS
+from evaluation.rq2_toolfree_fake_transport import (
+    PREFREEZE_C_SYSTEM_SHA256, PREFREEZE_K_SYSTEM_SHA256,
+)
 
 MODEL = fixtures.MODEL
 USAGE = {"input_tokens": 120, "output_tokens": 25, "total_tokens": 145}
@@ -82,6 +86,15 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
             },
             "C_K_tool_calls_allowed": False,
             "budget_limit_usd": None,
+            "D_output_contract_mode": "v2_enforce",
+            "D_variant_scheme": "current",
+            "D_max_tool_rounds": MAX_TOOL_ROUNDS,
+            "D_recursion_limit": 30,
+            "harnesses": list(HARNESSES),
+            "discovery_case_ids": list(DISCOVERY),
+            "test_case_ids": list(TEST),
+            "C_system_prompt_sha256": PREFREEZE_C_SYSTEM_SHA256,
+            "K_system_prompt_sha256": PREFREEZE_K_SYSTEM_SHA256,
             "plan_preview_sha256": parent.plan["preview_sha256"],
             "source_manifest_sha256": parent.plan["manifest_sha256"],
             "source_split_sha256": parent.plan["split_sha256"],
@@ -101,7 +114,12 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def d(self):
         self.parent.claim("D")
-        self.parent.d()
+        self.parent.recorder.record_d(
+            stage_id=self.parent.sid("D"), model_id_proposed=MODEL,
+            diagnostic_run=self.parent.diagnostic(
+                output_contract_mode="v2_enforce"
+            ),
+        )
         self.recorded_d = True
 
     def run(self, stage, model):
@@ -115,13 +133,22 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
         factory.assert_called_once_with("anthropic", MODEL)
         return result
 
-    def test_default_production_release_is_absent(self):
-        self.assertIsNone(
-            transport.RQ2LiveCKBlocked.__mro__[1]
-            if False else None
-        )
-        # Monkeypatch only in this unittest; real production constant
-        # remains None in the committed file.
+    def test_release_with_wrong_D_mode_is_refused_even_if_sha_matches(self):
+        self.d()
+        data = json.loads(self.release_path.read_text(encoding="utf-8"))
+        data["D_output_contract_mode"] = "legacy"
+        self.release_path.write_bytes(json.dumps(data).encode("utf-8"))
+        bad_hash = hashlib.sha256(self.release_path.read_bytes()).hexdigest()
+        with patch.object(transport, "RELEASE_SHA256", bad_hash):
+            with patch.object(transport, "crea_modello") as factory:
+                with self.assertRaisesRegex(
+                    transport.RQ2LiveCKBlocked, "mandatory safeguards"
+                ):
+                    transport.run_one_claimed_ck(
+                        data_dir=self.root, stage_id=self.parent.sid("C"),
+                        confirm_paid_api=True,
+                    )
+                factory.assert_not_called()
 
     def test_confirmation_required_before_source_or_provider(self):
         with patch.object(
