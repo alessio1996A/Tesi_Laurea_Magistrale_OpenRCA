@@ -536,3 +536,9 @@ Dopo **20/20 test del recorder RQ2 superati** (§48), sono stati verificati i mo
 Il professor-assenso riportato dall'utente (§50) elimina **qualsiasi tetto USD come vincolo di avvio**. Costi/token/attempt saranno comunque conservati nei log per rigore sperimentale; claim come prova anti-duplicazione, non controllo economico. Prima delle API resta la necessità di un **freeze scientifico e di un runner controllato**; non è necessaria una soglia monetaria predeterminata.
 
 **Prossimo comando PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_discovery_claim_journal.py" -v` dopo `git pull --ff-only`, attesi **20 test**. Non considerare questa suite superata prima dell'esito. RQ1 invariata; RQ2 ancora `DRAFT_NOT_EXECUTABLE`.
+
+## 52. Claim discovery create-only: suite 20/20 superata (12 novembre 2026)
+
+**Log reale ricevuto dall'utente:** `Ran 20 tests in 2.310s — OK` per `test_rq2_discovery_claim_journal.py`. Confermata la riuscita dei **20 test sintetici** del registro claim (no API): prenotazione esclusiva, blocco duplicati, persistenza delle incertezze dopo crash, riconciliazione con record successivo, dipendenze D/C/K, mismatch modelli, corruzione, sorgenti GT-free e blocco test. **Non sono state effettuate chiamate Gemini/Claude né run sui 15 incidenti RQ2.**
+
+La decisione del relatore riportata dall'utente in §50 rimane **budget economico non vincolante**, con rendicontazione token/costi solo per riproducibilità; i claim proteggono il protocollo, **non impongono un cap di spesa**. I claim non autorizzano il dispatch. **Prossima integrazione:** dry-run orchestrato che connetta claim, D/C/K e store con backend finto rigorosamente senza rete; parallela verifica dello stato di preregistrazione e del contratto D rispetto a RQ1. Un mock freeze NON è un freeze scientifico, e il test OOD resta chiuso.
