@@ -21,7 +21,7 @@ Quattro nomi **esatti**:
 **Scorer candidato:**
 `src/evaluation/rq2_fault_type_eval_policy.py`;
 test sintetici `src/tests/test_rq2_fault_type_eval_policy.py`
-(**16 preparati, non ancora eseguiti**).
+(**16/16 SUPERATI in PyCharm, 0.004s, output utente del 12/11/2026**).
 
 - La C ha una risposta libera `predicted_fault_type`, senza lista
   target in prompt. Scoring primario strettamente lessicale:
@@ -114,8 +114,9 @@ statistica forte.
 
 ## Confini e check da soddisfare prima della release
 
-- [ ] 16 unit test del valutatore lessicale su dati sintetici
-  superati e risultato registrato; nessun GT letto.
+- [x] 16 unit test del valutatore lessicale su dati sintetici
+  superati e risultato registrato: `Ran 16 tests in 0.004s — OK`;
+  nessun GT letto. **Il gate del test sintetico è chiuso**, non la firma scientifica.
 - [ ] Scelta finale della policy lessicale confermata e codice
   SHA congelato **prima di eseguire discovery/test OOD**.
 - [ ] Audit GT isolato già documentato, ma specifica partizione
