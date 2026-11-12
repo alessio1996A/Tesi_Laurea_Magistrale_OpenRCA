@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
 
 from agent.model_factory import (
@@ -90,9 +89,12 @@ def _read_source(src_root: Path, relative: str) -> bytes:
 
 def _check_frozen_blob(src_root: Path, relative: str, expected: str) -> str:
     body = _read_source(src_root, relative)
-    if git_blob_sha1(body) != expected:
+    # On Windows, Git may check out these Python sources with CRLF despite the
+    # repository Git blob being LF. Normalize ONLY for Git blob comparison.
+    normalized = body.replace(b"\r\n", b"\n")
+    if git_blob_sha1(normalized) != expected:
         raise ProtocolIdentityError("Frozen RQ1 source changed: " + relative)
-    return _sha256(body)
+    return _sha256(normalized)
 
 
 def preview_protocol_identity(*, src_root: Path | None = None) -> dict:
