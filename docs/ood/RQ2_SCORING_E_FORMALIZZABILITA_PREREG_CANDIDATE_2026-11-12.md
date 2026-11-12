@@ -1,7 +1,8 @@
 # RQ2 — Preregistrazione candidata scoring C e criterio K/RQ2-C
 
 **Data:** 12 novembre 2026. **Stato:** CANDIDATE, non firmata né
-usata per scoring reale; nessuna inferenza OOD eseguita.
+usata per scoring reale; nessuna inferenza OOD eseguita. **16/16 test
+sintetici del valutatore SUPERATI in PyCharm** (`Ran 16 tests in 0.004s — OK`), attestati dall'utente.
 
 L'oggetto di questo documento è **chiudere le scelte ex ante** prima
 di osservare le risposte C/K dei 4 discovery e prima di sbloccare gli
