@@ -1,6 +1,6 @@
 # RQ2 — Audit della presenza KPI nelle finestre development
 
-**12 novembre 2026** — **Codice e notebook predisposti, test PyCharm ancora da eseguire, Colab non ancora eseguito**. Nessuna API o scrittura sperimentale.
+**12 novembre 2026** — **Codice e notebook predisposti; 16/16 test PyCharm superati, Colab non ancora eseguito**. Nessuna API o scrittura sperimentale.
 
 ## 1. Motivazione
 
@@ -33,7 +33,7 @@ L'analisi **non** verifica disponibilità sulle 15 query OOD; non deve usarle pe
 ## 4. Nuovi file e ordine di esecuzione
 
 - `src/evaluation/rq2_development_kpi_audit.py` — modulo read-only e API-free, con CLI `--data-dir`. In esecuzione reale la verifica degli hash è obbligatoria; lo switch `_synthetic_test_fixture` è solo interno ai test e imposta `source_verified=false`.
-- `src/tests/test_rq2_development_kpi_audit.py` — **17 test sintetici predisposti, non ancora eseguiti**, incluso filtro delle righe OOD dallo scoring, unione finestre, conteggi non numerici, membri ZIP consentiti, file assenti/duplicati, tampering di split/manifest e filtro dei dati in output.
+- `src/tests/test_rq2_development_kpi_audit.py` — **16 test sintetici effettivi, superati in PyCharm dall'utente (Ran 16 tests in 0.503s — OK)**, incluso filtro delle righe OOD dallo scoring, unione finestre, conteggi non numerici, membri ZIP consentiti, file assenti/duplicati, tampering di split/manifest e filtro dei dati in output.
 - `notebooks/Colab_RQ2_Development_KPI_Presence_Audit_2026_11_12.ipynb` — notebook a **una sola cella Python** che monta Drive, ripristina branch e invoca l'audit. **Eseguire solo dopo suite PyCharm verde.** Non scrive alcun output file né chiama modelli.
 
 Comando PyCharm (PowerShell, root repository):
@@ -45,4 +45,4 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s src/tests -p "test_rq2_development_kpi_audit.py" -v
 ```
 
-**Attesi 17 test, non ancora confermati**. Dopo l'esito si potrà eseguire il notebook in Colab e discutere disponibilità numerica e segnali non presenti nel source-only catalog. Il runner D/C/K mock e la persistenza create-only rimangono i blocchi implementativi successivi; nessuna API senza freeze e autorizzazione.
+**Verificati: 16 test, Ran 16 tests in 0.503s — OK**. Dopo l'esito si potrà eseguire il notebook in Colab e discutere disponibilità numerica e segnali non presenti nel source-only catalog. Il runner D/C/K mock e la persistenza create-only rimangono i blocchi implementativi successivi; nessuna API senza freeze e autorizzazione.
