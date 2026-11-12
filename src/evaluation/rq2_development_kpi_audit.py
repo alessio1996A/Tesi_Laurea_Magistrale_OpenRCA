@@ -2,8 +2,10 @@
 
 Reads a SHA-verified split and GT-free instruction manifest, then *only*
 metric_node.csv / metric_container.csv archive members for development
-windows. Never reads record.csv, query.csv, scorer, target labels, OOD
-telemetry, prediction files, or model responses. Doesn't modify any file.
+windows. Daily CSV members can PHYSICALLY contain rows of other splits;
+we must stream those bytes to filter them but NEVER include their rows
+in metrics/statistics or output. No record.csv, query.csv, scorer, target
+labels, prediction files, model responses, or file writes are allowed.
 
 Audits a UNION of official development time windows: rows overlapping more
 than one development window are counted ONCE (not as independent replicates).
@@ -247,11 +249,14 @@ def audit_development_kpis(
             0, len(unknown) - MAX_UNKNOWN_NAMES_IN_REPORT
         ),
         "by_layer": by_layer,
-        "accessed_only_development_telemetry": True,
+        "statistics_only_development_windows": True,
+        "full_daily_metric_csv_members_streamed": True,
+        "non_development_rows_filtered_before_aggregation": True,
+        "possible_non_development_rows_decoded_from_shared_csv": True,
         "read_ground_truth": False,
         "read_record_csv": False,
         "read_scoring": False,
-        "read_ood_telemetry": False,
+        "read_ood_telemetry_for_analysis": False,
         "read_model_predictions": False,
         "model_api_calls": 0,
         "files_written": False,
@@ -261,7 +266,7 @@ def audit_development_kpis(
             "Numeric KPI presence in development does not prove presence in OOD.",
             "Rows in overlapping development windows are counted once.",
             "Presence in Market does not verify unit, counter/rate semantics, or cause.",
-            "This audit never reads tool-output logs, model predictions or held-out cases.",
+            "Full daily CSV members may contain other-split rows: these are decoded but filtered before any aggregation.",
             "Development-only KPI names must not be used to infer OOD target labels.",
         ],
     }
