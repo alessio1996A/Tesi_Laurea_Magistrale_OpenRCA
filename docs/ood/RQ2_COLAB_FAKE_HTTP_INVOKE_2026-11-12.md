@@ -67,7 +67,7 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_rq2_langchain_fake_http_invoke.py" -v
 ```
 
-Sono predisposti **8 test nuovi**, non ancora attestati dall'utente.
+**Esito PyCharm effettivamente attestato dall'utente (12 novembre 2026, dopo fix del fake messages):** `Ran 8 tests in 0.009s — OK`. La prova con SDK reale e HTTP finto in Colab **non è ancora stata eseguita**.
 Se falliscono, non passare alla fase Colab.
 
 ## Fase B: Colab (unica cella, sessione esistente)
