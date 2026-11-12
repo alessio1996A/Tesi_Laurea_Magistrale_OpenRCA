@@ -1,6 +1,6 @@
 # RQ2 — Pacchetto di revisione scientifica prima del release discovery
 
-**Data 12/11/2026 · STATO: CANDIDATE_FOR_REVIEW, NON APPROVATO, NON ESEGUIBILE**
+**Data 12/11/2026 · STATO: CRITERI_SCIENTIFICI_APPROVATI_DALL_UTENTE, RELEASE_NON_FIRMATO, NON ESEGUIBILE**
 
 **Scopo:** chiudere le decisioni scientifiche già discusse, senza aprire nuovi
 casi OOD, alterare RQ1 o autorizzare chiamate ai provider. Questo file **non**
@@ -254,3 +254,43 @@ D discovery. Rimangono obbligatori `RELEASE_SHA256=None`,
 `PLAN_STATUS="DRAFT_NOT_EXECUTABLE"` e `test_unlocked=false`;
 nessun OOD test, nessuna API e nessun test tecnico già superato viene
 sbloccato o ripetuto da questo addendum.
+
+---
+
+## Approvazione esplicita dei criteri e priorità Gemini (12/11/2026)
+
+**Evidenza decisionale:** in chat, dopo la revisione dei criteri documentati,
+l'utente ha risposto: *«ok approvo, e inizierei con gemini»*. Questa è
+l'**approvazione scientifica ex ante** di partizione, metrica primaria
+`correct/11` con errori nel denominatore, alias lessicali stretti,
+confronti appaiati, criteri K conservativi, separazione RQ2-A/B/C,
+limiti della baseline rule-based, arm dimostrativo RQ2-C
+`A1_8R + claude-sonnet-5-5` e policy di trasporto RQ2-only
+sincrona con timeout per richiesta candidato di 300s. Conferma inoltre
+la volontà di **iniziare la discovery con Gemini**.
+
+**Ordine proposto per la prima D discovery:** come prima voce del
+preview già ordinato da `rq2_dryrun_plan.make_workflow_preview`,
+`cloudbed-1_q032` / `A1` / `gemini-3.5-flash-lite` / stage `D`.
+Questo è soltanto un **candidato operativo predefinito** per il
+futuro consenso singolo; non è una chiamata autorizzata. La scelta
+Gemini per prima non modifica il contrasto dimostrativo RQ2-C
+con Sonnet deciso ex ante, né i 24 candidati K previsti.
+
+**Distinguere i livelli di approvazione:**
+- Criteri scientifici e limiti inferenziali: **APPROVATI dall'utente**.
+- Impronte runtime, commit finale e hash del release: **PENDENTI**
+  fino al preflight unico su checkout Colab definitivo e readback.
+- Release create-only `RQ2_SCIENTIFIC_DISCOVERY_RELEASE_V1.json`:
+  **NON CREATO / NON FIRMATO** da questa approvazione.
+- Sblocco live: **VIETATO** finché `RELEASE_SHA256=None`
+  e `PLAN_STATUS="DRAFT_NOT_EXECUTABLE"`.
+- Accesso ai test OOD: **VIETATO** fino al successivo freeze
+  indipendente delle K, con `test_unlocked=false`.
+- API reali: **NESSUNA autorizzazione specifica** a uno stage
+  D è stata ancora rilasciata; occorre chiedere caso/harness/modello
+  espliciti dopo la conclusione dei gate prerelease.
+
+Non riaprire RQ1, non reiterare le quattro suite PyCharm già verdi,
+non equiparare fake HTTP a inferenza reale, e non presentare questo
+documento come firma crittografica della release.
