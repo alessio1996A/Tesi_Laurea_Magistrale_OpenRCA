@@ -92,18 +92,23 @@ class RQ2DiscoveryDActualRunnerAdapterOfflineTests(unittest.TestCase):
         if result is None:
             result = self.synthetic_result()
         seen = []
-        def original_runner(config, *, verbose, salva):
+        fake_llm = object()
+        def original_runner(config, *, llm, verbose, salva):
+            self.assertIs(llm, fake_llm)
             seen.append((config, verbose, salva,
                          self.p.parent.journal._read_claim(self.sid) is not None))
             if exc is not None:
                 raise exc
             return result
-        with patch.object(subject, "run_experiment",
-                          side_effect=original_runner):
-            return subject.run_one_claimed_discovery_d(
-                data_dir=self.root, repo_dir=self.root,
-                stage_id=self.sid, confirm_paid_api=True,
-            ), seen
+        with patch.object(subject, "crea_modello_rq2", return_value=fake_llm) as factory:
+            with patch.object(subject, "run_experiment",
+                              side_effect=original_runner):
+                receipt = subject.run_one_claimed_discovery_d(
+                    data_dir=self.root, repo_dir=self.root,
+                    stage_id=self.sid, confirm_paid_api=True,
+                )
+            factory.assert_called_once_with("anthropic", "claude-sonnet-5-5")
+        return receipt, seen
 
     def test_live_path_reuses_frozen_RQ1_config_and_writes_one_d_artifact(self):
         receipt, calls = self.run_fake()
@@ -124,6 +129,10 @@ class RQ2DiscoveryDActualRunnerAdapterOfflineTests(unittest.TestCase):
         self.assertFalse(receipt["can_execute_test"])
         self.assertFalse(receipt["automatic_retry"])
         self.assertIsNone(receipt["financial_cost_ceiling"])
+        self.assertEqual(
+            receipt["transport_version"],
+            "rq2_discovery_d_provider_transport_v1_rq2_only_factory",
+        )
         stored = self.p.parent.recorder.store.load_discovery_stage(
             stage_id=self.sid
         )
