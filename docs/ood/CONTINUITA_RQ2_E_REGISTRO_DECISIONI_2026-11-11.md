@@ -677,3 +677,9 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s src/tests -p "test_rq2_ck_provider_transport.py" -v
 ```
 **Attesi 15 test, esito NON ancora confermato.** Se la suite manifesta errori ulteriori, analizzarli dai singoli traceback prima di qualunque altro refactoring. `RELEASE_SHA256=None` resta il blocco di produzione delle API; nel test si usa solo release temporanea con hash patchato e SDK fake. Budget senza massimale USD, test OOD bloccati fino a freeze scientifico.
+
+## 64. Adapter reale C/K con SDK mock: 15/15 test verdi (12 novembre 2026)
+
+**Log PyCharm dell'utente:** `Ran 15 tests in 5.476s — OK` per `src/tests/test_rq2_ck_provider_transport.py`, dopo la correzione del nome `TestCase.run()` registrata nel §63. Sono quindi **15/15 test della nuova interfaccia C/K superati**: release mock temporaneo e hash monkeypatchati SOLO nei test, factory `crea_modello` sostituita con SDK in memoria, un'unica chiamata, claim prima del modello, registra usage e stato error/JSON nei record create-only, blocca doppie chiamate e test. Nessuna inferenza RQ2 reale, nessun provider remoto coinvolto; nella produzione `RELEASE_SHA256=None` mantiene le API bloccate.
+
+**Prossima attività prioritaria:** completare il punto D con il vero `run_experiment(config,salva=False)` sullo schema RQ2 discovery, claim prima della chiamata, identità source-bound, parità `v2_enforce` RQ1, file di risultato create-only e un pilot senza tetto finanziario (dopo freeze scientifico). Non modificare `experiment_runner.py` o `model_factory.py` RQ1. Evitare proliferazione di mock e refactoring; l'obiettivo è chiudere le barriere tecniche necessarie al primo pilot reale, con gli 11 test ancora isolati.
