@@ -709,3 +709,9 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s src/tests -p "test_rq2_discovery_d_provider_transport.py" -v
 ```
 Attesi **12 test**. Se emergono errori diversi dopo il setup, diagnosticare gli specifici traceback (ora il test può raggiungere il codice D). In produzione resta `RELEASE_SHA256=None`, gli 11 test OOD rimangono chiusi, nessun provider chiamato, budget monetario non vincolato.
+
+## 67. Driver D sul runner storico: 12/12 verifiche superate (12 novembre 2026)
+
+**Log PyCharm reale dell'utente:** `Ran 12 tests in 1.011s — OK` per `src/tests/test_rq2_discovery_d_provider_transport.py` dopo il fix ai quattro riferimenti della fixture annidata (§66). Sono **12/12 test sintetici riusciti**, con release/CSV fake soltanto nei test e `run_experiment` monkeypatchato: verifica configurazione D `v2_enforce/current/6 round/recursion 30`, sorgenti e claim, scrittura create-only di risultato/metriche, blocco doppie esecuzioni, runner error e output `legacy` non falsamente accettati, fase test rifiutata. La suite 13/13 precedente sul **vero** grafo RQ1 con LLM finto resta separata. **Nessuna API Gemini/Claude RQ2 è stata chiamata** e nessun caso OOD reale è stato analizzato da questi test.
+
+**Milestone:** i tre ingressi tecnici D/C/K e la persistenza sono ora stati verificati in isolamento. È necessario **interrompere lo sviluppo di simulazioni aggiuntive non essenziali** e passare alla preregistrazione scientifica della discovery e al preflight GT-free reale (senza Market/scoring/provider), mantenendo `RELEASE_SHA256=None` fino a freeze deliberato, documentato, firmato e verificato; non usare mock release come release scientifico. La discovery 4 casi × 2 harness × 3 modelli = 24 D +24 C +24 K = **72 stage**; l'intera RQ2 resta 204 stage previsti (test 66 D +66 C). Il pilot reale va eseguito solo **dopo** freeze, e la sua evidenza va conservata senza tuning a posteriori; gli 11 casi test non si aprono prima del freeze dei K.
