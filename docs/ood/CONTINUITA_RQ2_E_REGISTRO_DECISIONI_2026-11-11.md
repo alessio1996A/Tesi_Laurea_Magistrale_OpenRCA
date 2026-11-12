@@ -562,3 +562,11 @@ Documentazione: `docs/ood/RQ2_REHEARSAL_CLAIM_RECORDER_E_DECISIONI_PRE_FREEZE_20
 **Prossima verifica:** `python -m unittest discover -s src/tests -p "test_rq2_fake_discovery_driver.py" -v` dopo pull, attesi **16**, esito non ancora confermato.
 
 **Decisioni prima di API:** mantieni i 204 stage logici (90 D + 90 C + 24 K) e 3 modelli/2 harness, budget senza tetto USD, costi/token annotati; congelare modalità D, ID/parametri C/K, hash prompt, protocollo e criterio freeze pseudoregole. Test e RQ1 rimangono sigillati. Il fake driver **non esercita ancora il grafo reale**, ma riduce il rischio nel codice di orchestrazione. Non confondere i suoi record con risultati scientifici.
+
+## 55. Coordinatore fake-only discovery: 16/16 test superati (12 novembre 2026)
+
+**Log effettivo comunicato dall'utente:** `Ran 16 tests in 8.230s — OK` per `src/tests/test_rq2_fake_discovery_driver.py`. Tutti e **16 i test sintetici** del coordinatore `RQ2FakeDiscoveryDriver` sono verdi. La prova include prenotazione prima della risposta finta, sequenza D→C→K, errori D/C e blocchi successivi, rifiuto di duplicati dopo riavvio, claim senza risposta dopo crash, astensione valida e isolamento da `Market.zip` / client provider. **Non sono run reali, nessuna API Gemini/Claude, nessuna lettura di telemetria OOD e nessuna modifica RQ1.**
+
+**Passo successivo:** eseguire preflight **source-only** delle identità precise dei modelli, modalità e parità del contratto D rispetto alla campagna RQ1, hash dei prompt C/K, moduli di runtime e scorer. Prima di scegliere `legacy` o `v2_enforce` sulla sola memoria, rintracciare l'opzione effettivamente usata nelle run RQ1 cross-model congelate; se i manifest disponibili non lo attestano, segnare `RQ1_OUTPUT_CONTRACT_PARITY_UNVERIFIED`, senza inferire o sostituire con un valore ipotetico. Questa verifica non deve toccare le 11 query test né sbloccare provider.
+
+**Budget:** l'indicazione del relatore riferita dall'utente (nessun cap USD) resta valida e non è un ostacolo alla preparazione di run, ma non sostituisce il freeze metodologico né autorizza retry involontari. Tracciare token e costi solo come evidenza.
