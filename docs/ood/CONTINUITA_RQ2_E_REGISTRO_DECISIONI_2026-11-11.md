@@ -482,3 +482,9 @@ A seguito della conferma utente `Ran 16 tests in 0.524s — OK` per il preflight
 - `docs/ood/RQ2_PERSISTENZA_STAGE_CREATE_ONLY_V0_2026-11-12.md` (commit `87dcc4179f5d3a34e7bcb815efe50d858af8505b`): dettaglio tecnico, limiti e test.
 
 **Comando PyCharm:** dopo `git pull --ff-only`, eseguire `python -m unittest discover -s src/tests -p "test_rq2_stage_artifact_store.py" -v`; **attesi 23 test, non ancora confermati**. È **persistenza vera su file** per contenuti caller-supplied, **non** un runner reale dei tre provider: mancano claim, retry, budget API, output mode/ID modello freeze e gate scientifico prima del test. RQ1 congelata invariata.
+
+## 46. Store artefatti RQ2 create-only: 23/23 test superati (12 novembre 2026)
+
+**Output effettivo comunicato dall'utente:** `Ran 23 tests in 1.617s — OK` per `src/tests/test_rq2_stage_artifact_store.py`. La suite sintetica del **nuovo archivio isolato RQ2** è tutta verde: creazione esclusiva di file, controllo digest, identità stage/plan, ripresa e blocco file corrotti/incompleti, propagazione errori D→C→K, blocco fase test, controllo GT solo a livello schema e sorgenti GT-free. Questi 23 test NON eseguono run dell'agente e NON validano API provider o freeze scientifico. Nessuna esecuzione sperimentale RQ2 reale è stata autorizzata.
+
+**Prossimo obiettivo:** collegare questo archivio ai componenti di preparazione D/C/K e al runner storico **in una orchestrazione iniettabile con provider fittizi**, mantenendo un perimetro hard-blocked prima del freeze. Non creare un nuovo motore RCA e non modificare i dati RQ1 congelati. Prima di una campagna API restano da definire modello versione esatta, parametri, protocollo, budget, gestione riavvii e vero congelamento delle regole K.
