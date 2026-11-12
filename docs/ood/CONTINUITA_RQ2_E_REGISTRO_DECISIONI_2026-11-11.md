@@ -397,3 +397,21 @@ A seguito di **19/19 test del preflight K source-only superati** in PyCharm (§3
 **Prossimo passo ora autorizzato per sola lettura, senza API:** esecuzione di `notebooks/Colab_RQ2_Development_KPI_Presence_Audit_2026_11_12.ipynb` (una cella). Il notebook monta Drive, verifica i due CSV GT-free congelati, analizza i dati numerici nelle sole finestre `development`, stampa riepilogo aggregato e non scrive file né chiama modelli. **Precisazione I/O:** il parsing dei CSV giornalieri può decodificare righe di altri split, che però sono escluse dalle aggregazioni; non dichiarare una separazione fisica di lettura per byte. `source_verified=true` riguarda solo i due CSV GT-free, non l'hash completo del Market.zip.
 
 In attesa dell'output reale Colab, **non dichiarare verifica della presenza dei KPI nel Market effettivamente completata**. Il piano RQ2 rimane `DRAFT_NOT_EXECUTABLE`; non avviare inferenze.
+
+## 39. Audit Colab reale KPI development: 29/29 KPI source-only presenti; 123 nomi in totale (12 novembre 2026)
+
+**Output Colab completo fornito dall'utente**, notebook `notebooks/Colab_RQ2_Development_KPI_Presence_Audit_2026_11_12.ipynb` sul commit `773f86d21c2e1d44473e4d077746d2d36733e50d`. Stato osservato: `rq2_development_kpi_presence_audit_v0`, `DEVELOPMENT_ONLY_GT_FREE_NUMERIC_PRESENCE`, `source_verified=true`; hash split `c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724`, manifest `5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13`, catalogo `81958222ebe027c6f205e9b6d8fc6c562b386eba20a05436b35522dfd92cf2eb`.
+
+**Risultati reali aggregati (non sintetici):**
+- `development_cases=92`, `metrics_archive_members_read=8`;
+- `rows_in_union_of_development_windows=6,722,921` e `valid_numeric_rows=6,722,921`, quindi **tutte le righe incluse nell'unione delle finestre development hanno valori numerici validi** in questi file node/container;
+- `observed_distinct_metrics=numeric_distinct_metrics=123`; **29/29 KPI già censiti nel codice RQ1 presenti con valori numerici** (21 node e 8 container);
+- **94 KPI aggiuntivi** non censiti nel catalogo source-only (38 node, 56 container); il report stampa i primi 60 nomi, **34 omessi**: il campione di nomi non è un catalogo completo dei 94;
+- righe numeriche nelle finestre development: **785,445 node** + **5,937,476 container** = 6,722,921.
+- I conteggi derivano dall'unione delle finestre: le righe in finestre development sovrapposte non sono duplicate.
+
+**Protezioni dichiarate dall'output:** `statistics_only_development_windows=true`, `non_development_rows_filtered_before_aggregation=true`, `possible_non_development_rows_decoded_from_shared_csv=true`, `read_ground_truth=false`, `read_record_csv=false`, `read_scoring=false`, `read_ood_telemetry_for_analysis=false`, `read_model_predictions=false`, `model_api_calls=0`, `files_written=false`, `can_execute_rule=false`. I **membri CSV giornalieri condivisi sono fisicamente letti e possono contenere righe di altri split**, escluse dai conteggi. I due CSV GT-free hanno hash verificati, ma `market_archive_sha256_checked=false` (**non** è una verifica crittografica di tutta Market.zip).
+
+**Interpretazione:** positiva la **fattibilità osservazionale** delle metriche nel development, ma **non** prova che ogni KPI compaia in ogni singolo caso, che sia presente nelle finestre OOD, che sia coerente fra cloudbed, né certifica unità fisica, tipo counter/rate, aggregazione idonea o effetto causale. Le 94 metriche extra sono osservate nel development e non sono prevalidati 94 nuovi detector; non progettare regole per le classi riservate basandosi su nomi di KPI senza discovery. Non leggere i casi OOD test per validare la disponibilità dei segnali prima del freeze.
+
+**Conseguenza:** si può continuare con un catalogo operativo di **presenza numerica nello sviluppo**, ma separato dal livello di semantica fisica. Prossima integrazione: orchestrazione **mock-only** del percorso D→C→K sul piano non eseguibile con controlli di provenienza e create-only, nessuna API finché mancano protocollo e budget congelati. RQ1 invariata.
