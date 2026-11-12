@@ -4,6 +4,32 @@
 Questa prova chiude il solo dubbio sul numero di richieste HTTP *sincrone*
 nel percorso LangChain → SDK quando il server restituisce 503.
 
+## Ripristino dopo reset runtime Colab (esito riportato dall'utente)
+
+La prima cella Colab ha generato
+`AssertionError: Repository RQ2 assente: ripristinare prima Colab`,
+alla riga `assert (REPO / ".git").is_dir()`.
+**Non è un test SDK fallito**: il codice si è fermato prima dei
+subprocess, della factory o di qualsiasi richiesta. Un runtime Colab
+appena riavviato perde le directory temporanee `/content/...`.
+
+**Soluzione documentata:** usare la cella autosufficiente riportata
+nella conversazione del 12 novembre 2026, oppure ricostruire prima
+l'ambiente dalla cella pinned in
+`RQ2_COLAB_PREFREEZE_REALE_SOLO_LETTURA_2026-11-12.md`,
+senza richiedere di rieseguire preflight GT-free o aprire Market.
+La cella recupera *solo codice* dal branch RQ2 e, se mancano, installa
+le medesime dipendenze pinned in
+`/content/rq2_prefreeze_packages_py313`; poi esegue gli 8 unit test
+e il probe HTTP 503 in memoria. Usa `GIT_TERMINAL_PROMPT=0`, così un
+eventuale repository privato non apre prompt interattivi né chiede di
+incollare token nella chat. Il test rimane bloccato dalle verifiche
+di sorgente, SHA/versioni e firma scientifica non presente.
+
+**Stato:** ripristino non ancora eseguito dall'utente; nessun esito
+Colab fake HTTP disponibile. `RELEASE_SHA256=None`,
+`PLAN_STATUS=DRAFT_NOT_EXECUTABLE`.
+
 ## Scopo e limiti
 
 - Usa esattamente le sei versioni già verificate in Colab, con SHA-256
