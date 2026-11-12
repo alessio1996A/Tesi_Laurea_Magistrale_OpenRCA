@@ -5,6 +5,8 @@ nel commit b1d3aa4f67e9ce3c63cf5bc76c40ac9b7953b33e.
 SHA-256 esatto del JSON, gia riletto da GitHub:
 a35c02f830a3c5f97424e0cbf8653eda6cfa674b9c8c34d95d04627e1dba8c52.
 
+**Correzione 12/11 dopo riavvio Colab:** la versione precedente si arrestava alla riga `Restore RQ2 checkout/deps first` perché il runtime non conservava una o entrambe le directory temporanee in `/content`. Nessun dato Drive o release è stato alterato da quell'errore. La nuova cella effettua clone e installazione dei pacchetti pinned **solo quando mancano**, verifica il runtime Python 3.13.18, non sovrascrive directory locali ambigue e poi esegue gli stessi controlli offline del release.
+
 Questa procedura NON esegue chiamate ai provider, NON crea claim,
 NON modifica RQ1, NON ripete le suite PyCharm e NON sblocca gli 11 casi OOD.
 Lo stage iniziale Gemini resta non autorizzato. Il pin sorgente e ancora None.
@@ -14,7 +16,7 @@ Lo stage iniziale Gemini resta non autorizzato. Il pin sorgente e ancora None.
 Aggiornare il branch dopo aver verificato che git status --short
 sia pulito. Non ripetere i 53 test gia superati.
 
-## Una cella Colab offline per installazione e readback
+## Una cella Colab autosufficiente: ripristino temporaneo, installazione e readback
 
 ~~~
 from pathlib import Path
@@ -38,7 +40,68 @@ def digest(path):
             h.update(chunk)
     return h.hexdigest()
 
-assert (REPO / ".git").is_dir() and DEPS.is_dir(), "Restore RQ2 checkout/deps first"
+# Ripristino automatico e fail-closed delle sole risorse TEMPORANEE /content.
+# Non tocca dati sperimentali né release sul Drive.
+print("=== [1/4] CHECKOUT RQ2 ===", flush=True)
+assert not REPO.is_symlink(), "Il path del checkout RQ2 è un symlink: STOP"
+if not REPO.exists():
+    subprocess.run(
+        ["git", "clone", "--depth", "1", "--single-branch",
+         "--branch", BRANCH, URL, str(REPO)],
+        env=dict(os.environ, GIT_TERMINAL_PROMPT="0"),
+        check=True,
+    )
+    print("REPO: CLONED", flush=True)
+elif not (REPO / ".git").is_dir():
+    raise RuntimeError(
+        "La cartella RQ2 esiste ma NON contiene .git: verifica manuale, NON cancellare"
+    )
+else:
+    print("REPO: EXISTING", flush=True)
+
+print("=== [2/4] DIPENDENZE PINNED ===", flush=True)
+assert sys.version.split()[0] == "3.13.18", (
+    "Versione Python Colab diversa dal runtime preregistrato: STOP"
+)
+PINS = [
+    "langchain==1.4.7",
+    "langchain-core==1.7.1",
+    "langgraph==1.2.18",
+    "langchain-google-genai==4.4.2",
+    "langchain-anthropic==1.7.7",
+    "google-genai==2.34.0",
+    "anthropic==2.6.0",
+    "google-auth==2.56.0",
+    "pandas", "networkx", "python-dotenv",
+]
+signature = hashlib.sha256(
+    ("\n".join(PINS) + "\n" + sys.version).encode("utf-8")
+).hexdigest()
+marker = DEPS / ".rq2_packages_ready"
+assert not DEPS.is_symlink(), "Il path delle dipendenze è un symlink: STOP"
+if not DEPS.exists():
+    DEPS.mkdir(parents=True)
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install",
+         "--disable-pip-version-check",
+         "--upgrade", "--target", str(DEPS), *PINS],
+        check=True,
+    )
+    marker.write_text(signature + "\n", encoding="utf-8")
+    print("DEPS: INSTALLED", flush=True)
+elif (not DEPS.is_dir() or not marker.is_file()
+      or marker.is_symlink() or marker.read_text().strip() != signature):
+    raise RuntimeError(
+        "Target dipendenze esistente ma incompleto/diverso: STOP, audit manuale"
+    )
+else:
+    print("DEPS: REUSED", flush=True)
+print("PYTHON_RUNTIME:", sys.version.split()[0], flush=True)
+
+print("=== [3/4] VERIFICA SORGENTI E RELASE ===", flush=True)
+assert (REPO / ".git").is_dir() and DEPS.is_dir(), (
+    "Ripristino checkout/dipendenze non completato"
+)
 assert not subprocess.check_output(
     ["git", "-C", str(REPO), "status", "--porcelain"], text=True
 ).strip(), "Dirty Git worktree: STOP"
