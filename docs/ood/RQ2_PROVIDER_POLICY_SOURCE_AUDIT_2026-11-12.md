@@ -1,6 +1,6 @@
 # RQ2 — Audit in sola lettura della configurazione provider (12 novembre 2026)
 
-**Stato:** 7/7 test nuovi **superati in PyCharm** (output dell'utente il 12 novembre 2026, `Ran 7 tests in 0.102s — OK`). Audit Windows raccolto; manca ancora quello sul runtime Colab effettivo. RQ1 congelata non modificata; niente release, niente API, niente test OOD.
+**Stato:** 7/7 test nuovi **superati in PyCharm** (`0.102s`) **e in Colab** (`0.026s`), entrambi attestati dall'utente il 12 novembre 2026. Runtime Colab completo con sei versioni coincidenti e SHA dei quattro sorgenti provider acquisiti. RQ1 congelata non modificata; niente release, niente API, niente test OOD.
 
 ## Motivazione e problema aperto
 
@@ -111,3 +111,33 @@ con le dipendenze già isolate, usando la cella in
 `RQ2_COLAB_SDK_POLICY_SOURCE_AUDIT_2026-11-12.md`.
 Prima di qualunque release servono audit del trasporto su SDK versionati
 con finti client HTTP, policy di timeout/retry documentata, e gate scientifici.
+
+## Evidenza reale Colab — audit SHA SDK (12/11/2026)
+
+**Commit eseguito dall'utente:** `9c7b31f5dbcaa018dd52bad473f675dcda71d64a`.
+**Test:** `Ran 7 tests in 0.026s — OK`.
+
+- Python **3.13.18**; `matches_previous_colab_versions=true`.
+- `langchain-core=1.7.1`; `langgraph=1.2.18`;
+  `langchain-google-genai=4.4.2`; `google-genai=2.34.0`;
+  `langchain-anthropic=1.7.7`; `anthropic=2.6.0`.
+- SHA `langchain_google_genai/chat_models.py`:
+  `589106719f2038805a27ddd0c44c23d5e4a4486ea0d7116b38a83d37722ac27f`.
+- SHA `google/genai/_api_client.py`:
+  `b179b80a126a35c98b98aeefa701950304c38c8a1e117136a2270a0901fd93e4`.
+- SHA `langchain_anthropic/chat_models.py`:
+  `c55a0cb8fed75b3d310dbddf03a455f95c3c1d47aab650317bf3c9e4bab62544`.
+- SHA `anthropic/_base_client.py`:
+  `a42ef507300287261fe0b215023672a97f8a9b01216a135d614bbede72fff680`.
+- Factory RQ1 blob `05308d5740763db0444556dcb7330d8fb4c308ec`.
+- `api_calls_executed=0`; `read_ground_truth=false`;
+  `read_market=false`; `read_predictions=false`; `files_written=false`.
+- `effective_google_sdk_retry_timeout_verified=false`,
+  `effective_anthropic_sdk_retry_timeout_verified=false`;
+  D/C/K/test sempre bloccati, release non firmato.
+
+**Decisione:** identificità *di versioni e file sorgente* confermata nel
+runtime Colab. Non confondere questo con prove di retry/timeout effettivi.
+Prossimo test separato: `rq2_sdk_retry_mock_probe.py`, solo trasporti
+finti e callback Python in memoria, con verifica fail-closed dei quattro SHA.
+Il comportamento di LangChain e i timeout di rete rimangono altri gate.
