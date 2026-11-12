@@ -802,3 +802,50 @@ Poi implementare, se necessario, un wrapper **RQ2-only** con retry
 e timeout motivati e un singolo test end-to-end di trasporto interamente
 finto, senza modificare factory RQ1; restano anche da chiudere alias,
 formalizzabilità K, SHA commit definitivo e firma del release.
+
+
+## 75. Trace LangChain→SDK SHA-pinned superata; preparato probe locale parametri (12 novembre 2026)
+
+**Output utente della cella Colab del commit**
+`8cc62f6f7c7c39f26258a44808ad228aa5113704`:
+`EXACT_SOURCE_BRIDGE_INSPECTED_FOR_REVIEW_NOT_SDK_HTTP_CERTIFIED`,
+`RQ2 SOURCE TRACE: CONTROLLI SUPERATI`. Quattro SHA dei sorgenti
+`langchain-google-genai`, `langchain-anthropic`, `google-genai`,
+`anthropic` corrispondono allo snapshot Colab precedente. Google LangChain
+L4100–4112 costruisce `HttpRetryOptions(attempts=max_retries)` e
+`HttpOptions(timeout=timeout)`, L4188/L4231/L4274/L4335
+contengono invocazioni sync/async e streaming; Google SDK L1856,
+L1906, L1988 e L2030–2052 ha logiche di implicit retry async che
+non possono essere ignorate. Anthropic LangChain L1414 usa default 2
+retry, ma la nostra RQ1 factory forza 0, inoltrati L1752; il timeout
+viene inoltrato da L1758–1759. Nessun client SDK usato nella trace,
+nessuna API RQ2, nessun release. Il report reale è registrato in
+`RQ2_COLAB_LANGCHAIN_BRIDGE_SOURCE_TRACE_2026-11-12.md`.
+
+**Nuova operazione predisposta**:
+`src/evaluation/rq2_langchain_parameter_mock_probe.py`,
+`src/tests/test_rq2_langchain_parameter_mock_probe.py` (8 test stdlib)
+e `docs/ood/RQ2_COLAB_LANGCHAIN_PARAMETER_MOCK_2026-11-12.md`.
+Sulle versioni e SHA Colab esatte, il probe installa un blocco socket
+totale, impiega API keys letterali sintetiche non usabili, istanzia
+solo oggetti locali e osserva:
+- Google: opzioni effettive della richiesta locale
+  `max_retries=1` → `HttpRetryOptions.attempts=1`,
+  `timeout=300s` → `300000ms`.
+- Anthropic: `max_retries=0` e `timeout=300s` passati dai
+  params LangChain al vero oggetto client SDK costruito **senza invocazione**.
+
+Il parametro `300s` è **solo per la prova**, non già una scelta
+scientifica. Nessuna inferenza, nessun Market/GT, nessun file persistente
+nel modulo, test OOD chiusi. **Il probe è preparato ma non ancora
+eseguito dall'utente in PyCharm/Colab**: non dichiarare output verde.
+Sorgenti originali RQ1, `RELEASE_SHA256=None` e
+`PLAN_STATUS=DRAFT_NOT_EXECUTABLE` invariati.
+L'esito positivo del probe dimostrerebbe il forwarding locale, **non**
+le latenze/retry reali HTTP né tool/streaming. Ulteriori gate scientifici:
+policy RQ2-only riproducibile, alias scoring, KPI formalizzability,
+evidence GT isolato, scelta arm dimostrativo e freeze release.
+
+**Prossimo passo**: pull PyCharm, 8 unit test del probe, poi unica
+cella Colab documentata, riportare output; evitare altro branching
+di ricerca e decidere quindi una policy RQ2-only finalizzabile.
