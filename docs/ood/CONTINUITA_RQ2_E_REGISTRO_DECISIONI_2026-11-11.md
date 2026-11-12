@@ -447,3 +447,21 @@ L'analisi delle 32 voci nominali dell'output conferma **16 test propri** di `RQ2
 Creato `docs/ood/RQ2_PONTE_RUNNER_REALE_CONTRATTO_PROPOSTA_V0_2026-11-12.md` (commit `d51d3583980987d9e4f74e1840658014b322f685`), a seguito della verifica effettiva 16+16 test (§41). Il contratto constata le **interfacce reali** `preview_market(root)`, `ExperimentConfig` e `run_experiment(config, llm=None, verbose=True, salva=False)`, e propone il riuso della sola esecuzione D esistente con salvataggio RQ2 isolato, invece di modificare il runner di RQ1. C/K restano chiamate senza tool con prompt già preparati e output strettamente convalidato, K solo in discovery. Obblighi: verifica di source **reale** e metadati del caso, lista di modelli esatti, create-only e crash/restart, errori conservati, gate **scientifico** distinta dal mock freeze, budget autorizzato e scoring GT offline.
 
 La correzione import `src/tests/test_rq2_mock_pipeline_integration.py` (commit `0256dc7642f65b881dfe57034c4c3c2d4f3e94da`) non modifica il runtime e non ha ancora un nuovo log di test; la suite precedente è interamente verde (16 integrazione + 16 contratti). Il documento è **DESIGN**, non codice eseguibile né protocollo frozen. **Prossima modifica tecnica prevista:** adapter sorgente D read-only e preflight delle vere configurazioni, senza API. RQ1 invariata, RQ2 ancora `DRAFT_NOT_EXECUTABLE`.
+
+## 43. Suite integrazione corretta 16/16; primo ponte D source-bound non eseguibile (12 novembre 2026)
+
+**Log reale comunicato dall'utente dopo commit `0256dc7642f65b881dfe57034c4c3c2d4f3e94da`:**
+```
+Ran 16 tests in 1.152s
+
+OK
+```
+Confermata la correzione della raccolta `unittest`: **16/16 test dell'integrazione mock D/C/K superati**, non più 32 per via dell'import accidentale del TestCase dei contratti. Non esiste un secondo ciclo di run sperimentali.
+
+**Nuovo codice:** `src/evaluation/rq2_source_bound_d_preflight.py` (commit `5db57fa249722ec1f8aa3033a01da9da2ad8764e`) è un **preflight soltanto di discovery e in sola lettura**. Per una D richiesta: usa direttamente `preview_market(root)` per autenticare il piano candidato da CSV GT-free SHA verificati, valida stage D e proprietà del piano con `_validate_plan`, ri-verifica hash di entrambi i file prima/dopo il parsing, impone identità esatta fra manifest/split/stage per finestra/task/case/cloudbed, e costruisce temporaneamente un `ExperimentConfig` per controllare `A1/A1_8R`, provider/modello proposto e schema `current`. **Non restituisce l'oggetto config né invoca `run_experiment`**; stampa soltanto metadati e SHA256 dell'istruzione, senza contenuto task o telemetria. Tutte le richieste **test** vengono respinte, e anche la discovery resta `can_execute_D=false`, `can_execute_api=false`, `model_version_frozen=false`, `scientific_protocol_frozen=false`, `api_budget_approved=false`. La proposta di ID modello e di `output_contract_mode` è da congelare prima delle API.
+
+**Test preparati ma ancora da eseguire:** `src/tests/test_rq2_source_bound_d_preflight.py`, **16 metodi unittest sintetici** che simulano in modo esplicito solo nei test la verifica delle fonti e usano CSV temporanei sintetici; controllano blocchi su manipolazione sorgenti, ID errati, colonne GT, istruzione e finestre non corrispondenti. Non dichiarare questi nuovi 16 test superati prima del log dell'utente.
+
+**Documentazione:** `docs/ood/RQ2_PREFLIGHT_D_SOURCE_BOUND_2026-11-12.md`, commit `5fd04621e31e9a22cb1268835313b52fa7dc467a`.
+
+**Prossimo comando PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_source_bound_d_preflight.py" -v` dopo pull, **attesi 16 test**. Nessuna esecuzione Colab o chiamata provider ancora autorizzata. Un futuro runner reale dovrà aggiungere budget, provider/temperature/parametri pin, error states e persistence create-only vera; il mock freeze non sblocca i test reali. RQ1 invariata.
