@@ -35,10 +35,10 @@ Nel terminale PowerShell dalla root del repository:
 git status --short
 git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10
 git rev-parse HEAD
-git hash-object src/evaluation/rq2_ck_provider_transport.py
+git rev-parse HEAD:src/evaluation/rq2_ck_provider_transport.py
 ```
 
-Il risultato di `git hash-object` deve essere:
+Il risultato di `git rev-parse HEAD:...` deve essere (hash del blob Git versionato, indipendente da eventuali conversioni CRLF nel working tree Windows):
 `84c33c05b198d1dc483f7fef466d8df52942f000`.
 Se il primo comando mostra modifiche locali da preservare,
 fermarsi prima del pull. **Non ripetere** le 53 verifiche
@@ -138,8 +138,8 @@ assert not subprocess.check_output(
 print("GIT_HEAD:", head)
 
 blob = subprocess.check_output(
-    ["git", "-C", str(REPO), "hash-object",
-     "src/evaluation/rq2_ck_provider_transport.py"], text=True
+    ["git", "-C", str(REPO), "rev-parse",
+     "HEAD:src/evaluation/rq2_ck_provider_transport.py"], text=True
 ).strip()
 assert blob == PIN_GIT_BLOB, "Source pin blob mismatch: STOP"
 assert file_sha256(REPO / RELEASE_REL) == EXPECTED
