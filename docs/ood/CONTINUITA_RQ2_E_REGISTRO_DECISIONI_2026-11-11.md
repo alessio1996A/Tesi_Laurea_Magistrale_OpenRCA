@@ -570,3 +570,21 @@ Documentazione: `docs/ood/RQ2_REHEARSAL_CLAIM_RECORDER_E_DECISIONI_PRE_FREEZE_20
 **Passo successivo:** eseguire preflight **source-only** delle identità precise dei modelli, modalità e parità del contratto D rispetto alla campagna RQ1, hash dei prompt C/K, moduli di runtime e scorer. Prima di scegliere `legacy` o `v2_enforce` sulla sola memoria, rintracciare l'opzione effettivamente usata nelle run RQ1 cross-model congelate; se i manifest disponibili non lo attestano, segnare `RQ1_OUTPUT_CONTRACT_PARITY_UNVERIFIED`, senza inferire o sostituire con un valore ipotetico. Questa verifica non deve toccare le 11 query test né sbloccare provider.
 
 **Budget:** l'indicazione del relatore riferita dall'utente (nessun cap USD) resta valida e non è un ostacolo alla preparazione di run, ma non sostituisce il freeze metodologico né autorizza retry involontari. Tracciare token e costi solo come evidenza.
+
+## 56. Parità D con RQ1 risolta su 13 blob frozen; prompt C/K SHA pre-freeze (12 novembre 2026)
+
+Dopo l'esito **16/16, 8.230s, OK** del coordinatore fake (§55), esaminate sul branch RQ2 le fonti storiche RQ1 al commit congelato `e4845e7fe9a399e10dd2db6f320dfeaeeddf3379`. **13 file** (preregister/campaign/runner/config/factory/agent prompts/graph/tool factory/tools/v2 task contract/evidence builder/signal catalog/rule container CPU) hanno **esattamente lo stesso Git blob SHA-1** nel commit RQ1 e nel branch corrente. Un confronto di questi 13 file non garantisce l'intera dipendenza e non equivale a test runtime.
+
+**Decisione D basata su sorgente verificato:** `src/evaluation/evaluation20_preregister.py` costruisce il piano RQ1 Evaluation20 con `"output_contract_mode": "v2_enforce"`, `"variant_scheme": "current"`, `"max_tool_rounds": 6`, `"recursion_limit": 30`; `evaluation20_campaign.py` passa il mode dal piano a `ExperimentConfig` e ne verifica la parità nel record. **RQ2 D dovrà usare `v2_enforce` per comparabilità con RQ1**, non il default `legacy` dell'oggetto. Rimane da congelare formalmente nel nuovo protocollo; nessuna API autorizzata ora.
+
+**Nuovo modulo di provenienza** `src/evaluation/rq2_protocol_identity_preflight.py` (commit iniziale `1130063f7edc53fdc6415f19aa5d5b7774e4dc79`, correzione compatibilità checkout Windows CRLF `4ccd4d1cb814572455da14dc63832dac4713b7c2`): ri-controlla i Git blob SHA1 di 13 sorgenti RQ1, registra hash SHA256 dei file RQ1 e di 7 file di input/validazione/store RQ2, calcola SHA256 di `CAUSE_SYSTEM` e `RULE_SYSTEM` importati da `rq2_probe_adapter`, verifica gli ID modelli e max_token Anthropic rispetto a factory e produce un **JSON senza case ID, GT, telemetry, LLM o scritture**, sempre `SOURCE_PROVENANCE_CAPTURE_NOT_SCIENTIFIC_FREEZE`, `rq2_discovery_api_enabled=false`, `rq2_test_unlocked=false`.
+
+**Nuova suite** `src/tests/test_rq2_protocol_identity_preflight.py`, **14 test preparati e NON ancora eseguiti dall'utente**, commit `ff131aa4d32eba7007d5f24d15b50fdf31e62423`. Documento `docs/ood/RQ2_PARITA_RQ1_E_IMPRONTE_PROMPT_CK_PRE_FREEZE_2026-11-12.md` commit `37a299c32c54499c4d7c77e5d8ca02593111ea0f`. **Prossima verifica in PyCharm:**
+```powershell
+git status
+git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10
+$env:PYTHONPATH="src"
+python -m unittest discover -s src/tests -p "test_rq2_protocol_identity_preflight.py" -v
+python -m evaluation.rq2_protocol_identity_preflight
+```
+**Attesi 14 test, poi JSON con hash C/K da acquisire.** Lo snapshot non è ancora un freeze scientifico, e non attesta runtime delle vere API. Prima dei provider: pin esplicito mode D/config, hash prompt C/K, versione/parametri provider, verfica fake `run_experiment` storico e protocollo 4+11.
