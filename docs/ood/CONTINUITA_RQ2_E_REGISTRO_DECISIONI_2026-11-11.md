@@ -1209,3 +1209,20 @@ unit test scorer PyCharm superati. Policy e release discovery
 scientifici non ancora firmati. Questo accordo è
 documentazione organizzativa, **non** autorizzazione API
 o modifica ai gate.
+
+
+## 85. Handoff sintetico pronto per una futura chat (12 novembre 2026)
+
+Per ridurre il rischio di perdere dettagli quando la conversazione
+si allunga, aggiunto il file **breve** e verificabile
+`docs/ood/HANDOFF_NUOVA_CHAT_RQ2_2026-11-12.md`.
+Contiene RQ1 frozen, RQ2 protocollo/partizione, gate
+scientifici ancora aperti, 53 test offline PyCharm e il
+mock HTTP Colab effettivamente superati, path per il
+prossimo freeze, divieto di API senza consenso e
+accordo sul refactoring italiano prima della stesura finale.
+Il documento lungo resta registro storico, ma nella
+nuova chat conviene partire dall'handoff breve,
+dai riferimenti precisi e dal commit HEAD GitHub attuale,
+**non** presumere di conoscere ogni riga dalle conversazioni.
+Nessun gate RQ2 modificato e nessuna API autorizzata.
