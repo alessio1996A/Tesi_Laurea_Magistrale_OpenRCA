@@ -415,3 +415,13 @@ In attesa dell'output reale Colab, **non dichiarare verifica della presenza dei 
 **Interpretazione:** positiva la **fattibilità osservazionale** delle metriche nel development, ma **non** prova che ogni KPI compaia in ogni singolo caso, che sia presente nelle finestre OOD, che sia coerente fra cloudbed, né certifica unità fisica, tipo counter/rate, aggregazione idonea o effetto causale. Le 94 metriche extra sono osservate nel development e non sono prevalidati 94 nuovi detector; non progettare regole per le classi riservate basandosi su nomi di KPI senza discovery. Non leggere i casi OOD test per validare la disponibilità dei segnali prima del freeze.
 
 **Conseguenza:** si può continuare con un catalogo operativo di **presenza numerica nello sviluppo**, ma separato dal livello di semantica fisica. Prossima integrazione: orchestrazione **mock-only** del percorso D→C→K sul piano non eseguibile con controlli di provenienza e create-only, nessuna API finché mancano protocollo e budget congelati. RQ1 invariata.
+
+## 40. Integrazione mock D→C→K predisposta dopo audit KPI development (12 novembre 2026)
+
+A seguito dell'audit reale documentato al §39 (92 development, **6.722.921 righe numeriche**, **29/29 KPI censiti presenti nell'unione delle finestre**, **123 nomi KPI**, 94 ulteriori nomi), è stata costruita la **prova d'integrazione sintetica** fra i componenti RQ2 già testati:
+
+- `src/evaluation/rq2_mock_pipeline_integration.py`: helper **solo mock**. `validate_mock_dck_without_io` verifica C e, esclusivamente per discovery, K su un D sintetico con bundle tool, `E###`, identità piano/harness/modello, contratti JSON e preflight conservativo della K; non invoca API/telemetria o pseudocodice. `record_mock_stages` usa **l'esistente** `RQ2MockJournal` in directory temporanea per marcare ricevute D→C→K create-only dopo validazione. Rifiuta D di altro caso/modello, C/K incoerenti, duplicati, K nel test e test prima di freeze mock. Il freeze del journal è `MOCK_ONLY_NOT_RULE_FREEZE`: NON sblocca né sostituisce il freeze scientifico reale.
+- `src/tests/test_rq2_mock_pipeline_integration.py`: **16 test sintetici predisposti, NON ancora eseguiti dall'utente**. Verificare prima di segnare un successo.
+- `docs/ood/RQ2_KPI_AUDIT_COMPLETATO_E_INTEGRAZIONE_MOCK_2026-11-12.md`: quadro completo dei risultati Colab, limiti I/O e dell'audit, interfacce mock e gap prima di chiamare i provider.
+
+**Prossimo passo PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_mock_pipeline_integration.py" -v` dopo `git pull --ff-only`, attesi **16 test**. Non avviare Colab/API per questa prova. Questo **non** è il vero runner RQ2; nessuna chiamata Gemini/Claude e nessuna modifica agli esperimenti RQ1.
