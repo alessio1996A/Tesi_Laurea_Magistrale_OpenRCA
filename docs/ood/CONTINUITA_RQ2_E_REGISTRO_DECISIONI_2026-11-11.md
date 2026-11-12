@@ -932,3 +932,34 @@ RQ2-only senza moltiplicare audit, e soprattutto le decisioni
 scientifiche preregistrate; infine release immutabile e autorizzazione
 alla prima run D discovery. Parallelamente iniziare stesura tesi
 con 19 giorni alla consegna del 1 dicembre 2026.
+
+
+## 78. Test PyCharm RQ2 fake HTTP 6/8, bug nel fake messages e fix test-only (12 novembre 2026)
+
+Evidenza PyCharm utente dopo commit `9337788...`:
+`Ran 8 tests in 0.010s — FAILED (failures=1, errors=1)`.
+Sei test verdi; fallimenti:
+`test_mocked_503_must_be_observed_once` (ERROR; il fake conta 0 invii)
+e `test_nonerror_fake_transport_response_is_rejected` (FAIL; viene
+sollevato il messaggio `attempts unexpected` anziché `silently accepted`).
+
+**Diagnosi:** nei test il finto `langchain_core.messages` era
+`type("FakeMessages", (), {"HumanMessage": lambda **kwargs: ...})()`.
+Le funzioni definite come attributi di classe diventano metodi legati,
+passando `self` implicito al lambda e causando un `TypeError`
+prima di invocare il modello fake. Il test non misura quindi la chiamata
+finta; il contatore resta a 0. Non indica problemi reali Google/Anthropic,
+e non è stata effettuata alcuna chiamata provider.
+
+**Correzione applicata SOLO ai test**
+`src/tests/test_rq2_langchain_fake_http_invoke.py`:
+`types.ModuleType` come finto modulo, con `HumanMessage` e
+`SystemMessage` assegnate all'istanza, evitando l'auto-binding.
+Commit fix `2c23cdb81d5e2a1c8ee94ea4b5bf935955bbedb4`.
+Una riproduzione sintetica indipendente stdlib ha verificato i due casi
+prima difettosi, ma **nessun nuovo test end-to-end SDK né nuova suite
+PyCharm è ancora attestata**. Documento Colab aggiornato
+`RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
+**Prossimo passo:** `git pull` e rerun 8 test PyCharm; SOLO con
+`Ran 8 tests ... OK` aprire la cella Colab. I 13 blob originali
+RQ1 invariati, release `RELEASE_SHA256=None`, test OOD bloccati.
