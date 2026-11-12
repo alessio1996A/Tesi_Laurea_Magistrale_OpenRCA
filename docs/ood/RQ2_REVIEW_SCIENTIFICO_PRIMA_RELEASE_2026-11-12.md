@@ -211,7 +211,7 @@ materiali derivati dalla ground truth degli 11 test.
 3. **Non confondere i nomi PAVE.** Il protocollo PAVE di OpenRCA 2.0
    è *Path Annotation via Verified Effects* e riguarda annotazioni
    causali passo-passo. La configurazione locale RQ1 denominata
-   \`A1_PAVE\` non va presentata automaticamente come replica di tale
+   `A1_PAVE` non va presentata automaticamente come replica di tale
    protocollo; la distinzione richiede descrizione dell'implementazione
    effettivamente congelata.
 4. **Causalità e finestre.** La corrispondenza di etichette di guasto
@@ -230,17 +230,17 @@ con le sezioni A-E del presente documento e con la preregistrazione
 candidata. Non sono nuovi esperimenti:
 
 - [ ] Confermare split **4 discovery / 11 test**, con gruppo condiviso
-  \`cloudbed-1_q014/q030\`, e la limitazione del gap temporale.
-- [ ] Confermare RQ2-A primaria (\`correct/11\`, alias lessicali fissi,
+  `cloudbed-1_q014/q030`, e la limitazione del gap temporale.
+- [ ] Confermare RQ2-A primaria (`correct/11`, alias lessicali fissi,
   missing/error/abstain nel denominatore), RQ2-B secondaria e RQ2-C
   esplorativa condizionata.
 - [ ] Confermare arm dimostrativo ex ante
-  \`A1_8R + claude-sonnet-5-5\` senza selezione post-hoc delle K.
+  `A1_8R + claude-sonnet-5-5` senza selezione post-hoc delle K.
 - [ ] Confermare il criterio K conservativo: controllo di unità,
   semantica e disponibilità solo su fonti consentite,
   implementazione deterministica solo se certificabile; 0 K
   formalizzabili rimane un possibile esito.
-- [ ] Confermare trasporto **solo sync** e \`timeout=300.0s\` per
+- [ ] Confermare trasporto **solo sync** e `timeout=300.0s` per
   singola richiesta nelle versioni SDK pinned; non presentarlo
   come timeout globale D o prova di stallo fisico.
 - [ ] Riconoscere espressamente i limiti del confronto con
@@ -250,7 +250,7 @@ candidata. Non sono nuovi esperimenti:
 scientifica esplicita deve precedere verifica finale di versioni
 e hash nel checkout di esecuzione, release create-only con readback
 SHA-256, e infine richiesta di consenso specifico per una sola
-D discovery. Rimangono obbligatori \`RELEASE_SHA256=None\`,
-\`PLAN_STATUS="DRAFT_NOT_EXECUTABLE"\` e \`test_unlocked=false\`;
+D discovery. Rimangono obbligatori `RELEASE_SHA256=None`,
+`PLAN_STATUS="DRAFT_NOT_EXECUTABLE"` e `test_unlocked=false`;
 nessun OOD test, nessuna API e nessun test tecnico già superato viene
 sbloccato o ripetuto da questo addendum.
