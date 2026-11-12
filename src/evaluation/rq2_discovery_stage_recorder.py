@@ -52,6 +52,63 @@ def _stage_sibling(sid: str, suffix: str) -> str:
     return sid.rsplit(":", 1)[0] + ":" + suffix
 
 
+def _validate_ck_receipt(receipt, *, stage_id, model_id, binding_sha, raw, error):
+    """Bind call usage to exact persisted C/K bytes; no invented token usage."""
+    if receipt is None:
+        return None
+    from evaluation.rq2_ck_provider_transport import VERSION
+    expected = {
+        "transport_version", "stage_id", "model_id", "provider",
+        "binding_sha256", "raw_response_sha256", "provider_error",
+        "api_attempts", "usage", "finish_reason", "provider_response_model",
+        "elapsed_seconds", "tools_enabled", "is_synthetic",
+    }
+    digest = _sha_text(raw) if raw is not None else None
+    provider = "google" if model_id.startswith("gemini-") else "anthropic"
+    if (type(receipt) is not dict or set(receipt) != expected
+        or receipt["transport_version"] != VERSION
+        or receipt["stage_id"] != stage_id
+        or receipt["model_id"] != model_id
+        or receipt["provider"] != provider
+        or receipt["binding_sha256"] != binding_sha
+        or receipt["raw_response_sha256"] != digest
+        or receipt["provider_error"] != error
+        or type(receipt["api_attempts"]) is not int
+        or receipt["api_attempts"] not in (0, 1)
+        or receipt["tools_enabled"] is not False
+        or receipt["is_synthetic"] is not False
+        or type(receipt["elapsed_seconds"]) not in (int, float)
+        or not 0 <= receipt["elapsed_seconds"] <= 604800
+        or type(receipt["usage"]) is not dict):
+        raise RQ2RecorderError("C/K transport receipt mismatch")
+    usage = receipt["usage"]
+    names = {"complete", "input_tokens", "output_tokens", "total_tokens",
+             "input_token_details", "output_token_details"}
+    if set(usage) != names or type(usage["complete"]) is not bool:
+        raise RQ2RecorderError("Invalid C/K usage keys")
+    counts = [usage[k] for k in ("input_tokens", "output_tokens", "total_tokens")]
+    if usage["complete"]:
+        if (any(type(x) is not int or x < 0 for x in counts)
+            or counts[2] != counts[0] + counts[1]):
+            raise RQ2RecorderError("Invalid C/K observed counts")
+    elif (any(x is not None for x in counts)
+          or usage["input_token_details"] is not None
+          or usage["output_token_details"] is not None):
+        raise RQ2RecorderError("Missing usage must not be fabricated")
+    for key in ("input_token_details", "output_token_details"):
+        detail = usage[key]
+        if detail is not None and (
+            type(detail) is not dict
+            or any(type(k) is not str or type(v) is not int or v < 0
+                   for k, v in detail.items())
+        ):
+            raise RQ2RecorderError("Invalid C/K usage detail")
+    if (receipt["api_attempts"] == 0 and
+        (raw is not None or usage["complete"])):
+        raise RQ2RecorderError("Unattempted request has model output")
+    return receipt
+
+
 class RQ2DiscoveryStageRecorder:
     """Persist caller-provided D, C and K outputs, never invoke a provider.
 
@@ -182,6 +239,7 @@ class RQ2DiscoveryStageRecorder:
         self, *, stage_id: str, model_id_proposed: str,
         raw_response: str | None = None,
         provider_error: str | None = None,
+        transport_receipt: dict | None = None,
     ) -> dict:
         """Record C strict JSON/transport outcome from prior D evidence only."""
         e = self._entry(stage_id, "C")
@@ -217,6 +275,11 @@ class RQ2DiscoveryStageRecorder:
             ))
         except (StageBindingError, EvidenceBundleError, ValueError) as exc:
             raise RQ2RecorderError("C input cannot be bound to recorded D") from exc
+        receipt = _validate_ck_receipt(
+            transport_receipt, stage_id=stage_id, model_id=model_id_proposed,
+            binding_sha=binding["binding_sha256"],
+            raw=raw_response, error=provider_error,
+        )
         status, parsed, issue = self._response_status(
             raw_response, provider_error, validate_cause_probe, allowed,
         )
@@ -229,6 +292,7 @@ class RQ2DiscoveryStageRecorder:
             "validated_c": parsed,
             "c_binding_sha256": binding["binding_sha256"],
             "bundle_sha256": binding["underlying_package"]["bundle_sha256"],
+            **({"transport_receipt": receipt} if receipt is not None else {}),
         }
         return self.store.save_discovery_stage(
             stage_id=stage_id, model_id_proposed=model_id_proposed,
@@ -239,6 +303,7 @@ class RQ2DiscoveryStageRecorder:
         self, *, stage_id: str, model_id_proposed: str,
         raw_response: str | None = None,
         provider_error: str | None = None,
+        transport_receipt: dict | None = None,
     ) -> dict:
         """Record K only after a C from exactly the same D and identity."""
         e = self._entry(stage_id, "K")
@@ -287,6 +352,11 @@ class RQ2DiscoveryStageRecorder:
         except (StageBindingError, EvidenceBundleError, ValueError) as exc:
             raise RQ2RecorderError("K input cannot be bound to recorded C/D") from exc
 
+        receipt = _validate_ck_receipt(
+            transport_receipt, stage_id=stage_id, model_id=model_id_proposed,
+            binding_sha=k_binding["binding_sha256"],
+            raw=raw_response, error=provider_error,
+        )
         status, parsed, issue = self._response_status(
             raw_response, provider_error, validate_candidate_rule, allowed,
         )
@@ -312,6 +382,7 @@ class RQ2DiscoveryStageRecorder:
                 feasibility["reasons"] if feasibility is not None else None
             ),
             "scientific_freeze": False,
+            **({"transport_receipt": receipt} if receipt is not None else {}),
         }
         return self.store.save_discovery_stage(
             stage_id=stage_id, model_id_proposed=model_id_proposed,
