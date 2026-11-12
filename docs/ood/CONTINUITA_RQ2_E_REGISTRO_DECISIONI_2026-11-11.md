@@ -659,3 +659,21 @@ Modifica **additiva** a `src/evaluation/rq2_discovery_stage_recorder.py` (commit
 **15 NUOVI test, NON ancora eseguiti in PyCharm:** `src/tests/test_rq2_ck_provider_transport.py` (commit `7e09ec3754d5ac07b9a6cd35f990122044e22043`, adattato gate `2ee3459ebadb105fdfc481792441ffaece08d818`). I test **simulano soltanto** un release con hash monkeypatchato e sostituiscono `crea_modello` con un modello in memoria; non hanno accesso alla rete e non chiamano provider. Testano source-bound claim→C→K con usage persistito, rifiuto di duplicati/stage test, gate freeze, v2 mode, errore provider senza testo sensibile, output non valido e divieto tool. Documento `docs/ood/RQ2_CK_PROVIDER_REALE_PRE_FREEZE_GATED_2026-11-12.md` (commit `46ac1cc053a55a5139c9aace67cc90d1a03cfd47`).
 
 **Prossimo test:** `python -m unittest discover -s src/tests -p "test_rq2_ck_provider_transport.py" -v`, **attesi 15**. Solo dopo suite verde: congelare scientificamente il protocollo, predisporre il driver D sul runner storico con claim, quindi una prima API pilot esplicitamente autorizzata su una delle 4 discovery. Budget economico non vincolante per decisione del relatore riferita dall'utente, ma ogni spesa/token va documentata; 11 test isolati fino a freeze K. RQ1 invariata.
+
+## 63. Correzione unittest nel test di trasporto C/K; 20/20 recorder ancora verdi (12 novembre 2026)
+
+**Log reale dell'utente:**
+- `python -m unittest discover -s src/tests -p "test_rq2_ck_provider_transport.py" -v` si è interrotto **prima di eseguire test**, con `TypeError: RQ2ActualCKProviderAdapterOfflineTests.run() missing 1 required positional argument: 'model'`.
+- `python -m unittest discover -s src/tests -p "test_rq2_discovery_stage_recorder.py" -v` → **`Ran 20 tests in 2.793s — OK`**. La retrocompatibilità della modifica additiva al recorder è confermata sui test sintetici esistenti.
+
+**Causa esatta:** il nuovo `src/tests/test_rq2_ck_provider_transport.py` aveva una funzione di supporto chiamata `def run(self, stage, model)`, che sovrascrive involontariamente il metodo standard `unittest.TestCase.run(result)`. Il runner di test la chiamava senza gli argomenti richiesti; questo NON è un errore dell'adapter provider, né una prova che la suite provider abbia fallito nei singoli casi. **Nessuna chiamata API reale**.
+
+**Correzione soltanto nel test:** rinominato `run` → `invoke_mocked_ck_stage` e aggiornate **9 chiamate `self.run(...)`**. Commit `c919464941ab3eaa830cb46f128a0819a0bb314c`. Il numero di metodi `test_*` resta **15**; i sorgenti di produzione RQ1 e RQ2 NON sono stati toccati per correggere questo errore.
+
+**Prossimo comando PyCharm:**
+```powershell
+git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10
+$env:PYTHONPATH="src"
+python -m unittest discover -s src/tests -p "test_rq2_ck_provider_transport.py" -v
+```
+**Attesi 15 test, esito NON ancora confermato.** Se la suite manifesta errori ulteriori, analizzarli dai singoli traceback prima di qualunque altro refactoring. `RELEASE_SHA256=None` resta il blocco di produzione delle API; nel test si usa solo release temporanea con hash patchato e SDK fake. Budget senza massimale USD, test OOD bloccati fino a freeze scientifico.
