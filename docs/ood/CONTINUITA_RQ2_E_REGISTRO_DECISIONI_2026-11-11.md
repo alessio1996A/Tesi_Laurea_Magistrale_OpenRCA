@@ -425,3 +425,19 @@ A seguito dell'audit reale documentato al §39 (92 development, **6.722.921 righ
 - `docs/ood/RQ2_KPI_AUDIT_COMPLETATO_E_INTEGRAZIONE_MOCK_2026-11-12.md`: quadro completo dei risultati Colab, limiti I/O e dell'audit, interfacce mock e gap prima di chiamare i provider.
 
 **Prossimo passo PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_mock_pipeline_integration.py" -v` dopo `git pull --ff-only`, attesi **16 test**. Non avviare Colab/API per questa prova. Questo **non** è il vero runner RQ2; nessuna chiamata Gemini/Claude e nessuna modifica agli esperimenti RQ1.
+
+## 41. Integrazione mock D→C→K superata in PyCharm; duplicazione involontaria della raccolta corretta (12 novembre 2026)
+
+**Log effettivo dall'utente:**
+```
+Ran 32 tests in 1.150s
+
+OK
+```
+L'analisi delle 32 voci nominali dell'output conferma **16 test propri** di `RQ2MockPipelineIntegrationTests` tutti `ok` **+ 16 test già esistenti** di `RQ2OutputContractsTests` tutti `ok`. La raccolta automatica `unittest discover -p "test_rq2_mock_pipeline_integration.py"` ha caricato indirettamente la classe `unittest.TestCase` dal test dei contratti, per via di `from test_rq2_output_contracts import RQ2OutputContractsTests` utilizzato soltanto per costruire la fixture K. **Non si tratta di 32 test nuovi di integrazione, né di 16 fallimenti/mancanze.**
+
+**Correzione minimale al solo file di test (commit `0256dc7642f65b881dfe57034c4c3c2d4f3e94da`):** sostituito l'import diretto della classe con `import test_rq2_output_contracts as contract_fixtures`, usando `contract_fixtures.RQ2OutputContractsTests.rule()`. La correzione evita che il discovery raccolga direttamente anche la classe importata. **Attesi 16 test in una futura nuova esecuzione; la variante corretta non è ancora stata rieseguita dall'utente.** RQ1, runner, mock journal e contratti C/K invariati.
+
+**Validato dal log:** il mock integra D→C→K sinteticamente, controlla input/provenienza E###, rifiuta K sui test e errori D/JSON non conformi, fa salvataggi mock create-only e non esegue pseudocodice. **Non è ancora una prova che il runner reale multi-provider o il freeze scientifico funzionino.**
+
+**Passo successivo:** progettare un adapter **source-bound** che usa `rq2_dryrun_plan.preview_market(root)` sui manifest GT-free SHA-verificati e reimpiega `ExperimentConfig` + `run_experiment(..., salva=False)` senza modificarli, producendo artefatti RQ2 isolati e create-only. C e K useranno i prompt del `rq2_probe_adapter` soltanto dopo la D conforme; test bloccato fino al vero freeze delle regole, non il freeze mock. **Da congelare prima di attivare la rete:** ID e parametri modello, budget, policy errori/retry, catalogo operativo e condizione di freeze scientifico. Nessuna chiamata provider autorizzata ora.
