@@ -1005,3 +1005,60 @@ in `RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
 **Nessuna API Gemini/Claude né discovery OOD:** test non iniziato,
 `RELEASE_SHA256=None` e `PLAN_STATUS=DRAFT_NOT_EXECUTABLE`
 immutati. Non alterare il release per aggirare il controllo.
+
+
+## 81. Mock HTTP 503 `model.invoke` 8/8 verde in Colab; factory RQ2-only candidata integrata, suite non eseguite (12/11/2026)
+
+**Output reale utente su Colab appena ripristinato:**
+checkout `7019020364dfae6ae649d9620ffb4948e70a2f71`,
+Python `3.13.18`, dipendenze isolated `/content/rq2_prefreeze_packages_py313`,
+`Ran 8 tests in 0.004s — OK`,
+`status=SYNC_FAKE_HTTP_503_INVOKE_VERIFIED_AS_TESTED_NOT_RELEASED`.
+Gemini backend `httpx`, Anthropic `httpx2.MockTransport`.
+Ciascuno dei due provider: `CK_tool_free` **1** invio HTTP503
+finto, `D_bound_tools` **1** invio HTTP503 finto,
+totale 2 per provider, `api_requests_to_real_providers=0`.
+Valori configurati: Google `max_retries=1`, Anthropic
+`max_retries=0`, timeout prova `300.0s`.
+Zero credenziali reali, tool, GT/Market e predizioni;
+`scientific_release_signed=false`,
+`can_execute_D/CK/test=false`.
+Non verificato async/streaming né timeout su stallo reale.
+Output documentato in
+`docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
+
+**Avanzamento di codice candidato, senza chiamate API**, sul branch
+`feature/ood-knowledge-transfer-audit-2026-11-10`:
+- nuovo `src/evaluation/rq2_model_factory.py`, che
+  accetta solo 3 ID modello RQ2, verifica 6 pacchetti pinned
+  e 4 SHA dei file sorgente SDK/LangChain e configura
+  no retry (Google 1 tentativo totale, Claude 0 retry),
+  timeout per-request 300.0s e Claude max_tokens 4096;
+- `src/evaluation/rq2_discovery_d_provider_transport.py`
+  inietta factory RQ2-only via `run_experiment(config, llm=...)`
+  dopo la source/release/claim guard, preservando il runner,
+  factory, graph, tool e prompt **RQ1 originali**;
+- `src/evaluation/rq2_ck_provider_transport.py`
+  usa stessa factory RQ2-only per C/K con una `invoke` sync,
+  sempre dopo release/claim.
+- nuovo `src/tests/test_rq2_model_factory.py`: 10 test
+  unitari fake SDK; aggiornato `test_rq2_discovery_d_provider_transport.py`
+  per ricevere l'oggetto `llm`. Mock test C/K già esistenti
+  applicano patch locale `crea_modello`, senza SDK live.
+
+**Tutti questi test della nuova integrazione sono predisposti, NON
+ancora eseguiti dall'utente**. Procedura unica PyCharm:
+`docs/ood/RQ2_INTEGRAZIONE_FACTORY_ONLY_OFFLINE_TEST_2026-11-12.md`
+(10 factory, 12 D, test C/K). Registrare i tre output prima
+di dichiarare la configurazione completa o passare alla firma.
+La policy `timeout=300s` resta candidata e non giustifica un
+claim di parity trasporto con RQ1 storica. RQ1 factory
+Git blob `05308d5740763db0444556dcb7330d8fb4c308ec`
+intatto. `RELEASE_SHA256=None`,
+`PLAN_STATUS=DRAFT_NOT_EXECUTABLE` e 11 test OOD chiusi.
+
+**Prossimo:** chiudere rapidamente scoring alias ex ante,
+criteri KPI e arm principale `A1_8R + Sonnet` prima di qualsiasi
+OOD discovery; firma release solo con provenance/readback;
+poi prima D con consenso esplicito. Parallelizzare stesura tesi,
+consegna 1 dicembre.
