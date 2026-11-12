@@ -198,12 +198,18 @@ def audit_development_kpis(
                     name_present = names.notna() & names.astype(str).str.strip().ne("")
                     # Count valid KPI names, including nonnumeric observations.
                     present_names = names[name_present].astype(str)
-                    observed_counts.update((layer, name) for name in present_names)
+                    observed_counts.update({
+                        (layer, str(name)): int(count)
+                        for name, count in present_names.value_counts(sort=False).items()
+                    })
                     numeric = name_present & values.notna() & np.isfinite(
                         values.to_numpy(dtype=float)
                     )
                     numeric_names = names[numeric].astype(str)
-                    numeric_counts.update((layer, name) for name in numeric_names)
+                    numeric_counts.update({
+                        (layer, str(name)): int(count)
+                        for name, count in numeric_names.value_counts(sort=False).items()
+                    })
                     total_rows_in_dev_windows += len(selected)
                     total_valid_numeric_rows += len(numeric_names)
 
@@ -244,6 +250,8 @@ def audit_development_kpis(
         "audit": VERSION,
         "status": "DEVELOPMENT_ONLY_GT_FREE_NUMERIC_PRESENCE",
         "source_verified": not _synthetic_test_fixture,
+        "verified_gtfree_csv_input_hashes": not _synthetic_test_fixture,
+        "market_archive_sha256_checked": False,
         "split_sha256": split_hash,
         "manifest_sha256": manifest_hash,
         "catalog_sha256": inventory["catalog_sha256"],
@@ -280,6 +288,7 @@ def audit_development_kpis(
             "Numeric KPI presence in development does not prove presence in OOD.",
             "Rows in overlapping development windows are counted once.",
             "Presence in Market does not verify unit, counter/rate semantics, or cause.",
+            "source_verified applies to the two GT-free CSVs, not a full Market.zip SHA-256.",
             "Full daily CSV members may contain other-split rows: these are decoded but filtered before any aggregation.",
             "Development-only KPI names must not be used to infer OOD target labels.",
         ],
