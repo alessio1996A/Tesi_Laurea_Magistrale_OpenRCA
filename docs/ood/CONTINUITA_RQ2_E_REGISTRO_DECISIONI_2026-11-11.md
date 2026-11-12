@@ -1161,3 +1161,51 @@ verifica blocco test e prima autorizzazione API D
 per un singolo stage. Non sbloccare automaticamente.
 Factory RQ1, `RELEASE_SHA256=None` e
 `PLAN_STATUS=DRAFT_NOT_EXECUTABLE` rimangono invariati.
+
+
+## 84. Accordo di chiusura progetto: refactoring e commenti italiani prima della tesi (12 novembre 2026)
+
+**Richiesta esplicita dell'utente:** una volta terminati gli esperimenti
+RQ2 e congelati i risultati, **prima della stesura definitiva della tesi**
+eseguire una fase dedicata di **refactoring e pulizia** del progetto:
+
+1. Riorganizzare il codice per leggibilità, ridurre duplicazioni e
+   rinominare soltanto quando le dipendenze sono state ricontrollate.
+2. Riscrivere o integrare in **italiano** docstring, commenti e
+   spiegazioni dei componenti principali, in particolare RQ1/RQ2,
+   pipeline OpenRCA, harness, tool, provider, test e valutatori.
+   Commentare le scelte architetturali e gli invarianti, non ogni
+   istruzione banale. Conservare identificatori e formati esterni
+   necessari alla riproducibilità.
+3. Censire tutte le directory e distinguere
+   sorgenti attivi, script di test, documenti di continuità,
+   snapshot congelati, output sperimentali e artefatti temporanei.
+   Rimuovere dal ramo di consegna solo file **realmente superflui**,
+   dopo verifiche di riferimenti/import e con manifest delle
+   eliminazioni. Non cancellare dati originali, piano congelato,
+   claim, hash, report di scoring, log necessari alla provenance
+   o test che supportano la riproducibilità.
+4. Eseguire il refactoring **su un nuovo branch post-freeze**,
+   preservando tag/commit sperimentali e SHA dei sorgenti
+   realmente usati: non alterare retroattivamente RQ1/RQ2
+   né presentare i sorgenti refactorizzati come identici a quelli
+   dell'esecuzione. Prima/dopo eseguire test di regressione,
+   audit sui riferimenti di file e, se opportuno, confronto
+   funzionale senza nuove API.
+5. Quando il codice finale risulta leggibile, documentato
+   e testato, iniziare la **stesura definitiva della tesi**
+   facendo riferimento ai protocolli e ai risultati congelati.
+
+**Vincolo temporale:** consegna prevista 1 dicembre 2026.
+Questa sequenza non deve provocare settimane di ritardo:
+anticipare eventualmente solo la raccolta delle note e della
+struttura della tesi, senza cambiare il desiderio dell'utente
+di completare il refactoring prima della redazione definitiva.
+
+**Stato al momento dell'accordo:** RQ1 risultati congelati;
+RQ2 nessuna chiamata LLM reale ancora eseguita; fake HTTP
+Colab verificato, 37/37 unit test factory/D/C/K e 16/16
+unit test scorer PyCharm superati. Policy e release discovery
+scientifici non ancora firmati. Questo accordo è
+documentazione organizzativa, **non** autorizzazione API
+o modifica ai gate.
