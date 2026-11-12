@@ -211,6 +211,7 @@ class RQ2StageArtifactStore:
             or record["split_sha256"] != EXPECTED_SPLIT_SHA256
             or record["manifest_sha256"] != EXPECTED_MANIFEST_SHA256
             or record["authorization"] != "NO_API_AUTHORITY"
+            or type(record["status"]) is not str
             or record["status"] not in _STATUSES
             or e["phase"] != "discovery"
             or type(record["model_id_proposed"]) is not str
@@ -305,8 +306,8 @@ class RQ2StageArtifactStore:
         if e["phase"] != "discovery":
             raise RQ2ArtifactStoreError("TEST results blocked before scientific freeze")
         if (
-            status not in _STATUSES
-            or type(status) is not str
+            type(status) is not str
+            or status not in _STATUSES
             or type(artifact) is not dict
             or type(model_id_proposed) is not str
             or e["logical_model"] not in model_id_proposed.lower()
