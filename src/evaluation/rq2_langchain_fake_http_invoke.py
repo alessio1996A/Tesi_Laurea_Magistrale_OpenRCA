@@ -76,10 +76,6 @@ def _fake_google() -> dict:
 
     count: list[dict] = []
 
-    def handler(request):
-        count.append({"method": request.method})
-        return type(request).__module__  # unreachable: replaced below
-
     model = ChatGoogleGenerativeAI(
         model="gemini-3.5-flash-lite",
         api_key=SYNTHETIC_GOOGLE_KEY,
