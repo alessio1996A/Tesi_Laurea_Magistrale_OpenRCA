@@ -1,7 +1,6 @@
 # RQ2 — Integrazione factory provider dedicata e prova offline, senza API
 
-**12/11/2026 · Stato: codice candidato predisposto, suite aggiornate NON
-ancora eseguite dall'utente. Nessuna API live autorizzata.**
+**12/11/2026 · Stato: 37/37 test offline PyCharm SUPERATI, attestati dall'utente. Nessuna API live autorizzata.**
 
 ## Successo precedente attestato
 
@@ -83,3 +82,37 @@ ricontrollato **prima** del release scientifico.
    ancora chiusi. Poi singola run D approvata.
 6. In parallelo avviare capitoli della tesi RQ1 / architettura,
    per consegna 1 dicembre 2026.
+
+
+## Esito reale della verifica d'integrazione PyCharm — 12/11/2026
+
+L'utente ha eseguito nella `.venv` Windows sul branch RQ2, con
+`PYTHONPATH=src`, i tre comandi documentati. Output integralmente
+forniti in conversazione:
+
+| Suite | Risultato effettivo | Durata |
+|---|---|---:|
+| `test_rq2_model_factory.py` | `Ran 10 tests — OK` | 0.055s |
+| `test_rq2_discovery_d_provider_transport.py` | `Ran 12 tests — OK` | 0.963s |
+| `test_rq2_ck_provider_transport.py` | `Ran 15 tests — OK` | 8.137s |
+| **Totale** | **37/37 OK** | |
+
+**Cosa attesta:** la factory RQ2-only passa esattamente i kwargs
+`max_retries`, `timeout` e `max_tokens`; la whitelist e i controlli
+di versione/SHA falliscono in modo sicuro su fixture sintetiche; il
+runner D storico riceve `llm` dopo claim e controllo del release;
+C/K sono tool-free e vengono registrati con provenance, uso token
+o errore non mascherato; il test OOD resta precluso.
+
+**Limiti:** tutte queste tre suite usano SDK/mock sintetici, non
+accreditano nuove diagnosi RCA; la verifica dei 4 send HTTP503 finti
+con LangChain/SDK reali è un test Colab separato, anch'esso già verde.
+Il runtime completo Colab della **nuova factory applicata a D/C/K**
+non è ancora certificato da un'esecuzione del piano reale. I dati GT
+e le 11 query test rimangono isolati. `RELEASE_SHA256=None`,
+`PLAN_STATUS=DRAFT_NOT_EXECUTABLE` invariati.
+
+**Decisione operativa:** chiudere ora i gate scientifici di alias,
+criterio K, arm preregistrato e release; nessun altro ciclo SDK
+esplorativo in assenza di errore materiale. La consegna della tesi
+è il 1° dicembre 2026: parallelizzare la scrittura.
