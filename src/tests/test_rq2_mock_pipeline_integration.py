@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from test_rq2_dryrun_plan import plan as make_plan
-from test_rq2_output_contracts import RQ2OutputContractsTests
+import test_rq2_output_contracts as contract_fixtures
 from test_rq2_stage_binding import (
     INSTRUCTION, cause, stage_id, synthetic_d,
 )
@@ -16,7 +16,7 @@ from evaluation.rq2_mock_pipeline_integration import (
 
 
 def k_json():
-    return json.dumps(RQ2OutputContractsTests.rule())
+    return json.dumps(contract_fixtures.RQ2OutputContractsTests.rule())
 
 
 def arguments(plan=None, *, cid="cloudbed-1_q003", k=True):
