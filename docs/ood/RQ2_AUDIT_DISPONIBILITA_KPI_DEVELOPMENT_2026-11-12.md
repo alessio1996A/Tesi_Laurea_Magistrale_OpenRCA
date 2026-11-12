@@ -10,7 +10,7 @@ Il preflight aggiuntivo `src/evaluation/rq2_development_kpi_audit.py` verifica *
 
 ## 2. Sorgenti e isolamento
 
-- Verifica SHA-256 **esatti** dei due CSV già congelati: `split_market_v1.csv` e `benchmark_inputs_market.csv`. Rifiuta schema modificato con colonna GT, ID disallineati, split non previsti e numero di 92 casi development diverso dall'inventario originale.
+- Verifica SHA-256 **esatti** dei due CSV già congelati (questo NON include il controllo dell'hash completo di `Market.zip`): `split_market_v1.csv` e `benchmark_inputs_market.csv`. Rifiuta schema modificato con colonna GT, ID disallineati, split non previsti e numero di 92 casi development diverso dall'inventario originale.
 - Rifiuta qualsiasi **overlap temporale** fra una finestra development e una `ood_holdout` nello stesso cloudbed.
 - Genera esclusivamente percorsi ZIP `Market/{cloudbed}/telemetry/{YYYY_MM_DD}/metric/metric_node.csv` e `metric_container.csv`; rifiuta file mancanti e ZIP con duplicati dei membri interessati.
 - Usa le finestre ufficiali `[start_unix,end_unix)` con timezone `Asia/Shanghai`, come nel codice RQ1; per ogni membro ZIP considera l'**unione** degli intervalli development, così una riga numerica appartenente a più finestre development non viene contata due volte.
