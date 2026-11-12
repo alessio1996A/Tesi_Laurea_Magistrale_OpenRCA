@@ -976,3 +976,32 @@ ancora esercitato SDK o transport reali. Prova Colab con
 **ancora pendente**. Cella e prerequisiti:
 `docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
 Tutti i blocchi RQ2/API/GT rimangono in vigore.
+
+
+## 80. Colab runtime reset: checkout RQ2 non presente (12 novembre 2026)
+
+**Output utente:** la cella per il fake HTTP `model.invoke` è
+terminata **prima di avviare i test**, con
+`AssertionError: Repository RQ2 assente: ripristinare prima Colab`
+alla guardia `assert (REPO / ".git").is_dir()`.
+Percorso non trovato:
+`/content/Tesi_OpenRCA_RQ2`, verosimilmente eliminato dal reset
+della VM temporanea Colab. Non ci sono risultati nuovi di LangChain,
+SDK, HTTP o LLM. Gli 8 test PyCharm corretti restano
+`Ran 8 tests in 0.009s — OK`.
+
+**Ripristino concordato:** ricreare `/content/Tesi_OpenRCA_RQ2`
+clonando **lo stesso branch** da GitHub e ripristinare, se assenti,
+**esattamente le dipendenze pinned** in
+`/content/rq2_prefreeze_packages_py313` via `pip --target`,
+stesso marcatore hash delle precedenti celle. NON utilizzare il venv
+Colab incompleto o cambiare sorgenti/versioni, NON clonare nel Drive,
+NON cambiare RQ1. Poi rieseguire, in un subprocess isolato,
+8 test e il modulo `rq2_langchain_fake_http_invoke` con mock HTTP
+503 e socket blocco. Riportare traceback se clone o pinned install
+falliscono; non chiedere credenziali in chat. Procedura annotata anche
+in `RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
+
+**Nessuna API Gemini/Claude né discovery OOD:** test non iniziato,
+`RELEASE_SHA256=None` e `PLAN_STATUS=DRAFT_NOT_EXECUTABLE`
+immutati. Non alterare il release per aggirare il controllo.
