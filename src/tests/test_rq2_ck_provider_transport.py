@@ -122,7 +122,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
         )
         self.recorded_d = True
 
-    def run(self, stage, model):
+    def invoke_mocked_ck_stage(self, stage, model):
         with patch.object(
             transport, "crea_modello", return_value=model
         ) as factory:
@@ -221,7 +221,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
     def test_one_c_api_simulation_persists_exact_usage_and_model(self):
         self.d()
         chat = InMemoryChat(binding_fixtures.cause())
-        result = self.run("C", chat)
+        result = self.invoke_mocked_ck_stage("C", chat)
         self.assertEqual(chat.calls, 1)
         self.assertEqual(result["status"], "RECORDED_COMPLETE")
         self.assertEqual(result["provider_attempts"], 1)
@@ -240,8 +240,8 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def test_one_k_after_c_persists_real_adapter_receipt(self):
         self.d()
-        self.run("C", InMemoryChat(binding_fixtures.cause()))
-        self.run("K", InMemoryChat(
+        self.invoke_mocked_ck_stage("C", InMemoryChat(binding_fixtures.cause()))
+        self.invoke_mocked_ck_stage("K", InMemoryChat(
             json.dumps(contract_fixtures.RQ2OutputContractsTests.rule())
         ))
         audit = self.parent.journal.audit_restart()
@@ -258,7 +258,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
     def test_provider_error_does_not_save_exception_text_or_retry(self):
         self.d()
         chat = InMemoryErrorChat()
-        result = self.run("C", chat)
+        result = self.invoke_mocked_ck_stage("C", chat)
         self.assertEqual(chat.calls, 1)
         self.assertEqual(result["status"], "PROVIDER_ERROR")
         self.assertEqual(result["provider_attempts"], 1)
@@ -271,7 +271,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def test_response_invalid_json_kept_and_usage_still_saved(self):
         self.d()
-        self.run("C", InMemoryChat("NOT JSON"))
+        self.invoke_mocked_ck_stage("C", InMemoryChat("NOT JSON"))
         c = self.parent.recorder.store.load_discovery_stage(
             stage_id=self.parent.sid("C")
         )
@@ -282,7 +282,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def test_tool_attempt_refused_without_dispatching_tool(self):
         self.d()
-        self.run("C", InMemoryChat(
+        self.invoke_mocked_ck_stage("C", InMemoryChat(
             "", tool_calls=[{
                 "name": "tool_get_node_metrics", "args": {},
                 "id": "must-not-execute",
@@ -297,7 +297,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def test_missing_usage_preserved_null(self):
         self.d()
-        self.run("C", InMemoryChat(binding_fixtures.cause(), usage=None))
+        self.invoke_mocked_ck_stage("C", InMemoryChat(binding_fixtures.cause(), usage=None))
         c = self.parent.recorder.store.load_discovery_stage(
             stage_id=self.parent.sid("C")
         )
@@ -307,7 +307,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
 
     def test_duplicate_c_run_blocked_before_second_factory(self):
         self.d()
-        self.run("C", InMemoryChat(binding_fixtures.cause()))
+        self.invoke_mocked_ck_stage("C", InMemoryChat(binding_fixtures.cause()))
         with patch.object(transport, "crea_modello") as factory:
             with self.assertRaises(transport.RQ2LiveCKBlocked):
                 transport.run_one_claimed_ck(
@@ -335,7 +335,7 @@ class RQ2ActualCKProviderAdapterOfflineTests(unittest.TestCase):
     def test_bogus_usage_cannot_be_persisted_as_verified(self):
         self.d()
         bogus = {"input_tokens": 10, "output_tokens": 10, "total_tokens": 99}
-        self.run("C", InMemoryChat(binding_fixtures.cause(), usage=bogus))
+        self.invoke_mocked_ck_stage("C", InMemoryChat(binding_fixtures.cause(), usage=bogus))
         c = self.parent.recorder.store.load_discovery_stage(
             stage_id=self.parent.sid("C")
         )
