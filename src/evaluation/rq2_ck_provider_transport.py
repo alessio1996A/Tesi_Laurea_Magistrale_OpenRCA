@@ -29,9 +29,15 @@ from evaluation.rq2_budget_preflight import CANDIDATE_MODELS
 from evaluation.rq2_discovery_claim_journal import RQ2DiscoveryClaimJournal
 from evaluation.rq2_discovery_stage_recorder import RQ2DiscoveryStageRecorder
 from evaluation.rq2_stage_binding import (
-    ALLOWED_TOOLS, prepare_bound_c, prepare_bound_k,
+    prepare_bound_c, prepare_bound_k,
 )
-from evaluation.rq2_toolfree_fake_transport import _check_package
+from evaluation.rq2_dryrun_plan import (
+    DISCOVERY, TEST, HARNESSES, MAX_TOOL_ROUNDS,
+)
+from evaluation.rq2_toolfree_fake_transport import (
+    PREFREEZE_C_SYSTEM_SHA256, PREFREEZE_K_SYSTEM_SHA256,
+    _check_package,
+)
 
 VERSION = "rq2_ck_provider_transport_v0"
 RELEASE_SHA256 = None  # SET ONLY AFTER SCIENTIFIC FREEZE; NEVER in a pilot ad hoc.
@@ -77,6 +83,15 @@ def _read_release(root: Path) -> dict:
         }
         or record.get("C_K_tool_calls_allowed") is not False
         or record.get("budget_limit_usd") is not None
+        or record.get("D_output_contract_mode") != "v2_enforce"
+        or record.get("D_variant_scheme") != "current"
+        or record.get("D_max_tool_rounds") != MAX_TOOL_ROUNDS
+        or record.get("D_recursion_limit") != 30
+        or record.get("harnesses") != list(HARNESSES)
+        or record.get("discovery_case_ids") != list(DISCOVERY)
+        or record.get("test_case_ids") != list(TEST)
+        or record.get("C_system_prompt_sha256") != PREFREEZE_C_SYSTEM_SHA256
+        or record.get("K_system_prompt_sha256") != PREFREEZE_K_SYSTEM_SHA256
     ):
         raise RQ2LiveCKBlocked("Scientific release lacks mandatory safeguards")
     return record
@@ -105,6 +120,8 @@ def _source_bound_binding(
     if _sha(instruction.encode("utf-8")) != d["artifact"]["original_instruction_sha256"]:
         raise RQ2LiveCKBlocked("D and original instruction SHA differ")
     run = d["artifact"]["diagnostic_run"]
+    if run.get("output_contract_mode") != "v2_enforce":
+        raise RQ2LiveCKBlocked("Recorded D does not use frozen RQ1 V2 mode")
     c_id = stage_id.rsplit(":", 1)[0] + ":C"
     c_binding = prepare_bound_c(
         plan=recorder.plan, c_stage_id=c_id,
