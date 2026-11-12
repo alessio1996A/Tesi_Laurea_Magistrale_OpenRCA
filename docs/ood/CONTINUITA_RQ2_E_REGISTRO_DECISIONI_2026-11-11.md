@@ -498,3 +498,9 @@ Dopo il log dell'utente **`Ran 23 tests in 1.617s — OK`** dello store create-o
 - `docs/ood/RQ2_DISCOVERY_RECORDER_INTEGRAZIONE_V0_2026-11-12.md`: spiegazioni, confini epistemici e prossimi passi.
 
 **Comando PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_discovery_stage_recorder.py" -v` dopo pull, **attesi 20 test**. Prima della campagna provider devono ancora essere fissati e verificati: politica D invalid_json, ID/parametri modello, contratto della D, cost ceiling, claim/retry, versionamento dei prompt ed effettivo freeze del protocollo/candidati K. Il mock freeze NON sblocca il test. RQ1 congelata invariata, RQ2 non eseguibile e non ancora lanciata.
+
+## 48. Recorder RQ2 D/C/K: 20/20 test superati (12 novembre 2026)
+
+**Log effettivo inviato dall'utente:** `Ran 20 tests in 3.351s — OK` per `test_rq2_discovery_stage_recorder.py`. Tutti i **20 test sintetici** dell'adapter D→C→K su `RQ2StageArtifactStore` sono verdi; verificate in ambiente locale catena D/C/K, create-only, errori e blocchi, astensione, integrità del manifest sintetico e audit restart. Queste NON sono run RQ2 sui 15 incidenti OOD; il codice non effettua dispatch provider. RQ1 congelata invariata.
+
+**Passo successivo:** specificare l'identità esatta dei modelli e realizzare stima ex ante dei costi usando tariffe ufficiali correnti, distinguendo una D multi-chiamata dai passaggi logici C/K. Prima di abilitare qualunque API servono ancora modello e parametri congelati, cost ceiling approvato, modalità D, claim/riavvio, protocollo freeze e gestione test indipendente.
