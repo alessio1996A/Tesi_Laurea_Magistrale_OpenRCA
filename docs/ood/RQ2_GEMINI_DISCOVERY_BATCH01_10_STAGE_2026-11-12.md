@@ -354,37 +354,39 @@ except BaseException as exc:
 # Se uno stage non è RECORDED_COMPLETE, fermarsi anche se ha salvato
 # un artefatto di failure. NON saltarlo e NON ritentarlo.
 finished = []
-for i, sid in enumerate(BATCH, 1):
-    print(f"\n=== REAL STAGE {i}/10: {sid} ===", flush=True)
-    completed = subprocess.run(
-        [sys.executable, "-c", driver, sid],
-        cwd=REPO, env=paid_env,
-        text=True, capture_output=True,
-    )
-    lines = completed.stdout.splitlines()
-    safe_results = [line[len("RQ2_BATCH_STAGE_RESULT:"):]
-                    for line in lines if line.startswith("RQ2_BATCH_STAGE_RESULT:")]
-    safe_errors = [line[len("RQ2_BATCH_STAGE_ERROR:"):]
-                   for line in lines if line.startswith("RQ2_BATCH_STAGE_ERROR:")]
-    if completed.returncode != 0 or len(safe_results) != 1 or safe_errors:
-        for error in safe_errors:
-            print("BATCH_STAGE_ERROR:", error, flush=True)
-        print("BATCH01_STOP_NO_RETRY_MANUAL_AUDIT_REQUIRED", flush=True)
-        # Never print unfiltered stdout/stderr, prompts or credential context.
-        raise RuntimeError("Batch stopped; preserve claims, do not rerun")
-    result = json.loads(safe_results[0])
-    assert result["stage_id"] == sid
-    finished.append(result)
-    print("BATCH_STAGE:", json.dumps(result, ensure_ascii=False), flush=True)
-    if result["status"] != "RECORDED_COMPLETE":
-        print("BATCH01_STOP_NONCOMPLETE_NO_RETRY", flush=True)
-        raise RuntimeError("Noncomplete stage; audit before any further stage")
+try:
+    for i, sid in enumerate(BATCH, 1):
+        print(f"\n=== REAL STAGE {i}/10: {sid} ===", flush=True)
+        completed = subprocess.run(
+            [sys.executable, "-c", driver, sid],
+            cwd=REPO, env=paid_env,
+            text=True, capture_output=True,
+        )
+        lines = completed.stdout.splitlines()
+        safe_results = [line[len("RQ2_BATCH_STAGE_RESULT:"):]
+                        for line in lines if line.startswith("RQ2_BATCH_STAGE_RESULT:")]
+        safe_errors = [line[len("RQ2_BATCH_STAGE_ERROR:"):]
+                       for line in lines if line.startswith("RQ2_BATCH_STAGE_ERROR:")]
+        if completed.returncode != 0 or len(safe_results) != 1 or safe_errors:
+            for error in safe_errors:
+                print("BATCH_STAGE_ERROR:", error, flush=True)
+            print("BATCH01_STOP_NO_RETRY_MANUAL_AUDIT_REQUIRED", flush=True)
+            # Never print unfiltered stdout/stderr, prompts or credential context.
+            raise RuntimeError("Batch stopped; preserve claims, do not rerun")
+        result = json.loads(safe_results[0])
+        assert result["stage_id"] == sid
+        finished.append(result)
+        print("BATCH_STAGE:", json.dumps(result, ensure_ascii=False), flush=True)
+        if result["status"] != "RECORDED_COMPLETE":
+            print("BATCH01_STOP_NONCOMPLETE_NO_RETRY", flush=True)
+            raise RuntimeError("Noncomplete stage; audit before any further stage")
+finally:
+    # Eliminare sempre la chiave dal dizionario del notebook, anche su errore.
+    paid_env.pop("GOOGLE_API_KEY", None)
 print("\nSTATUS: BATCH01_10_REAL_DISCOVERY_STAGES_COMPLETED")
 print("BATCH01_COMPLETED_COUNT:", len(finished))
 print("OTHER_STAGES: NOT_LAUNCHED")
 print("OOD_TEST: LOCKED")
-# No further API calls. Secret was never displayed or stored.
-paid_env.pop("GOOGLE_API_KEY", None)
 ~~~
 
 ## Invio dell'output
