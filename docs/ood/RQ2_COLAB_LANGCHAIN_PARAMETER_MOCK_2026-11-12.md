@@ -1,6 +1,6 @@
 # RQ2 — Prova dinamica offline LangChain → SDK: parametri di retry/timeout
 
-**12 novembre 2026 · Stato: 8/8 unit test PyCharm SUPERATI (`Ran 8 tests in 0.005s — OK`, confermato dall'utente); prova runtime Colab non ancora eseguita.**
+**12 novembre 2026 · Stato: 8/8 test PyCharm (`0.005s`) E 8/8 Colab (`0.002s`) SUPERATI; forwarding locale runtime attestato dall'utente, trasporto HTTP non ancora certificato.**
 
 ## Decisione tecnica
 
@@ -127,3 +127,27 @@ Riportare all'assistente output completo, soprattutto gli oggetti
 `google` e `anthropic`, senza alterare i pacchetti. Se fallisce
 un import o una costruzione locale, non cambiare le versioni: verificare
 il traceback e correggere solo il probe prima di firmare qualsiasi release.
+
+
+## Esito Colab realmente attestato — 12/11/2026
+
+- **Git commit:** `5c6c56c246abbf7a187b173ac0375f88f9d2b440`.
+- **Unit test:** `Ran 8 tests in 0.002s — OK`.
+- **Status:** `LANGCHAIN_LOCAL_FORWARDING_CHECKED_NETWORK_HTTP_NOT_CERTIFIED`.
+- **Gemini:** modello `gemini-3.5-flash-lite`, `configured_max_retries=1`,
+  `sdk_http_retry_attempts=1`, `configured_timeout_seconds=300.0`,
+  `sdk_http_timeout_milliseconds=300000`,
+  `generate_content_invoked=false`, `client_network_calls=0`.
+- **Claude:** `configured_max_retries=0`, `sdk_max_retries=0`,
+  `configured_timeout_seconds=300.0`, `sdk_timeout_seconds=300.0`,
+  `messages_create_invoked=false`, `client_network_calls=0`.
+- `external_provider_requests=0`, `real_credentials_used=false`,
+  `sdk_http_transport_exercised=false`; nessuna lettura GT/Market/predizioni
+  e nessuna scrittura file da questo probe.
+- **Release non firmato**, stage D/C/K/test ancora bloccati.
+
+**Interpretazione:** il forwarding locale LangChain → oggetti SDK è
+verificato **per i parametri di prova** su versioni e SHA effettivamente
+installati in Colab. Nessuna evidenza di richieste HTTP bloccate, di
+streaming, di retry nascosti in invocazioni né di timeout sotto stallo.
+Non prendere `300s` come scelta scientifica già approvata.
