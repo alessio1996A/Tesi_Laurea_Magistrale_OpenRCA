@@ -693,3 +693,19 @@ Dopo **15/15 suite provider C/K verde** (§64), creato `src/evaluation/rq2_disco
 **Nuova suite preparata, NON ANCORA eseguita:** `src/tests/test_rq2_discovery_d_provider_transport.py` commit `30e3c0c8b16a864889d97e99f814539ae345b85a`, **12 test sintetici**. Il test monkeypatcha un release temporaneo e la sola funzione `run_experiment`; i componenti source-bound e claim/recorder restano attivi su CSV finti temporanei con SHA di fixture. Prova percorso D, conformità config, preflight fail-closed, duplicati, eccezioni runner senza retry, conservazione metriche ed errori. Documento `docs/ood/RQ2_DISCOVERY_D_RUNNER_ORIGINALE_GATE_PRE_FREEZE_2026-11-12.md` commit `86048c5aae33792320f4ecdf8e23de732e02e9f3`.
 
 **Prossimo comando PyCharm** dopo pull: `python -m unittest discover -s src/tests -p "test_rq2_discovery_d_provider_transport.py" -v`, **attesi 12 test, NON ancora verificati**. Se verdi, completare **una sola preregistrazione scientifica con release immutabile** e un preflight Colab offline, poi pilot reale su 1 discovery previa approvazione. Le 11 test rimangono chiuse fino a freeze delle pseudoregole. Non ripartire da zero né modificare protocollo RQ1 congelato.
+
+## 66. Suite D discovery: 12 errori di setup nella fixture annidata, corretti (12 novembre 2026)
+
+**Log PyCharm dell'utente** per `python -m unittest discover -s src/tests -p "test_rq2_discovery_d_provider_transport.py" -v`: `Ran 12 tests in 0.451s — FAILED (errors=12)`. **Tutti i traceback sono identici**, alla riga 48 di `setUp()`: `AttributeError: 'RQ2ActualCKProviderAdapterOfflineTests' object has no attribute 'plan'`. Nessuno dei 12 metodi di test ha raggiunto il suo scenario; **nessuna chiamata API e nessuna esecuzione del vero motore sui casi OOD**.
+
+**Diagnosi:** il nuovo setup crea `parent = RQ2ActualCKProviderAdapterOfflineTests(...)`, la quale conserva il setup di origine `RQ2ClaimRecorderEndToEndTests` come `parent.parent`. Il piano sintetico è `parent.parent.plan`, **non** `parent.plan`. La suite richiama la proprietà sbagliata in **quattro punti**: patch `preview_market`, SHA dello split, SHA del manifest e lista dei casi discovery.
+
+**Correzione soltanto nel test** `src/tests/test_rq2_discovery_d_provider_transport.py` commit `d8628902df35b6f69d7b5a0dc63166efdce64d9d`: sostituite le 4 occorrenze `parent.plan` con `parent.parent.plan`. La fixture e gli SHA sono finti solo per la suite; nessun sorgente RQ1, codice D/C/K di produzione, hash scientifico o blocco delle API è stato modificato. **I 12 test NON sono stati ancora rieseguiti**.
+
+**Prossimo comando PyCharm:**
+```powershell
+git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10
+$env:PYTHONPATH="src"
+python -m unittest discover -s src/tests -p "test_rq2_discovery_d_provider_transport.py" -v
+```
+Attesi **12 test**. Se emergono errori diversi dopo il setup, diagnosticare gli specifici traceback (ora il test può raggiungere il codice D). In produzione resta `RELEASE_SHA256=None`, gli 11 test OOD rimangono chiusi, nessun provider chiamato, budget monetario non vincolato.
