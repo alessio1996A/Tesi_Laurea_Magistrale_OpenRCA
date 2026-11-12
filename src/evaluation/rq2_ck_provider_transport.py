@@ -12,8 +12,9 @@ discovery case, reconstructs C/K solely from saved D/C, creates a claim
 BEFORE any SDK construction, then writes raw result + usage into the
 existing create-only RQ2 stage record. Ambiguous crash => no auto retry.
 
-This implementation is *not yet executable*: RELEASE_SHA256 is None until
-the scientific preregistration is completed, audited and committed.
+Scientific release SHA-256 is pinned after successful independent GitHub/Drive
+readback. Provider execution STILL requires confirm_paid_api=True for exactly
+one approved stage; no live API is authorized by the release itself.
 """
 from __future__ import annotations
 
@@ -41,7 +42,7 @@ from evaluation.rq2_toolfree_fake_transport import (
 )
 
 VERSION = "rq2_ck_provider_transport_v1_rq2_only_factory"
-RELEASE_SHA256 = None  # SET ONLY AFTER SCIENTIFIC FREEZE; NEVER in a pilot ad hoc.
+RELEASE_SHA256 = "a35c02f830a3c5f97424e0cbf8653eda6cfa674b9c8c34d95d04627e1dba8c52"  # Signed RQ2 discovery; test OOD remains locked.
 RELEASE_FILENAME = "RQ2_SCIENTIFIC_DISCOVERY_RELEASE_V1.json"
 
 
@@ -234,8 +235,9 @@ def run_one_claimed_ck(
 ) -> dict:
     """Live path: preregistered source/freeze -> claim -> invoke -> record.
 
-    Currently always blocked by RELEASE_SHA256=None. Never call in unit tests
-    with real credentials or with unsaved claims. Does not release test.
+    Requires exact SHA-pinned discovery release AND confirm_paid_api=True.
+    Never call in unit tests with real credentials or with unsaved claims.
+    Does not release test or authorize any live provider request by itself.
     """
     if confirm_paid_api is not True:
         raise RQ2LiveCKBlocked("Explicit paid API invocation confirmation required")
