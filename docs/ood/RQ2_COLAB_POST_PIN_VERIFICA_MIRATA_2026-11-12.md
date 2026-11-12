@@ -180,7 +180,7 @@ code = (
     "['confirm_paid_api'].default is False;"
     "assert signature(run_one_claimed_ck).parameters"
     "['confirm_paid_api'].default is False;"
-    "stage = 'rq2_dryrun_workflow_preview_v0:cloudbed-1_q032:gemini:A1:D';"
+    "stage = 'rq2_dryrun_workflow_preview_v0:cloudbed-1_q032:gemini:A1:D'\n"
     "try:\n"
     " run_one_claimed_discovery_d(data_dir=Path("
       + repr(str(DATA)) + "),repo_dir=Path("
