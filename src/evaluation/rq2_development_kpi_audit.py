@@ -86,6 +86,20 @@ def _development_intervals(split: dict, manifest: dict, *, synthetic: bool):
     if not synthetic and dict(counts) != EXPECTED_SPLITS:
         raise KPIAuditError("Original frozen cohort counts differ")
 
+    # Explicit GT-free overlap guard: if any development window intersects
+    # an OOD holdout window, a development-only numeric audit is impossible
+    # without also aggregating holdout observations. Fail closed.
+    development = [r for r in split.values() if r["split"] == "development"]
+    ood = [r for r in split.values() if r["split"] == "ood_holdout"]
+    for dev in development:
+        a, b = _window(dev)
+        for heldout in ood:
+            if dev["cloudbed"] != heldout["cloudbed"]:
+                continue
+            c, d = _window(heldout)
+            if a < d and c < b:
+                raise KPIAuditError("Development/holdout windows intersect")
+    
     per_member: dict[str, list[tuple[int, int]]] = defaultdict(list)
     dev_ids = 0
     for cid, row in split.items():
