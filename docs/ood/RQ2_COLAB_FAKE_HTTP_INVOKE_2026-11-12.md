@@ -30,6 +30,34 @@ nel percorso LangChain → SDK quando il server restituisce 503.
 - `RELEASE_SHA256=None` e `PLAN_STATUS=DRAFT_NOT_EXECUTABLE`
   devono rimanere tali anche se il test è positivo.
 
+## Errore dei test PyCharm e correzione circoscritta (12 novembre 2026)
+
+**Primo output effettivo PyCharm:** `Ran 8 tests in 0.010s`,
+`FAILED (failures=1, errors=1)`; 6 test passati,
+`test_mocked_503_must_be_observed_once` ERROR e
+`test_nonerror_fake_transport_response_is_rejected` FAIL.
+
+**Causa precisa nel test:** `type("FakeMessages", (), {"HumanMessage":
+lambda **kwargs: ...})()` inserisce una funzione dentro una classe;
+l'accesso tramite istanza produce un **metodo bound** e Python gli passa
+`self` anche se il lambda accetta solo keyword arguments. La costruzione
+del messaggio genera `TypeError` prima di `model.invoke`; l'handler
+generico osserva quindi un conteggio HTTP finto pari a zero. **Non è
+un errore del provider** e non esiste una richiesta API reale in questo test.
+
+**Fix:** sostituiti i tre finti moduli messaggi con un vero
+`types.ModuleType("langchain_core.messages")` e funzioni assegnate
+all'istanza ModuleType: non c'è più il binding `self` imprevisto.
+Il fix riguarda **solo** `src/tests/test_rq2_langchain_fake_http_invoke.py`.
+La funzione di prova HTTP vera, factory RQ1 e gate release non cambiano.
+Una riproduzione sintetica con sole librerie standard ha superato
+entrambi i percorsi prima difettosi; **non è ancora l'attestazione
+dell'intera suite PyCharm**.
+
+**Azione:** prima ripetere gli 8 test PyCharm sul nuovo commit.
+Solo se sono tutti `OK`, utilizzare la successiva cella Colab.
+Non reinstallare pacchetti e non attivare API a pagamento.
+
 ## Fase A: PyCharm (unit test stdlib, nessun provider)
 
 ```powershell
