@@ -588,3 +588,30 @@ python -m unittest discover -s src/tests -p "test_rq2_protocol_identity_prefligh
 python -m evaluation.rq2_protocol_identity_preflight
 ```
 **Attesi 14 test, poi JSON con hash C/K da acquisire.** Lo snapshot non è ancora un freeze scientifico, e non attesta runtime delle vere API. Prima dei provider: pin esplicito mode D/config, hash prompt C/K, versione/parametri provider, verfica fake `run_experiment` storico e protocollo 4+11.
+
+## 57. Preflight sorgenti RQ1 e SHA dei prompt C/K: 14/14 test ed esecuzione CLI confermati (12 novembre 2026)
+
+**Output dell'utente su PyCharm:**
+```
+Ran 14 tests in 0.348s
+
+OK
+```
+Eseguito inoltre `python -m evaluation.rq2_protocol_identity_preflight`, JSON `version=rq2_protocol_identity_preflight_v0`, `status=SOURCE_PROVENANCE_CAPTURE_NOT_SCIENTIFIC_FREEZE`, `rq1_reference_commit=e4845e7fe9a399e10dd2db6f320dfeaeeddf3379`, `rq1_source_blob_sha1_match=true`. **13/13 sorgenti RQ1** in elenco corrispondono ai Git blob congelati. `rq1_D_output_contract_mode_verified=v2_enforce`; proposta identica RQ2 D, `D_variant_scheme=current`, `D_max_tool_rounds=6`, `D_recursion_limit=30`, harness `A1,A1_8R`.
+
+**Cattura SHA-256 reale dall'output CLI (pre-freeze, non nuovo protocollo immutabile):**
+- Prompt C `CAUSE_SYSTEM`: `81a5800500b3fafc23af4b7643e79a3d206c3ca6c80f6924514001ec85dc2a42`.
+- Prompt K `RULE_SYSTEM`: `0935e2b7232715b623bb174f0a059387659f8d9bc7939804c8a372d8aa27ba71`.
+- `evaluation/rq2_probe_adapter.py` SHA256 `60de1f73af15609a4328532dacd54b20b42701836bd6d6c4b60128ef9e6a4e53`.
+- `evaluation/rq2_output_contracts.py` `6c4d838bc86daf118b896462a3ee9a88f2952100126d58a0173a816b02fd4c0b`.
+- `evaluation/rq2_evidence_bundle.py` `c51fc5cb4455e46037352b52fb3fa0ec83ea275a91219269b683755ffa360e79`.
+- `evaluation/rq2_stage_binding.py` `8a353d8ffb30eafe8a3db3334a361224a2e38dd405750cfe30cc42357cdee97c`.
+- `evaluation/rq2_discovery_stage_recorder.py` `39986f1e74442f65046f1812abdc8a5fd16dd2cfb57326dfca80ccc6203b2873`.
+- `evaluation/rq2_discovery_claim_journal.py` `378c5f871dc1395f706c650be4227a795bc7f9548e6ed91e6c85e64a938b7ec1`.
+- `evaluation/rq2_stage_artifact_store.py` `1badfae0038622e186a6e8a5dd739f9c67af841cc2e6309dc18af45cb671f7cd`.
+- La suite controlla **sorgenti RQ1 nel clone reale locale**, non il dataset; `read_market=false`, `read_ground_truth=false`, `read_model_predictions=false`, `provider_issued_requests=0`, `files_written=false`.
+- Modelli proposti `gemini-3.5-flash-lite`, `claude-sonnet-5-5`, `claude-haiku-5-5`; max output Anthropic 4096, sampler non esplicitamente pinned nella factory storica.
+
+**Caveat vincolanti:** il report conferma `rq2_scientific_protocol_frozen=false`, `rq2_discovery_api_enabled=false`, `rq2_test_unlocked=false`. Si sono **acquisite** le impronte dei prompt ma non si è ancora verificata/fissata la configurazione runtime tool-free per C/K né l'identità di tutte le dipendenze; gli SHA delle sole stringhe di sistema non coprono i prompt dinamici per caso. Il protocollo deve definire e immutabilmente vincolare i parametri prima delle API, senza accesso ai casi test.
+
+**Prossimo passo:** esercitare `run_experiment(config,llm=fake,salva=False)` nel vero LangGraph con caso e tool **sintetici e confinati**, e poi provare la chiamata tool-free C/K con provider fake. Non modificare runner RQ1, non chiamare API/Market, non introdurre cost ceiling.
