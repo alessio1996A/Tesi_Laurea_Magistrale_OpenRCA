@@ -898,3 +898,37 @@ formalizzabilità KPI senza vedere test OOD, audit isolato della
 discovery per classe e arm Sonnet/A1_8R, quindi firmare release e chiedere
 autorizzazione della prima D. Alla scadenza 1 dicembre
 mancano 19 giorni: avviare in parallelo capitoli tesi su RQ1 e metodo.
+
+
+## 77. Preparato ultimo audit tecnico sync invoke con HTTP 503 finto — NON eseguito (12 novembre 2026)
+
+Dopo il `8/8 OK` reale del forwarding LangChain→SDK, sono stati
+aggiunti sullo stesso branch, **solo RQ2**:
+- `src/evaluation/rq2_langchain_fake_http_invoke.py`, nuovo
+  probe Colab `rq2_langchain_fake_http_invoke_v0`;
+- `src/tests/test_rq2_langchain_fake_http_invoke.py` (8 test stdlib
+  unitari, NON ancora attestati dall'utente);
+- `docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md` con un'unica
+  cella Colab e procedura PyCharm.
+
+Il probe richiede l'identità di sorgenti e package Colab già verificata,
+il release NON firmato e i gate D/C/K/test chiusi. Con chiavi **letterali
+finte** costruisce `ChatGoogleGenerativeAI` (`max_retries=1`,
+`timeout=300s`) e `ChatAnthropic` (`max_retries=0`,
+`timeout=300s`, `max_tokens=4096`). I rispettivi SDK sono
+forzati a usare esclusivamente `httpx/httpx2.MockTransport` che
+risponde HTTP 503 e il socket è bloccato a livello Python.
+Per ogni provider esegue **due** `invoke` sync sintetici (tool-free
+come C/K, `bind_tools` come D) e accetta solo **un invio HTTP finto**
+per ogni `invoke`. Nessun tool reale, Market, GT, predizioni, token o
+API esterna. Non certifica async, streaming o timeout contro stallo
+di rete e **non** sblocca il release.
+
+I test sintetici e la CLI Colab sono **predisposti ma non ancora
+eseguiti dall'utente**: non attribuire loro esito positivo anticipato.
+Non modificare `src/agent/model_factory.py` congelata, e non
+rimettere mano al protocollo RQ1. Dopo la prova, chiudere la policy
+RQ2-only senza moltiplicare audit, e soprattutto le decisioni
+scientifiche preregistrate; infine release immutabile e autorizzazione
+alla prima run D discovery. Parallelamente iniziare stesura tesi
+con 19 giorni alla consegna del 1 dicembre 2026.
