@@ -465,3 +465,9 @@ Confermata la correzione della raccolta `unittest`: **16/16 test dell'integrazio
 **Documentazione:** `docs/ood/RQ2_PREFLIGHT_D_SOURCE_BOUND_2026-11-12.md`, commit `5fd04621e31e9a22cb1268835313b52fa7dc467a`.
 
 **Prossimo comando PyCharm:** `python -m unittest discover -s src/tests -p "test_rq2_source_bound_d_preflight.py" -v` dopo pull, **attesi 16 test**. Nessuna esecuzione Colab o chiamata provider ancora autorizzata. Un futuro runner reale dovrà aggiungere budget, provider/temperature/parametri pin, error states e persistence create-only vera; il mock freeze non sblocca i test reali. RQ1 invariata.
+
+## 44. Preflight source-bound D superato in PyCharm; autorizzata solo progettazione della persistenza (12 novembre 2026)
+
+**Log dell'utente:** `Ran 16 tests in 0.524s — OK` per `src/tests/test_rq2_source_bound_d_preflight.py`. Sono **16/16 test sintetici** della verifica di identità fonte/piano/finestre/configurazione D, senza errori. Questo non costituisce un preflight Colab eseguito con la nuova funzione sul dataset vero, né prova che la D possa essere lanciata: `can_execute_api=false`, `DRAFT_NOT_EXECUTABLE`, ID modello e budget non congelati.
+
+**Passaggio successivo:** storage persistente RQ2 isolato dal percorso `data/results` congelato RQ1, create-only, digest dei payload e delle dipendenze, guardie GT e audit crash/restart; prima soltanto con fixture sintetiche e nessuna invocazione modello. Distinguere ricevute `rq2_mock_journal` da archivi **di output** per future run, senza utilizzare il freeze mock come autorizzazione della fase test. Non dichiarare esito dei nuovi test prima del log PyCharm.
