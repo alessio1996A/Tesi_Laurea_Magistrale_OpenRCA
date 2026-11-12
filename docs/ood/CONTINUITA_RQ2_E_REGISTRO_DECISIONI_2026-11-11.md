@@ -851,3 +851,50 @@ evidence GT isolato, scelta arm dimostrativo e freeze release.
 **Prossimo passo**: pull PyCharm, 8 unit test del probe, poi unica
 cella Colab documentata, riportare output; evitare altro branching
 di ricerca e decidere quindi una policy RQ2-only finalizzabile.
+
+
+## 76. Forwarding runtime LangChain→SDK confermato in Colab; policy RQ2 solo candidata (12 novembre 2026)
+
+L'utente ha eseguito Colab sul commit
+`5c6c56c246abbf7a187b173ac0375f88f9d2b440`:
+`Ran 8 tests in 0.002s — OK`,
+`RQ2 MOCK PARAMETER FORWARDING: CONTROLLI SUPERATI`,
+`LANGCHAIN_LOCAL_FORWARDING_CHECKED_NETWORK_HTTP_NOT_CERTIFIED`.
+Con chiavi sintetiche e socket bloccati:
+- Gemini `gemini-3.5-flash-lite`:
+  `configured_max_retries=1`, `sdk_http_retry_attempts=1`,
+  `configured_timeout_seconds=300.0`,
+  `sdk_http_timeout_milliseconds=300000`.
+- Anthropic: `configured_max_retries=0`,
+  `sdk_max_retries=0`, `configured_timeout_seconds=300.0`,
+  `sdk_timeout_seconds=300.0`.
+- `generate_content_invoked=false`,
+  `messages_create_invoked=false`,
+  `external_provider_requests=0`, `real_credentials_used=false`,
+  `sdk_http_transport_exercised=false`; nessun GT/Market/predizioni/file.
+  Tutti i gate D/C/K/test falsi. Evidenza integrale descritta in
+  `RQ2_COLAB_LANGCHAIN_PARAMETER_MOCK_2026-11-12.md`.
+
+**Conclusione certificabile:** inoltro locale parametri dalla LangChain
+concreta al client SDK, non controllo end-to-end su HTTP. Il valore
+`300s` **era di prova**, non una decisione scientifica approvata.
+
+Per ridurre test ripetitivi, formalizzata una sola proposta tecnica in
+`docs/ood/RQ2_PROVIDER_RUNTIME_POLICY_CANDIDATE_2026-11-12.md`:
+Google `max_retries=1` (= 1 tentativo complessivo sulla versione
+Google pinned), Claude `max_retries=0`; timeout per-request candidato
+300s; no stage automatic retry; nessun cambio a RQ1; sola factory
+RQ2-only futura, iniettata nel runner D storico mediante il parametro
+`llm` opzionale e usata in C/K. Risultati RQ1 frozen non modificati;
+non rivendicare parità totale dei trasporti. Evitare `ainvoke/stream`
+non verificati nel protocollo RQ2. La checklist prereg è rimasta
+**[ ]** sui retry/timeout, perché il semplice forwarding locale non
+è una verifica HTTP completa; release/plan ancora bloccati.
+
+**Passi critici successivi**: un unico test con HTTP completamente fake
+su `invoke` sync in SDK reali; solo allora scelta/freeze espliciti della
+policy RQ2-only; contemporaneamente chiudere scoring alias ex ante,
+formalizzabilità KPI senza vedere test OOD, audit isolato della
+discovery per classe e arm Sonnet/A1_8R, quindi firmare release e chiedere
+autorizzazione della prima D. Alla scadenza 1 dicembre
+mancano 19 giorni: avviare in parallelo capitoli tesi su RQ1 e metodo.
