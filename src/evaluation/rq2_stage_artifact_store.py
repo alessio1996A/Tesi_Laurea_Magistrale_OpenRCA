@@ -295,6 +295,19 @@ class RQ2StageArtifactStore:
             "test_phase_unlocked": False,
         }
 
+    def load_discovery_stage(self, *, stage_id: str) -> dict | None:
+        """Load a verified discovery artifact, never release test or model calls.
+
+        Re-audits the full journal first, then returns the canonical record.
+        This is for a separate offline D/C/K recorder, NOT a provider runner.
+        """
+        if type(stage_id) is not str or stage_id not in self.entries:
+            raise RQ2ArtifactStoreError("Unknown discovery stage")
+        if self.entries[stage_id]["phase"] != "discovery":
+            raise RQ2ArtifactStoreError("Test artifacts remain locked")
+        self.audit_restart()
+        return self._check_record(stage_id)
+
     def save_discovery_stage(
         self, *, stage_id: str, model_id_proposed: str,
         status: str, artifact: dict,
