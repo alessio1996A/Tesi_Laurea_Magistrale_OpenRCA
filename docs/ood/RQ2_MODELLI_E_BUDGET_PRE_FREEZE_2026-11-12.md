@@ -1,6 +1,6 @@
 # RQ2 — Identità dei modelli, tariffe e scenari di budget (pre-freeze)
 
-**12 novembre 2026** — Documento di progettazione e stima **OFFLINE, NON eseguibile, NON autorizzato alla spesa**. RQ1 e i suoi risultati congelati rimangono invariati.
+**12 novembre 2026** — Documento di progettazione e stima **OFFLINE, NON eseguibile**. **Aggiornamento successivo del 12 novembre:** su indicazione dell'utente, il professore ha autorizzato un budget senza massimale prefissato; resta da finalizzare il protocollo tecnico/scientifico prima delle chiamate reali. RQ1 e i suoi risultati congelati rimangono invariati.
 
 ## 1. Base verificata
 
@@ -83,7 +83,7 @@ Perché la fascia Haiku è un intervallo? I 150.000 input token nella D sono una
 - `estimate_campaign_cost()` riceve esattamente 3 ipotesi di token D/C/K, conta i 30/30/8 stage per modello e calcola scenari low/conservative con `Decimal`, senza usare un provider o leggere file;
 - Sempre `can_execute_api=false`, `api_budget_approved=false`, `scientific_protocol_frozen=false`, `cost_hard_cap_enforced=false`, `approved_spending_limit_usd=null`. **Nessun limite numerico è stato autorizzato dall'utente** e il codice non può far partire inference.
 
-`src/tests/test_rq2_budget_preflight.py`: **16 test sintetici predisposti, ancora da eseguire**. Coprono ID esatti, factory drift, tariffe e input non validi, soglia Haiku a 100k e per-request C/K, coorte 204, scenario riproducibile, nessun provider creato e nessun blocco sciolto.
+`src/tests/test_rq2_budget_preflight.py`: **16 test sintetici completati in PyCharm: `Ran 16 tests in 0.005s — OK`**. Coprono ID esatti, factory drift, tariffe e input non validi, soglia Haiku a 100k e per-request C/K, coorte 204, scenario riproducibile, nessun provider creato e nessun blocco sciolto.
 
 ### Prossimo comando PyCharm
 
@@ -94,14 +94,14 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s src/tests -p "test_rq2_budget_preflight.py" -v
 ```
 
-**Attesi 16 test, non ancora confermati.**
+**Esito confermato dall'utente: 16/16 — OK.**
 
 ## 6. Decisioni da congelare PRIMA di spendere
 
 1. **Versioni/ID e parametri**: tre nomi sopra, compatibili con RQ1; `temperature`, output token limit, eventuali effort defaults e tentativi di retry. Una modifica rispetto alla RQ1 va motivata.
 2. **Output mode di D**: la scelta `legacy` vs `v2_enforce` è ancora aperta nel preflight; stabilirla prima della prima run. Per C/K i prompt/validator devono avere hash congelati.
-3. **Hard cap reale**: scegliere assieme all'utente un importo massimo USD per la discovery e per l'intera campagna, pre-claim in caso di chiamata già avviata, e rifiuto fail-closed quando il costo stimato residuo supera il budget. Il calcolatore da solo non impone tale cap e non autorizza API.
+3. **Budget senza limite USD prestabilito (decisione del relatore riferita dall'utente):** nessun hard cap finanziario da approvare o imporre; conservare token, numero di chiamate, utilizzo/costi a fini di reporting. Il **claim create-only** resta necessario per evitare duplicazioni involontarie e perdita di provenienza: non è una quota economica. Il calcolatore offline non autorizza l'esecuzione, che rimane subordinata al protocollo tecnico e scientifico.
 4. **Pilot senza contaminazione dei test**: provare un caso sintetico o development e una sola configurazione, con massimo e log di token/costo. L'output del pilot non deve essere usato per ottimizzare le regole sui test.
 5. **Scientific freeze**: protocolli, candidato 4+11, metriche e criterio di selezione K devono essere congelati *prima* dei risultati di test; l'archivio mock e il preflight budget non possono aprire il test.
 
-**Stato:** RQ2 ancora `DRAFT_NOT_EXECUTABLE`. Non sono state lanciate nuove API e non esistono risultati reali della discovery.
+**Stato:** RQ2 ancora `DRAFT_NOT_EXECUTABLE` per motivi tecnico-scientifici, **non per mancanza di budget economico**. Non sono state lanciate nuove API e non esistono risultati reali della discovery.
