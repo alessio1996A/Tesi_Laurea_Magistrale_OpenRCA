@@ -1,7 +1,8 @@
 """Actual C/K provider path, HARD-BLOCKED until scientific protocol release.
 
-Uses the unchanged RQ1 agent.model_factory.crea_modello to instantiate
-Gemini/Anthropic, but no provider client is created at import or in preflight.
+Uses the RQ2-only candidate factory with explicit no-retry/timeout kwargs,
+while preserving the unchanged RQ1 agent and its original model factory.
+No provider client is created at import or in preflight.
 Only a future, separately reviewed release with an exact pinned SHA-256
 can enable a discovery request. No test stages, no auto retry, no tools,
 no budget ceiling (per supervisor), no ground truth or scorer access.
@@ -24,7 +25,7 @@ from pathlib import Path
 from langchain_core.messages import AIMessage
 
 from agent.graph_engine import testo_messaggio
-from agent.model_factory import crea_modello
+from evaluation.rq2_model_factory import crea_modello_rq2 as crea_modello
 from evaluation.rq2_budget_preflight import CANDIDATE_MODELS
 from evaluation.rq2_discovery_claim_journal import RQ2DiscoveryClaimJournal
 from evaluation.rq2_discovery_stage_recorder import RQ2DiscoveryStageRecorder
@@ -39,7 +40,7 @@ from evaluation.rq2_toolfree_fake_transport import (
     _check_package,
 )
 
-VERSION = "rq2_ck_provider_transport_v0"
+VERSION = "rq2_ck_provider_transport_v1_rq2_only_factory"
 RELEASE_SHA256 = None  # SET ONLY AFTER SCIENTIFIC FREEZE; NEVER in a pilot ad hoc.
 RELEASE_FILENAME = "RQ2_SCIENTIFIC_DISCOVERY_RELEASE_V1.json"
 
@@ -193,7 +194,7 @@ def _one_call(provider: str, model_id: str, messages: list) -> dict:
         "finish_reason": None, "provider_response_model": None,
     }
     try:
-        model = crea_modello(provider, model_id)  # lazy model SDK factory
+        model = crea_modello(provider, model_id)  # RQ2-only pinned lazy SDK factory
     except Exception as exc:
         result["provider_error"] = "SDK_CONSTRUCTION_ERROR:" + type(exc).__name__
     else:
