@@ -109,3 +109,49 @@ esclusivamente **dopo** l'autorizzazione tramite release firmato:
 metodologica della RQ2; non è un risultato diagnostico. Con la consegna
 del 1 dicembre, iniziare parallelamente la scrittura dei capitoli
 RQ1/architettura senza aspettare l'esito delle discovery.
+
+
+## 12/11: chiuso il gate del fake HTTP sync; integrazione RQ2-only candidata
+
+**Output Colab realmente attestato:** sul commit
+`7019020364dfae6ae649d9620ffb4948e70a2f71`,
+`Ran 8 tests in 0.004s — OK`,
+`SYNC_FAKE_HTTP_503_INVOKE_VERIFIED_AS_TESTED_NOT_RELEASED`.
+Google `httpx.MockTransport` e Claude `httpx2.MockTransport`:
+**1 solo send HTTP finto per ciascuna delle 4 invocazioni**,
+`CK_tool_free` e `D_bound_tools` su entrambi i provider.
+Zero richieste reali, zero tool eseguiti. È ora lecito considerare
+**verificato solo** il no-retry per `invoke` sincrono con HTTP 503
+mockato sulle versioni/sorgenti Colab pin, non per async,
+streaming o timeout fisico.
+
+**Codice candidato aggiunto dopo questo risultato** (da sottoporre
+ancora a unit test aggiornati e freeze):
+- `src/evaluation/rq2_model_factory.py`: consentiti esattamente
+  Google Gemini 3.5 Flash Lite, Claude Sonnet 5.5 e Claude Haiku 5.5;
+  verifica 6 versioni e 4 SHA file SDK prima di istanziare modelli;
+  Google `max_retries=1`, Claude `max_retries=0`,
+  entrambi `timeout=300s`, Claude `max_tokens=4096`.
+  Nessuna nuova temperature/sampling option.
+- `src/evaluation/rq2_discovery_d_provider_transport.py`:
+  riutilizza `run_experiment(config, llm=..., salva=False)`
+  senza cambiare il runner RQ1; istanzia la factory RQ2-only
+  **dopo** la validazione del release e del claim create-only.
+- `src/evaluation/rq2_ck_provider_transport.py`: importa
+  `crea_modello_rq2` come factory locale, lasciando invariata
+  la guardia del release, claim e l'unica `invoke` sync tool-free.
+- Test `src/tests/test_rq2_model_factory.py` (10 test stdlib
+  preparati, non ancora attestati) + adattamento al modello iniettato
+  degli esistenti test D. Tutti i mock C/K già presenti patchano
+  il simbolo locale `crea_modello` e non usano API vere.
+
+**Distinzione da RQ1:** i kwargs della factory sono deliberatamente
+più espliciti dei default Gemini storici e del timeout Claude storico.
+Resta valida la comparazione di *harness* all'interno della RQ2, con
+un trasporto replicabile; NON asserire che la configurazione provider
+RQ2 sia identica a quella storica RQ1. La fonte dell'agente RQ1
+`src/agent/model_factory.py` mantiene SHA Git blob
+`05308d5740763db0444556dcb7330d8fb4c308ec`.
+**Nessun release scientifico firmato e nessuna API live**.
+Il valore timeout 300s è un candidato operativo verificato solo
+come parametro, non come limite eseguito su stallo HTTP.
