@@ -80,7 +80,7 @@ Il catalogo `rq2_kpi_formalizability_preflight.py` contiene indicatori noti dal 
 
 **Tutti i seguenti gate sono ancora aperti** (e NON diventano “fatti approvati” grazie a questa bozza):
 
-- [ ] Verifica reale in Colab del `preview_market(data_dir)` con hash originali GT-free: controllo 4+11, gruppi 4+10, 204 stage e `preview_sha256` della coorte.
+- [x] Verifica reale in Colab del `preview_market(data_dir)` con hash originali GT-free: controllo 4+11, gruppi 4+10, 204 stage e `preview_sha256` della coorte. **Evidenza riportata dall'utente il 12/11:** `docs/ood/RQ2_PREFLIGHT_GT_FREE_REALE_VERIFICATO_2026-11-12.md`; questo solo gate tecnico è chiuso, mentre il release scientifico resta NON firmato.
 - [ ] Impronta esatta di commit Git/pacchetti runtime e policy effettiva di retry/timeout Google/Anthropic; *nessuna* modifica RQ1 non versionata.
 - [ ] Catalogo KPI versione e SHA, criteri statici conservativi di formalizzabilità e documentazione tecnica di unità/tipo/aggregazione; dove non certificabile => dichiarare not_formalizable.
 - [ ] Regole del mapping alias per lo scorer offline fissate senza vedere le predizioni; denominatori per provider errors e astensioni.
