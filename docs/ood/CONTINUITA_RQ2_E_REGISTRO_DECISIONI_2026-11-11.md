@@ -389,3 +389,11 @@ A seguito di **19/19 test del preflight K source-only superati** in PyCharm (§3
 - `docs/ood/RQ2_AUDIT_DISPONIBILITA_KPI_DEVELOPMENT_2026-11-12.md`: documentazione tecnica e limiti.
 
 **Prossimo comando PyCharm**, dopo `git pull --ff-only origin feature/ood-knowledge-transfer-audit-2026-11-10`: `python -m unittest discover -s src/tests -p "test_rq2_development_kpi_audit.py" -v`, attesi **17 test**. Solo in caso di successo passare al notebook Colab. RQ2 ancora **DRAFT_NOT_EXECUTABLE**, RQ1 congelata invariata, zero API.
+
+## 38. Audit KPI development: 16/16 test superati; correzione conteggio suite (12 novembre 2026)
+
+**Output PyCharm dell'utente:** `Ran 16 tests in 0.503s — OK` per `src/tests/test_rq2_development_kpi_audit.py`. L'esito è **positivo e completo**: verifica del sorgente GitHub conferma esattamente **16 metodi `unittest.TestCase.test_*`**. La precedente previsione di **17 test** nel §37 e nel report era un errore di conteggio: era stata inclusa per errore la funzione ausiliaria di modulo `def test_rows()`, che costruisce i dati sintetici e non è un metodo `unittest` eseguibile. **Non risulta alcun test saltato**. Documentazione corrente corretta, nessuna modifica al codice o agli esperimenti RQ1.
+
+**Prossimo passo ora autorizzato per sola lettura, senza API:** esecuzione di `notebooks/Colab_RQ2_Development_KPI_Presence_Audit_2026_11_12.ipynb` (una cella). Il notebook monta Drive, verifica i due CSV GT-free congelati, analizza i dati numerici nelle sole finestre `development`, stampa riepilogo aggregato e non scrive file né chiama modelli. **Precisazione I/O:** il parsing dei CSV giornalieri può decodificare righe di altri split, che però sono escluse dalle aggregazioni; non dichiarare una separazione fisica di lettura per byte. `source_verified=true` riguarda solo i due CSV GT-free, non l'hash completo del Market.zip.
+
+In attesa dell'output reale Colab, **non dichiarare verifica della presenza dei KPI nel Market effettivamente completata**. Il piano RQ2 rimane `DRAFT_NOT_EXECUTABLE`; non avviare inferenze.
