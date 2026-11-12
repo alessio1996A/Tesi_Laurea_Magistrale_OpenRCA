@@ -1062,3 +1062,60 @@ criteri KPI e arm principale `A1_8R + Sonnet` prima di qualsiasi
 OOD discovery; firma release solo con provenance/readback;
 poi prima D con consenso esplicito. Parallelizzare stesura tesi,
 consegna 1 dicembre.
+
+
+## 82. Factory RQ2-only validata 37/37 PyCharm e policy RQ2-A/K candidata ex ante (12 novembre 2026)
+
+**Output reali utente PyCharm** sul branch di RQ2, Windows .venv con
+`PYTHONPATH=src`:
+- `test_rq2_model_factory.py`: `Ran 10 tests in 0.055s — OK`.
+- `test_rq2_discovery_d_provider_transport.py`:
+  `Ran 12 tests in 0.963s — OK`.
+- `test_rq2_ck_provider_transport.py`:
+  `Ran 15 tests in 8.137s — OK`.
+**Totale 37/37**. Test con SDK finti e dati sintetici, non OOD
+reali. Colab precedente aveva separatamente certificato 4/4
+`LangChain.sync invoke` con risposta HTTP503 simulata e nessun
+retry addizionale; questi non sono ancora risultati diagnostici.
+
+Evidenza registrata in
+`docs/ood/RQ2_INTEGRAZIONE_FACTORY_ONLY_OFFLINE_TEST_2026-11-12.md`.
+La configurazione provider RQ2-only è ora verificata a livello unit
+test e mock HTTP sincrono nelle condizioni di prova, senza affermare
+certificazione di real-world timeout. RQ1 originali immutati,
+`RELEASE_SHA256=None` e `PLAN_STATUS=DRAFT_NOT_EXECUTABLE`.
+Nessuna API RQ2, costo reale zero e 11 casi test ancora chiusi.
+
+**Nuova decisione candidata esclusivamente per scorer offline:**
+`src/evaluation/rq2_fault_type_eval_policy.py` e
+`src/tests/test_rq2_fault_type_eval_policy.py` (16 test sintetici
+PREDISPOSTI, non ancora eseguiti), documentati in
+`docs/ood/RQ2_SCORING_E_FORMALIZZABILITA_PREREG_CANDIDATE_2026-11-12.md`.
+Quattro nomi ufficiali dal precedente inventario GT isolato;
+normalizzazione lessicale (case/punteggiatura/spazi, IO vs I/O)
+senza sinonimi/fuzzy o adattamenti alle risposte. Una
+`unmatched_diagnosis` conta come errata, non come astensione.
+Metrica primaria `correct/11` per provider+harness, mantenendo
+astensioni/invalid/provider error/blocked/missing nel denominatore;
+accuratezza condizionata e win/tie/loss sono secondari.
+Lo scorer riceve labels GT **solo** da processo di valutazione
+separato, non le importa in alcun prompt o runtime provider e non
+esporta mapping caso→classe.
+
+**Criterio K candidato:** catalogo 29 KPI noti nel codice RQ1
+non prova unità fisiche, presenza, tipo contatore o aggregazione;
+`candidate` JSON non basta per essere `formalizable`.
+Senza prove su development GT-free/documentazione e validazione
+deterministica ex ante, la K è `not_formalizable`, nessun
+pseudocodice eseguito; 0 regole formalizzabili sarebbe risultato
+negativo valido, non motivo per usare gli 11 test per ritarare.
+L'arm dimostrativo primario rimane proposto come
+`A1_8R + Claude Sonnet 5.5`, ancora non firmato nella release.
+
+**Prossimo passo unico PyCharm:** testare la nuova policy offline
+`python -m unittest discover -s src/tests -p "test_rq2_fault_type_eval_policy.py" -v`.
+Poi definire SHA/catalogo versionati e release scientifico
+create-only, verificato e firmato indipendentemente, con
+`test_unlocked=false`, prima di qualsiasi discovery autorizzata.
+Tesi, consegna 1 dicembre: avviare capitoli RQ1/architettura
+in parallelo, non aspettare la fine della campagna OOD.
