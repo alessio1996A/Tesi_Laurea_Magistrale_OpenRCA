@@ -963,3 +963,16 @@ PyCharm è ancora attestata**. Documento Colab aggiornato
 **Prossimo passo:** `git pull` e rerun 8 test PyCharm; SOLO con
 `Ran 8 tests ... OK` aprire la cella Colab. I 13 blob originali
 RQ1 invariati, release `RELEASE_SHA256=None`, test OOD bloccati.
+
+
+## 79. Ripetizione PyCharm dopo fix del mock HTTP: 8/8 PASS (12 novembre 2026)
+
+**Output utente:** `Ran 8 tests in 0.009s — OK` per
+`python -m unittest discover -s src/tests -p "test_rq2_langchain_fake_http_invoke.py" -v`,
+dopo correzione `ModuleType` dei tre mock `langchain_core.messages`.
+Il test *stdlib* certifica la logica di controllo locale, **non** ha
+ancora esercitato SDK o transport reali. Prova Colab con
+`httpx/httpx2.MockTransport` 503 e `model.invoke` sync
+**ancora pendente**. Cella e prerequisiti:
+`docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
+Tutti i blocchi RQ2/API/GT rimangono in vigore.
