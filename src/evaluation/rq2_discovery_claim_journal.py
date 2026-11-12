@@ -19,6 +19,9 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from evaluation.rq2_dryrun_plan import (
+    EXPECTED_MANIFEST_SHA256, EXPECTED_SPLIT_SHA256,
+)
 from evaluation.rq2_stage_artifact_store import (
     RQ2ArtifactStoreError, RQ2StageArtifactStore,
     _encoded, _create_exclusive, _read_canonical, _sha,
@@ -103,8 +106,8 @@ class RQ2DiscoveryClaimJournal:
             or claim["logical_model"] != entry["logical_model"]
             or claim["harness"] != entry["harness"]
             or claim["plan_preview_sha256"] != self.plan_sha
-            or claim["split_sha256"] != self.store.plan_split_sha256
-            or claim["manifest_sha256"] != self.store.plan_manifest_sha256
+            or claim["split_sha256"] != EXPECTED_SPLIT_SHA256
+            or claim["manifest_sha256"] != EXPECTED_MANIFEST_SHA256
             or claim["attempt_number"] != 1
             or type(claim["attempt_number"]) is not int
             or claim["authority"] != AUTHORITY
@@ -222,8 +225,8 @@ class RQ2DiscoveryClaimJournal:
             "harness": entry["harness"],
             "model_id_proposed": model_id_proposed,
             "plan_preview_sha256": self.plan_sha,
-            "split_sha256": self.store.plan_split_sha256,
-            "manifest_sha256": self.store.plan_manifest_sha256,
+            "split_sha256": EXPECTED_SPLIT_SHA256,
+            "manifest_sha256": EXPECTED_MANIFEST_SHA256,
             "dependency_record_hashes": dependencies,
             "attempt_number": 1,
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
