@@ -74,13 +74,15 @@ def _price(tokens: int, per_million: Decimal) -> Decimal:
     return Decimal(tokens) * per_million / TOKENS_PER_MTOK
 
 
-def _prices(model: str, input_tokens: int) -> tuple[dict, dict]:
+def _prices(model: str, stage: str, input_tokens: int) -> tuple[dict, dict]:
     base = BASE_PAID_USD_PER_MTOK[model]
     if model != "haiku" or input_tokens <= HAIKU_THRESHOLD:
         return base, base
-    # D may have multiple requests: low is possible if all prompts <=100k;
-    # high is a tariff upper bound if any prompts exceed 100k. Applying it
-    # to the entire D stage intentionally overestimates when requests mix.
+    # C/K are EACH one request: >100k input definitely triggers high tier.
+    if stage != "D":
+        return HAIKU_OVER_100K_USD_PER_MTOK, HAIKU_OVER_100K_USD_PER_MTOK
+    # D may have multiple requests: low remains possible when each prompt is
+    # <=100k, while high is a conservative entire-stage tariff bound.
     return base, HAIKU_OVER_100K_USD_PER_MTOK
 
 
@@ -125,7 +127,7 @@ def estimate_stage_token_cost(
         raise RQ2BudgetPreflightError("Unknown model or logical stage")
     in_tokens = _token_count(input_tokens, "input_tokens")
     out_tokens = _token_count(output_tokens, "output_tokens")
-    low_rates, high_rates = _prices(logical_model, in_tokens)
+    low_rates, high_rates = _prices(logical_model, stage, in_tokens)
     low = _price(in_tokens, low_rates["input"]) + _price(
         out_tokens, low_rates["output"]
     )
@@ -184,7 +186,7 @@ def estimate_campaign_cost(*, per_stage_assumptions: dict) -> dict:
         for stage in STAGES_PER_MODEL:
             input_tokens = checked[stage]["input_tokens"]
             output_tokens = checked[stage]["output_tokens"]
-            low_rates, high_rates = _prices(model, input_tokens)
+            low_rates, high_rates = _prices(model, stage, input_tokens)
             low = _price(input_tokens, low_rates["input"]) + _price(
                 output_tokens, low_rates["output"]
             )
