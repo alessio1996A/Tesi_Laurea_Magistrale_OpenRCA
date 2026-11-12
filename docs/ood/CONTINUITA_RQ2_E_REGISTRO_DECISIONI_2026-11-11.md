@@ -1119,3 +1119,45 @@ create-only, verificato e firmato indipendentemente, con
 `test_unlocked=false`, prima di qualsiasi discovery autorizzata.
 Tesi, consegna 1 dicembre: avviare capitoli RQ1/architettura
 in parallelo, non aspettare la fine della campagna OOD.
+
+
+## 83. Scorer RQ2-A 16/16 PASS e review scientifico prerelease predisposta (12/11/2026)
+
+L'utente ha comunicato il nuovo esito locale PyCharm della suite
+`test_rq2_fault_type_eval_policy.py`:
+`Ran 16 tests in 0.004s — OK`.
+Combinato con 10 test factory, 12 D e 15 C/K PyCharm
+precedentemente attestati, risultano **53/53 test delle ultime 4 suite**
+superati. Questo non equivale a inferenza reale OOD.
+Documento `RQ2_SCORING_E_FORMALIZZABILITA_PREREG_CANDIDATE_2026-11-12.md`
+aggiornato con evidenza e checkbox specifica **[x]** per i 16
+test; la firma scientifica resta pendente.
+
+Per procedere al freeze senza moltiplicare audit,
+creata scheda di revisione
+`docs/ood/RQ2_REVIEW_SCIENTIFICO_PRIMA_RELEASE_2026-11-12.md`
+**CANDIDATE_FOR_REVIEW, non firmata e non eseguibile**.
+Raccoglie: quattro discovery/undici test, 72/132 stage,
+tassonomia lessicale ufficiale e denominatori /11,
+mapping GT rigorosamente offline, regole K candidate non
+necessariamente formalizzabili, opzione di arm principale
+`A1_8R + claude-sonnet-5-5`, trasporto
+solo sync/retry con timeout per-request candidato 300s,
+hash preflight osservati e limiti di indipendenza/numerosità.
+
+**Distinzione inferenziale obbligatoria:** RQ2-A misura
+robustezza/generalizzazione diagnostica OOD dell'harness;
+non dimostra da sola un knowledge transfer operativo.
+Quest'ultimo richiederebbe RQ2-C con K formalizzate,
+implementate deterministicamente e frozen PRIMA del test.
+Esito 0 regole formalizzabili da riportare senza
+inventare detector/soglie, senza utilizzare GT test.
+
+**Gate ancora aperti:** revisione/approvazione scientifica
+e dei confini di scoring, eventuali verification KPI
+consentite su development, impronte sorgenti e commit
+definitivi per release, readback SHA del release,
+verifica blocco test e prima autorizzazione API D
+per un singolo stage. Non sbloccare automaticamente.
+Factory RQ1, `RELEASE_SHA256=None` e
+`PLAN_STATUS=DRAFT_NOT_EXECUTABLE` rimangono invariati.
