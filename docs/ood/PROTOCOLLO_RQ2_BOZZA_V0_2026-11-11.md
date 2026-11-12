@@ -153,3 +153,13 @@ La scelta è comunque metodologicamente fragile con pochi esempi per classe; non
 - Preparati `src/evaluation/rq2_output_contracts.py` e `src/tests/test_rq2_output_contracts.py` (**16 test sintetici, ancora da eseguire dall'utente in PyCharm**).
 
 **Non congelare ancora il protocollo:** il bundle deterministico delle evidenze, il formato esatto dei prompt C/K, lo scorer di classe e la procedura per falsi positivi multi-fault, la scelta della regola principale e le guardie anti-GT del runner richiedono verifiche ulteriori. L'esistenza dei file non equivale a una run né ad autorizzazione API.
+
+## Addendum del 12 novembre 2026 — budget non vincolato, readiness tecnica e status pre-freeze
+
+Questo addendum **integra senza riscrivere le precedenti decisioni storiche**. L'utente ha riportato che il relatore autorizza il budget necessario per tutti e tre i modelli: **nessun hard cap USD è un prerequisito all'esecuzione**. Le sezioni precedenti che richiedevano un tetto di spesa economico sono **superate**, mentre rimangono obbligatori log di token, chiamate, costi ed errori (per riproducibilità) e il blocco dei retry automatici non tracciati. Il permesso economico **non** equivale a un piano scientificamente congelato o a un'autorizzazione per un dispatch arbitrario.
+
+**Suite PyCharm confermate:** source-bound D `16/16`, store artefatti `23/23`, recorder D/C/K `20/20`, preflight budget `16/16`, claim anti-duplicazione `20/20`. Tutte **sintetiche**, senza inferenze RQ2 reali. Il prossimo `test_rq2_claim_recorder_end_to_end.py` contiene **16 nuovi test preparati e non ancora eseguiti**; integra claim e recorder, senza introdurre un nuovo runner.
+
+**La campagna resta `DRAFT_NOT_EXECUTABLE` per motivi scientifici e tecnici:** prima di API bisogna congelare modalità task-output D in parità RQ1, ID/parametri dei modelli, hash dei prompt C/K, il protocollo 4+11 e politica degli errori; completare il vero adapter provider con fake backend, distinguere freeze regole scientifiche da mock e bloccare il test fino al freeze. KPI development: 29/29 nomi source-only numericamente presenti, unità fisiche ancora non certificate. Rimangono esclusi il *human-in-the-loop* diagnostico e il refactoring cosmetico prematuro.
+
+Il nuovo report di riferimento è `docs/ood/RQ2_REHEARSAL_CLAIM_RECORDER_E_DECISIONI_PRE_FREEZE_2026-11-12.md`. Il suo elenco è una **matrice di decisioni da pre-registrare**, non la pre-registrazione definitiva.
