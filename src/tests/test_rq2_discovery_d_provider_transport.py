@@ -45,13 +45,13 @@ class RQ2DiscoveryDActualRunnerAdapterOfflineTests(unittest.TestCase):
             patch.object(subject, "preview_protocol_identity",
                          return_value=self.frozen_identity),
             patch.object(preflight, "preview_market",
-                         return_value=parent.plan),
+                         return_value=parent.parent.plan),
             patch.object(preflight, "EXPECTED_SPLIT_SHA256",
-                         parent.plan["split_sha256"]),
+                         parent.parent.plan["split_sha256"]),
             patch.object(preflight, "EXPECTED_MANIFEST_SHA256",
-                         parent.plan["manifest_sha256"]),
+                         parent.parent.plan["manifest_sha256"]),
             patch.object(preflight, "DISCOVERY",
-                         tuple(parent.plan["partition"]["discovery_case_ids"])),
+                         tuple(parent.parent.plan["partition"]["discovery_case_ids"])),
         )
         for item in self.patches:
             item.start()
