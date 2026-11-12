@@ -11,6 +11,7 @@ No graph, telemetry, ground truth, real model inference or release.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 from pathlib import Path
 
@@ -69,6 +70,16 @@ def _mocked_error_invoke(model, count: list[dict], *, bound: bool, provider: str
     }
 
 
+def _socket_locked(func):
+    """Ensure even direct calls to a fake provider helper prohibit sockets."""
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs):
+        with network_forbidden():
+            return func(*args, **kwargs)
+    return wrapped
+
+
+@_socket_locked
 def _fake_google() -> dict:
     import httpx
     import httpx2
@@ -116,6 +127,7 @@ def _fake_google() -> dict:
     }
 
 
+@_socket_locked
 def _fake_anthropic() -> dict:
     import anthropic
     import httpx2
