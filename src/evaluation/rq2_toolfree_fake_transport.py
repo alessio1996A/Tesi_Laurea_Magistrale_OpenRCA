@@ -18,6 +18,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from agent.graph_engine import testo_messaggio
 from evaluation.rq2_budget_preflight import CANDIDATE_MODELS
+from evaluation.rq2_dryrun_plan import HARNESSES, VERSION as PLAN_VERSION
 from evaluation.rq2_probe_adapter import (
     CAUSE_SYSTEM, RULE_SYSTEM, VERSION as PROBE_VERSION,
 )
@@ -98,7 +99,8 @@ def _check_package(binding: dict) -> tuple[str, str, list]:
     if type(sid) is not str:
         raise ToolFreeFakeTransportError("Missing stage ID")
     parts = sid.split(":")
-    if len(parts) != 5 or parts[-1] not in _STAGES:
+    if (len(parts) != 5 or parts[0] != PLAN_VERSION
+            or parts[3] not in HARNESSES or parts[-1] not in _STAGES):
         raise ToolFreeFakeTransportError("Expected discovery C or K stage ID")
     stage = parts[-1]
     if (
