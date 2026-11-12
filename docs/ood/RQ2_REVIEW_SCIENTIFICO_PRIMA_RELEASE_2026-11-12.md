@@ -167,3 +167,90 @@ risulta solo in cloudbed-2 e la separazione per finestre
 non prova indipendenza fisica delle iniezioni. Formulare
 le conclusioni in termini di evidenza osservata e
 limiti di generalizzazione, non di universalità.
+
+
+---
+
+## Allineamento con indicazioni del relatore e letteratura (12/11/2026)
+
+**Stato di questo addendum: proposta documentale; NON costituisce approvazione,
+freeze, release, autorizzazione provider o modifica del protocollo.** Fonti:
+trascrizioni di colloqui con il relatore denominate REGIS 1 e REGIS 3
+(condivise dall'utente in chat il 12/11/2026), paper *OpenRCA: Can Large
+Language Models Locate the Root Cause of Software Failures?* (ICLR 2025),
+preprint *OpenRCA 2.0: From Outcome Labels to Causal Process Supervision*
+(2026), e white paper *Agent Harness, Agent Harnessing e Harness Engineering*
+(v1.0, 13/10/2026). Non si copiano qui trascrizioni private né si aggiungono
+materiali derivati dalla ground truth degli 11 test.
+
+### Corrispondenza tra obiettivi del relatore ed evidenza effettiva
+
+| Obiettivo emerso dai colloqui | Cosa è stato / sarà misurato | Confine della conclusione |
+|---|---|---|
+| Verificare il contributo dell'harness nella RCA | RQ1: ablation incrementale/varianti, più provider, scorer Microsoft e costi/token | RQ1 è congelata; non affermare che ogni variante migliori accuratezza, tempo e token su ogni modello. |
+| Valutare guasti non coperti dalla conoscenza iniziale | RQ2-A: 4 discovery e 11 query OOD chiuse, C su due harness e tre provider | *Held-out dal nostro disegno* non significa che il modello preaddestrato non abbia mai visto concetti analoghi. |
+| Estrarre una possibile regola a partire da evidenze | RQ2-B: output K con riferimenti E###, limiti, counterexample, pseudocodice come dati non fidati | JSON valido/spiegazione plausibile NON equivale a regola vera né detector eseguibile. |
+| Trasferire conoscenza a una componente deterministica | RQ2-C solo dopo verifica KPI, implementazione deterministica e freeze indipendente pre-test | Se non esistono K formalizzabili, l'esito è negativo/inconcludente per il trasferimento operativo; vietato inventare detector o soglie. |
+| Architettura agente + rule-based per known/unknown | Concetto motivante e possibile sviluppo futuro; il protocollo attuale non certifica una baseline rule-based esaustiva sulle 11 classi note | Non dichiarare implementato o perfetto un sistema deterministico di confronto senza test, copertura e provenance specifici. |
+| Human-in-the-loop per accettare nuove regole | Solo evoluzione architetturale futura menzionabile in tesi, non implementazione richiesta | L'audit manuale di crash e claim non è human-in-the-loop della diagnosi. |
+
+### Precisazioni inferenziali per la tesi
+
+1. **RQ1 non è una replicazione numerica controllata del paper originale.**
+   Il paper OpenRCA ICLR 2025 riporta RCA-agent con Claude 3.5;
+   le nostre famiglie/versioni di modello, coorti e configurazioni
+   differiscono. Confrontare i risultati pubblicati come contesto,
+   separando lo scorer ufficiale riutilizzato dalla comparabilità
+   sperimentale diretta.
+2. **Non chiamare "apprendimento nel tempo" un aggiornamento dei pesi.**
+   Il modello rimane fisso: la conoscenza candidata proviene da
+   osservazioni e può essere proposta come futura estensione di regole
+   esterne. Per parlare di trasferimento implementato serve RQ2-C.
+   Discovery su quattro esempi, da sola, non prova miglioramento
+   longitudinale o generalizzazione universale.
+3. **Non confondere i nomi PAVE.** Il protocollo PAVE di OpenRCA 2.0
+   è *Path Annotation via Verified Effects* e riguarda annotazioni
+   causali passo-passo. La configurazione locale RQ1 denominata
+   \`A1_PAVE\` non va presentata automaticamente come replica di tale
+   protocollo; la distinzione richiede descrizione dell'implementazione
+   effettivamente congelata.
+4. **Causalità e finestre.** La corrispondenza di etichette di guasto
+   non prova una spiegazione causale corretta: segnali, timeline e
+   componenti richiedono evidenze e validazione. I 10 gruppi test per
+   11 query non sono automaticamente 10 iniezioni indipendenti.
+5. **L'effetto marginale dell'harness dipende dal modello.** Non
+   inferire dai colloqui come risultato acquisito che modelli più grandi
+   ricevano sempre meno beneficio; usare soltanto i contrasti osservati
+   in RQ1, con errore, astensione, costo e variabilità espliciti.
+
+### Conferme richieste nella review scientifica pre-release
+
+Le seguenti sono **proposte ex ante non ancora firmate**, coerenti
+con le sezioni A-E del presente documento e con la preregistrazione
+candidata. Non sono nuovi esperimenti:
+
+- [ ] Confermare split **4 discovery / 11 test**, con gruppo condiviso
+  \`cloudbed-1_q014/q030\`, e la limitazione del gap temporale.
+- [ ] Confermare RQ2-A primaria (\`correct/11\`, alias lessicali fissi,
+  missing/error/abstain nel denominatore), RQ2-B secondaria e RQ2-C
+  esplorativa condizionata.
+- [ ] Confermare arm dimostrativo ex ante
+  \`A1_8R + claude-sonnet-5-5\` senza selezione post-hoc delle K.
+- [ ] Confermare il criterio K conservativo: controllo di unità,
+  semantica e disponibilità solo su fonti consentite,
+  implementazione deterministica solo se certificabile; 0 K
+  formalizzabili rimane un possibile esito.
+- [ ] Confermare trasporto **solo sync** e \`timeout=300.0s\` per
+  singola richiesta nelle versioni SDK pinned; non presentarlo
+  come timeout globale D o prova di stallo fisico.
+- [ ] Riconoscere espressamente i limiti del confronto con
+  baseline rule-based e con i paper, senza riaprire RQ1.
+
+**I checkbox restano non approvati.** La loro approvazione
+scientifica esplicita deve precedere verifica finale di versioni
+e hash nel checkout di esecuzione, release create-only con readback
+SHA-256, e infine richiesta di consenso specifico per una sola
+D discovery. Rimangono obbligatori \`RELEASE_SHA256=None\`,
+\`PLAN_STATUS="DRAFT_NOT_EXECUTABLE"\` e \`test_unlocked=false\`;
+nessun OOD test, nessuna API e nessun test tecnico già superato viene
+sbloccato o ripetuto da questo addendum.
