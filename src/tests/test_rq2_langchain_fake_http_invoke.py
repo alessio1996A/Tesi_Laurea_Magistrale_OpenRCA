@@ -3,9 +3,18 @@ from __future__ import annotations
 
 import socket
 import unittest
+from types import ModuleType
 from unittest.mock import patch
 
 import evaluation.rq2_langchain_fake_http_invoke as subject
+
+
+def _fake_messages_module():
+    """A module, not a class instance: avoid Python binding a fake 'self'."""
+    stub = ModuleType("langchain_core.messages")
+    stub.HumanMessage = lambda **kwargs: kwargs
+    stub.SystemMessage = lambda **kwargs: kwargs
+    return stub
 
 
 def good_trace():
@@ -95,10 +104,7 @@ class RQ2FinalFakeHTTPInvokeOfflineTests(unittest.TestCase):
         counters = []
         with patch.dict(
             "sys.modules",
-            {"langchain_core.messages": type("FakeMessages", (), {
-                "HumanMessage": lambda **kwargs: kwargs,
-                "SystemMessage": lambda **kwargs: kwargs,
-            })()},
+            {"langchain_core.messages": _fake_messages_module()},
         ):
             out = subject._mocked_error_invoke(
                 FailingModel(), counters, bound=True, provider="fake"
@@ -112,10 +118,7 @@ class RQ2FinalFakeHTTPInvokeOfflineTests(unittest.TestCase):
                 raise ValueError("synthetic pretransport failure")
         with patch.dict(
             "sys.modules",
-            {"langchain_core.messages": type("FakeMessages", (), {
-                "HumanMessage": lambda **kwargs: kwargs,
-                "SystemMessage": lambda **kwargs: kwargs,
-            })()},
+            {"langchain_core.messages": _fake_messages_module()},
         ):
             with self.assertRaisesRegex(subject.RQ2BridgeMockBlocked, "attempts unexpected"):
                 subject._mocked_error_invoke(
@@ -130,10 +133,7 @@ class RQ2FinalFakeHTTPInvokeOfflineTests(unittest.TestCase):
         counters = []
         with patch.dict(
             "sys.modules",
-            {"langchain_core.messages": type("FakeMessages", (), {
-                "HumanMessage": lambda **kwargs: kwargs,
-                "SystemMessage": lambda **kwargs: kwargs,
-            })()},
+            {"langchain_core.messages": _fake_messages_module()},
         ):
             with self.assertRaisesRegex(subject.RQ2BridgeMockBlocked, "silently accepted"):
                 subject._mocked_error_invoke(
