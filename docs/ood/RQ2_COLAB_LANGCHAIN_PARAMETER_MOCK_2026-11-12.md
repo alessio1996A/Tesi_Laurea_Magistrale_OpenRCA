@@ -1,6 +1,6 @@
 # RQ2 — Prova dinamica offline LangChain → SDK: parametri di retry/timeout
 
-**12 novembre 2026 · Stato: predisposta, non ancora eseguita.**
+**12 novembre 2026 · Stato: 8/8 unit test PyCharm SUPERATI (`Ran 8 tests in 0.005s — OK`, confermato dall'utente); prova runtime Colab non ancora eseguita.**
 
 ## Decisione tecnica
 
@@ -43,8 +43,7 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_rq2_langchain_parameter_mock_probe.py" -v
 ```
 
-**Attesi 8 test unitari**, senza provider. Attendere esito reale prima
-di scrivere che sono superati.
+**8 test PyCharm superati**: `Ran 8 tests in 0.005s — OK`; risultato riportato dall'utente.
 
 ## Passo B: Colab, nella sessione già ripristinata
 
