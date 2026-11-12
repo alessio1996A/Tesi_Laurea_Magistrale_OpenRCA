@@ -1,6 +1,6 @@
 # RQ2 — Ultimo audit tecnico mirato: LangChain invoke, HTTP finto, nessuna API
 
-**12 novembre 2026 — PREPARATO, NON ANCORA ATTESTATO SU COLAB.**
+**12 novembre 2026 — COLAB SUPERATO: 8/8 test, 4/4 invocazioni sync con HTTP 503 finto, 0 richieste remote.**
 Questa prova chiude il solo dubbio sul numero di richieste HTTP *sincrone*
 nel percorso LangChain → SDK quando il server restituisce 503.
 
@@ -180,3 +180,37 @@ una failure di compatibilità del probe da correggere prima del freeze.
 RQ2-only e concludere i gate scientifici rimasti aperti (alias
 scoring, KPI, GT-isolated audit, arm dimostrativo). Non moltiplicare
 altri audit tecnici generici. RQ1 resta congelata.
+
+
+## Esito Colab realmente riportato dall'utente — 12/11/2026
+
+La cella autosufficiente di recupero ha ricreato il repository RQ2
+sul commit `7019020364dfae6ae649d9620ffb4948e70a2f71`,
+installato i pacchetti isolati sotto
+`/content/rq2_prefreeze_packages_py313` con Python `3.13.18`
+ed eseguito `Ran 8 tests in 0.004s — OK`.
+
+Il subprocess `evaluation.rq2_langchain_fake_http_invoke` ha restituito
+`SYNC_FAKE_HTTP_503_INVOKE_VERIFIED_AS_TESTED_NOT_RELEASED`.
+Con `httpx.MockTransport` per Gemini e `httpx2.MockTransport`
+per Anthropic, ciascun provider ha contato **2 invii sintetici totali**:
+`CK_tool_free = 1` e `D_bound_tools = 1`. Nessuna esecuzione
+di tool, nessuna risposta di modello, nessuna credenziale reale,
+`api_requests_to_real_providers=0`.
+Entrambi i provider erano configurati con timeout di prova `300s`,
+Gemini `max_retries=1` (SDK attempts=1) e Claude
+`max_retries=0`.
+`async_streaming_retry_verified=false` e
+`timeout_under_real_network_stall_verified=false`.
+Tutti i gate rimangono falsi:
+`scientific_release_signed=false`,
+`can_execute_D=false`, `can_execute_CK=false`,
+`can_execute_test=false`.
+
+**Interpretazione:** validazione end-to-end di
+`LangChain.sync invoke → SDK → HTTP finto 503` a livello
+di send-count. **Non** è certificazione del timeout sotto stallo,
+del grafo D con tool osservativi reali o dei provider live.
+Il successivo lavoro è la configurazione RQ2-only e il freeze
+scientifico, non un nuovo audit SDK generico.
+
