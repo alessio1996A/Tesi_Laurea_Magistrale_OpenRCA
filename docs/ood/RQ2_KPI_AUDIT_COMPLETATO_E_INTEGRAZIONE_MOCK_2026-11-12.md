@@ -1,6 +1,6 @@
 # RQ2 — Audit numerico development completato, integrazione D/C/K mock-only
 
-**12 novembre 2026** · **Audit Colab REALE completato; integrazione mock predisposta, ancora da testare in PyCharm.**  
+**12 novembre 2026** · **Audit Colab REALE completato; integrazione mock verificata in PyCharm (16/16 test propri superati).**  
 Branch: `feature/ood-knowledge-transfer-audit-2026-11-10`.
 
 ## 1. Risultati REALI dell'audit Colab
@@ -46,7 +46,7 @@ Serve la prova di **integrazione**: il medesimo D sintetico passa a C, produce u
 - Il report d'integrazione mantiene `model_api_calls=0`, `can_execute_api=false`, `ready_for_test=false`, `rule_executed=false`; le ricevute create-only non sono risultati scientifici.
 - **Limiti dichiarati:** nessuna verifica dell'istruzione originale contro i byte effettivi del manifest, nessun freeze degli ID dei modelli, nessuna chiamata ai provider, nessun catalogo KPI fisico verificato, nessun nuovo detector.
 
-`src/tests/test_rq2_mock_pipeline_integration.py`: **16 test sintetici predisposti e NON ANCORA ESEGUITI** (solo `TestCase.test_*`); casi positivi D/C/K, scrittura create-only, rifiuto duplicati, blocco test senza freeze mock, rifiuto di evidence IDs fittizi, errori provider D simulati, K JSON non valido e pseudocodice mai eseguito.
+`src/tests/test_rq2_mock_pipeline_integration.py`: **16 test sintetici propri SUPERATI in PyCharm** (solo `TestCase.test_*`); casi positivi D/C/K, scrittura create-only, rifiuto duplicati, blocco test senza freeze mock, rifiuto di evidence IDs fittizi, errori provider D simulati, K JSON non valido e pseudocodice mai eseguito.
 
 ## 4. Esecuzione successiva in PyCharm
 
@@ -57,7 +57,7 @@ $env:PYTHONPATH="src"
 python -m unittest discover -s src/tests -p "test_rq2_mock_pipeline_integration.py" -v
 ```
 
-Attesi **16 test**; **non affermare che sono riusciti** prima dell'output dell'utente.
+**Output osservato sull'attuale versione prima della correzione import:** `Ran 32 tests in 1.150s — OK`. Dal log risultano **16 test dell'integrazione e 16 test del modulo dei contratti C/K**, raccolti indirettamente perché nel file di integrazione era stata importata una classe `unittest.TestCase` dall'altro modulo. Tutti e 32 hanno esito `ok`, quindi nessun errore dell'integrazione. È stato corretto **solo l'import** in `test_rq2_mock_pipeline_integration.py` (commit `0256dc7642f65b881dfe57034c4c3c2d4f3e94da`): la classe non viene più importata direttamente nel namespace del file di test, così una nuova esecuzione del comando dovrebbe raccogliere **16 test**; tale nuova esecuzione non è ancora stata verificata dall'utente. Si possono continuare a eseguire separatamente i 16 test dei contratti con `-p "test_rq2_output_contracts.py"`.
 
 ## 5. Che cosa manca ancora per la campagna reale
 
