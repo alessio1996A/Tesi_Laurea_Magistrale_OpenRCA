@@ -1,6 +1,6 @@
 # RQ2 — Audit in sola lettura della configurazione provider (12 novembre 2026)
 
-**Stato:** codice predisposto su branch RQ2; **7 test nuovi NON ancora attestati da PyCharm**. RQ1 congelata non modificata; niente release, niente API, niente test OOD.
+**Stato:** 7/7 test nuovi **superati in PyCharm** (output dell'utente il 12 novembre 2026, `Ran 7 tests in 0.102s — OK`). Audit Windows raccolto; manca ancora quello sul runtime Colab effettivo. RQ1 congelata non modificata; niente release, niente API, niente test OOD.
 
 ## Motivazione e problema aperto
 
@@ -56,7 +56,7 @@ python -m unittest discover -s src/tests -p "test_rq2_provider_policy_source_aud
 python -m evaluation.rq2_provider_policy_source_audit --repo-dir .
 ```
 
-**Attesi 7 metodi di test; esito da confermare dal log reale dell'utente.**
+**Verificati 7/7 metodi in PyCharm, `Ran 7 tests in 0.102s — OK`, output condiviso dall'utente.**
 Riportare il JSON della CLI come prodotto del computer dove viene eseguita.
 Non interpretare l'eventuale differenza tra PyCharm Windows e Colab Linux
 come fallimento scientifico automatico: serve lo snapshot anche sul runtime
@@ -73,3 +73,41 @@ effettivo di esecuzione prima del freeze. Non serve alcuna API key.
    parità di trasporto se si cambia il comportamento.
 4. Solo dopo le restanti decisioni scientifiche preregistrate, firmare il
    release create-only. Gli 11 casi test restano preclusi fino al freeze K.
+
+## Risultato reale PyCharm Windows — fornito dall'utente il 12/11/2026
+
+CLI `rq2_provider_policy_source_audit_v0`, eseguita nella `.venv` locale,
+Python **3.12.10**; `status=SOURCE_EVIDENCE_ONLY_EFFECTIVE_RETRIES_TIMEOUTS_UNVERIFIED`.
+
+- `factory_git_blob_sha1=05308d5740763db0444556dcb7330d8fb4c308ec`,
+  `frozen_rq1_factory_blob_match=true`.
+- RQ1 Anthropic: `max_retries=0` dichiarato esplicitamente;
+  nessun timeout dichiarato. Gemini: nessuno dei due dichiarato.
+- `langchain-core=1.7.0`, `langgraph=1.2.18`,
+  `langchain-google-genai=4.4.2`, `google-genai=2.33.0`;
+  `anthropic=null`, `langchain-anthropic=null` perché **non installati
+  nella .venv locale esaminata**.
+- SHA-256 file `langchain_google_genai/chat_models.py`:
+  `589106719f2038805a27ddd0c44c23d5e4a4486ea0d7116b38a83d37722ac27f`.
+- SHA-256 file `google/genai/_api_client.py`:
+  `26ea3189d3ba09bbf16208d2a46a9846bd19bc7c478ae9d61bc479a90dd831fb`.
+- `matches_previous_colab_versions=false`: **coerente con la differenza
+  d'ambiente** rispetto al preflight Colab del 12/11:
+  Python 3.13.18, `langchain-core=1.7.1`,
+  `langgraph=1.2.18`, `langchain-anthropic=1.7.7`,
+  `langchain-google-genai=4.4.2`, `anthropic=2.6.0`,
+  `google-genai=2.34.0`.
+- Nessuna chiamata API, nessun accesso a GT, Market o predizioni;
+  `can_execute_D=false`, `can_execute_CK=false`,
+  `can_execute_test=false`.
+
+**Interpretazione:** il test PyCharm dimostra il funzionamento dell'audit e
+la provenienza della factory RQ1, **non** dimostra la policy effettiva di rete
+su Colab. Evitare di modificare la `.venv` Windows soltanto per rendere i
+numeri uguali: il runtime scientifico candidato è quello Colab isolato.
+
+**Prossima azione:** eseguire solo l'inventario sorgenti sul runtime Colab
+con le dipendenze già isolate, usando la cella in
+`RQ2_COLAB_SDK_POLICY_SOURCE_AUDIT_2026-11-12.md`.
+Prima di qualunque release servono audit del trasporto su SDK versionati
+con finti client HTTP, policy di timeout/retry documentata, e gate scientifici.
