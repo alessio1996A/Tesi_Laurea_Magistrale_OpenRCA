@@ -1,6 +1,6 @@
 # RQ2 — Tracciamento statico del collegamento LangChain → SDK in Colab
 
-**Stato:** preparato per esecuzione; risultato reale ancora da raccogliere.
+**Stato:** eseguito realmente in Colab dall'utente il 12 novembre 2026, sorgenti SHA-256 verificati, ma trasporto effettivo non ancora certificato.
 
 ## Scopo
 
@@ -119,3 +119,51 @@ Anche se la cella riesce, `RELEASE_SHA256=None`, `PLAN_STATUS=DRAFT_NOT_EXECUTAB
 D/C/K/test non sono eseguibili. **Solo dopo aver compreso i quattro sorgenti**
 decideremo l'eventuale wrapper RQ2-only e un test end-to-end con trasporto
 finto. Nessuna modifica ai 13 blob di RQ1.
+
+
+## Risultato reale Colab — output riportato dall'utente (12/11/2026)
+
+Commit eseguito `8cc62f6f7c7c39f26258a44808ad228aa5113704`.
+Status `EXACT_SOURCE_BRIDGE_INSPECTED_FOR_REVIEW_NOT_SDK_HTTP_CERTIFIED`.
+La cella è terminata con `RQ2 SOURCE TRACE: CONTROLLI SUPERATI`.
+Le seguenti righe si riferiscono ai **sorgenti installati SHA-pinned**,
+non a un differente snapshot della repository upstream.
+
+| Modulo | SHA-256 verificato |
+|---|---|
+| `langchain_google_genai/chat_models.py` | `589106719f2038805a27ddd0c44c23d5e4a4486ea0d7116b38a83d37722ac27f` |
+| `langchain_anthropic/chat_models.py` | `c55a0cb8fed75b3d310dbddf03a455f95c3c1d47aab650317bf3c9e4bab62544` |
+| `google/genai/_api_client.py` | `b179b80a126a35c98b98aeefa701950304c38c8a1e117136a2270a0901fd93e4` |
+| `anthropic/_base_client.py` | `a42ef507300287261fe0b215023672a97f8a9b01216a135d614bbede72fff680` |
+
+**Tracciamento Google LangChain:**
+- L3867–L3868: `max_retries = kwargs.pop("max_retries", None)`, segue fallback alla proprietà del modello se `None`.
+- L4100–L4108: se `max_retries` non nullo viene costruito `HttpRetryOptions(attempts=max_retries)`, insieme all'opzione `timeout`.
+- L4112: merge per-request `http_options`.
+- L4188 / L4231: `generate_content` sync/async; L4274 / L4335: stream sync/async.
+
+**Tracciamento SDK Google:**
+- L667 `retry_args` controlla configurazione retry.
+- L1831–L1849: `_request` sync; override per-request con `retry_options`.
+- L2030–L2052: `_async_request` include distinzione tra retry esplicito e percorso base.
+- L1856, L1906 e L1988: nei percorsi async esiste la logica `implicit_retry`.
+  **Non basta** l'output del mock `retry_args(None)=1` per escludere
+  ritentativi nascosti nell'intera invocazione dell'agente.
+
+**Tracciamento Anthropic:**
+- `langchain-anthropic` L1414 default `max_retries=2`, ma la nostra factory RQ1
+  lo sovrascrive con `0`; L1752 lo inoltra al client; L1758–L1759
+  determinano l'inoltro del timeout. Nessun valore timeout esplicito nel
+  sorgente RQ1 congelato.
+- `anthropic` L442–L454 definisce retry e timeout lato SDK;
+  L1247 / L2029 contengono `_request` sync/async;
+  L1409 / L2195 contengono `_attempt_request` sync/async.
+
+**Conclusione minima supportata dal codice:** il forwarding di retry e
+timeout è presente nei sorgenti LangChain esaminati, ma nessuna invocazione
+LangChain è stata esercitata dal trace. Per certificare i parametri
+osservabili nel nostro utilizzo serve una prova *runtime* con chiavi
+fittizie e connessione bloccata, su versioni SHA-identiche. I timeout
+di rete reali e il funzionamento end-to-end di eventuali streaming restano
+non verificati. Lo stato del piano rimane `DRAFT_NOT_EXECUTABLE`,
+`RELEASE_SHA256=None`, zero API.
