@@ -766,3 +766,39 @@ A seguire è stato creato `rq2_provider_policy_source_audit.py` con 7 test offli
 Creato `src/evaluation/rq2_sdk_retry_mock_probe.py` e otto test unitari `src/tests/test_rq2_sdk_retry_mock_probe.py`, più `docs/ood/RQ2_COLAB_SDK_RETRY_MOCK_2026-11-12.md` con comandi PyCharm e cella Colab. L'accesso alla prova dinamica è fail-closed se le versioni e le quattro impronte Colab non sono quelle osservate, o se i gate non sono bloccati. Per **google-genai 2.34.0** si chiama `retry_args` e `tenacity.Retrying` contro una callback di errore sintetico `httpx.ConnectError`, senza client Google; conteggi attesi `None→1`, `attempts=1→1`, `attempts=2→2`. Per **anthropic 2.6.0** si costruisce un SDK client con `httpx2.MockTransport`, base URL e key sintetici e risposta HTTP503 fake: con `max_retries=0`, atteso esattamente un tentativo *verso il mock*. Lo script non legge credenziali o dati Market, non richiede accesso rete, non fa inferenze.
 
 **Attenzione:** test **predisposti ma NON attestati** PyCharm/Colab. Non dichiarare riuscita senza output. Neppure con esito positivo questo prova la policy effettiva end-to-end LangChain→SDK, Google streaming/async/aiohttp, o timeout su stallo reale. Le conclusioni finali vanno preregistrate e motivate con test senza rete a livello wrapper, senza alterare factory o RQ1 congelate. La bozza scientifica è ancora non firmata, 4 discovery e 11 test non autorizzati alle API. Prossima azione: utente pull, esegue 8 test PyCharm, poi la cella Colab documentata e riporta output. Se fallisce, investigare senza retry provider.
+
+
+## 74. Test SDK simulati 8/8 superati in Colab e preparata trace LangChain (12 novembre 2026)
+
+**Output reale riportato dall'utente:** commit Colab
+`e32d572d32240d895ffac49b59834f49a2c2e3e2`; `Ran 8 tests in 0.003s — OK`.
+`rq2_sdk_retry_mock_probe_v0` ha restituito
+`SDK_LOCAL_MOCK_CHECKED_LANGCHAIN_NETWORK_POLICY_NOT_FROZEN`:
+Google `retry_args(None)` 1 callback simulata,
+`HttpRetryOptions(attempts=1)` 1, `attempts=2` 2; Anthropic
+`max_retries=0` con `httpx2.MockTransport` e HTTP503 finto 1 richiesta al mock.
+Impronta snapshot quattro provider
+`79d209cd7678b9ca036699cfa572579a20c2a62c4fd021042adf9d5b90f5ee98`.
+Zero richieste remote, zero credenziali reali, nessun accesso GT/Market,
+nessun file persistente scritto dalla CLI. Gate di produzione false.
+L'output **non attesta** che questi tentativi coincidano con
+`LangChain.invoke`/streaming o che timeout sia osservabile su un socket in stallo.
+Esito scritto in `RQ2_COLAB_SDK_RETRY_MOCK_2026-11-12.md`; non si è
+ricevuto un esito distinto degli otto test PyCharm, quindi non attribuirlo.
+
+Per evitare di moltiplicare unit test di fixture, predisposto
+`src/evaluation/rq2_langchain_bridge_source_trace.py` e procedura
+`docs/ood/RQ2_COLAB_LANGCHAIN_BRIDGE_SOURCE_TRACE_2026-11-12.md`:
+lettura statica in Colab dei quattro **file installati** già noti
+in base alle impronte SHA (non la documentazione più recente), estratti
+con numeri di riga di `max_retries`, timeout, retry options e
+`generate_content`/message create. Il modulo verifica sei versioni
+esatte e gate di release ancora chiusi, non importa modelli e non apre
+Market o API. **Non ancora eseguito dall'utente**.
+
+**Prossima azione:** usare la cella in `RQ2_COLAB_LANGCHAIN_BRIDGE_SOURCE_TRACE_2026-11-12.md`
+sullo stesso ambiente Colab, riportare le linee pertinenti al forwarding.
+Poi implementare, se necessario, un wrapper **RQ2-only** con retry
+e timeout motivati e un singolo test end-to-end di trasporto interamente
+finto, senza modificare factory RQ1; restano anche da chiudere alias,
+formalizzabilità K, SHA commit definitivo e firma del release.
