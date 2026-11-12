@@ -10,12 +10,12 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import importlib.metadata as metadata
 import json
 from pathlib import Path
 
 from evaluation.rq2_provider_policy_source_audit import (
-    EXPECTED_COLAB_VERSIONS, KNOWN_SOURCE_PATHS,
-    _package_evidence, preview_provider_policy,
+    KNOWN_SOURCE_PATHS, preview_provider_policy,
 )
 from evaluation.rq2_sdk_retry_mock_probe import (
     EXPECTED_SOURCE_DIGESTS, validate_sdk_snapshot,
@@ -97,7 +97,7 @@ def trace_exact_bridge_sources(*, repo_dir: Path) -> dict:
     for package, expected_sha in EXPECTED_SOURCE_DIGESTS.items():
         relative = KNOWN_SOURCE_PATHS[package]
         # _package_evidence uses importlib.metadata only; no SDK import.
-        dist = __import__("importlib.metadata", fromlist=["distribution"]).distribution(package)
+        dist = metadata.distribution(package)
         file = Path(dist.locate_file(relative))
         if file.is_symlink() or not file.is_file() or file.stat().st_size > 4_000_000:
             raise RQ2BridgeTraceBlocked("Source missing/too large/symlink: " + package)
