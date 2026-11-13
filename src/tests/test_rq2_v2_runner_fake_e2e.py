@@ -21,13 +21,14 @@ import agent.model_factory as model_factory
 import evaluation.experiment_runner as runner
 from agent.rq2_v2_graph_engine import esegui_grafo_rca_v2
 from evaluation.experiment_config import ExperimentConfig
+from output.v2_contract import infer_requested_faults
 from evaluation.rq2_evidence_bundle import (
     EvidenceBundleError, build_evidence_bundle, evidence_ids,
 )
 from evaluation.rq2_probe_adapter import prepare_cause_probe
 
 CASE_ID = "cloudbed-1_q999"  # Fittizio: fuori dallo split RQ2.
-INSTRUCTION = "Synthetic service issue: no ground labels available."
+INSTRUCTION = "The synthetic cloud service experienced one failure in the observed time window."
 FINAL_JSON = json.dumps({
     "1": {
         "root cause occurrence datetime": "2023-11-15 06:13:20",
@@ -72,6 +73,10 @@ class ParallelSameNameFakeLLM:
 
 
 def fake_preparation(config: ExperimentConfig) -> dict:
+    # Questo fixture deve rispettare il contratto OpenRCA V2 senza
+    # consultare label o istruzioni di casi reali.
+    if infer_requested_faults(INSTRUCTION) != 1:
+        raise AssertionError("Il caso sintetico deve richiedere un guasto")
     if config.case_id != CASE_ID or config.canonical_variant not in ("A1", "A1_8R"):
         raise AssertionError("Solo caso e harness sintetici ammessi")
     return {
