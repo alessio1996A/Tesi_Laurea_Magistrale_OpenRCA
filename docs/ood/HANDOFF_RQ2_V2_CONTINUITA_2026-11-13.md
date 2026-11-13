@@ -76,7 +76,10 @@ del benchmark reale. Sono ancora in stato
 - 16/16 nuovo store/journal sintetico V2.
 - **841/841 suite globale — 72.153 secondi — OK**.
 - **3/3 runner-to-new-V2-ledger fake E2E — 4.434 secondi — OK**,
-  dopo correzione dell'import; nuova suite globale ancora pending.
+  dopo correzione dell'import.
+- **844/844 suite globale — 80.612 secondi — OK**:
+  include il gate completo runner→V2→D/C/K→nuovo ledger,
+  più regressioni V1 e gate precedenti.
 
 Sono test software, non 841 diagnosi sul benchmark.
 GO solo offline, NO-GO API reali, NO-GO test OOD.
@@ -129,9 +132,19 @@ runner → esecutore V2 → D/C/K → nuovo ledger
 sintetico è quindi **3/3 PASS**.
 Report: `docs/ood/RQ2_V2_RUNNER_TO_NEW_LEDGER_3_PASS_AFTER_IMPORT_FIX_2026-11-13.md`.
 
-**Stato attuale:** resta DA ESEGUIRE la suite
-globale aggiornata, con **844 test previsti**.
-Non dichiararla PASS finché non perviene il log.
+**Stato aggiornato 13 novembre:** l'utente ha eseguito la
+suite completa aggiornata:
+```text
+Ran 844 tests in 80.612s
+OK
+```
+Quindi **844/844 PASS**, gate integrato offline chiuso
+con esito positivo. Nuovo rapporto e decisione:
+`docs/ood/RQ2_V2_844_844_GATE_TECNICO_CHIUSO_DECISIONE_SCIENTIFICA_2026-11-13.md`.
+Non servono ulteriori test generici adesso: la priorità
+è la decisione scientifica, la scheda per il relatore
+e la preparazione di un eventuale pilot minimo V2,
+ma senza autorizzazione a provider.
 
 ### Comandi PyCharm
 
@@ -154,6 +167,19 @@ SOLO nuovi file V2.
 Se OK, ripetere
 `python -m unittest discover -s src/tests -p "test_*.py" -v`.
 Previsti circa **844** test (841+3), da verificare.
+
+## Integrità e decisione al gate 844
+
+Confronto GitHub contro la base V1:
+**28 file aggiunti, zero file preesistenti modificati**
+prima del rapporto 844. I file di documentazione
+aggiunti successivamente non modificano V1.
+Gli 844 PASS sono test software, non scoring.
+Il codice store/journal V2 attuale è solo
+sintetico. Stato **GO_OFFLINE_TECHNICAL_PASSED**
+ma **NO_GO_LIVE_API** e **NO_GO_OOD_TEST**.
+Le quattro discovery V1 già osservate non forniscono
+una replica indipendente di generalizzazione.
 
 ## Decisioni ancora aperte
 
@@ -179,13 +205,16 @@ compromettono la scrittura RQ1 e la scadenza tesi.
 > `experiment/rq2-provenance-v2-offline-2026-11-13`,
 > verifica HEAD/ultimo commit e report.
 > Non modificare V1 né inventare risultati.
-> L'ultima suite globale confermata era 841/841.
-> È pendente il test fake runner-to-new-ledger V2:
-> 3 nuovi test in
-> `test_rq2_v2_runner_to_ledger_fake_e2e.py`.
-> Procedi metodicamente con commit su GitHub,
-> test PowerShell/PyCharm e nessuna API senza
-> autorizzazione.
+> L'ultima suite globale confermata è **844/844**
+> (13 novembre, 80.612 s, OK); l'integrazione
+> fake runner→V2→D/C/K→nuovo ledger è 3/3 PASS.
+> Leggi anche
+> `docs/ood/RQ2_V2_844_844_GATE_TECNICO_CHIUSO_DECISIONE_SCIENTIFICA_2026-11-13.md`.
+> Il gate tecnico offline è chiuso. Procedi alla
+> scheda scientifica per il relatore e alla definizione
+> del minimo esperimento reale solo se necessario,
+> senza API, senza OOD e senza modificare V1.
+> Continua con commit GitHub e PyCharm/PowerShell.
 
 In una chat successiva verificare HEAD perché
 nuovi commit/test potrebbero aver aggiornato lo stato.
