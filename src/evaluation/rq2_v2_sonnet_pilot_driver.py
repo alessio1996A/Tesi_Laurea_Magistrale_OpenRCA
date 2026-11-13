@@ -77,10 +77,9 @@ class _LimitedModel:
             raise SonnetPilotBlocked("Missing trustworthy token usage; STOP")
         self.input_tokens += usage["input_tokens"]
         self.output_tokens += usage["output_tokens"]
-        # Questo stop NON e' un hard cap USD: la singola risposta puo'
-        # avere gia' consumato oltre la soglia prima che sia osservata.
-        if self.observed_cost_usd >= self.approved_limit:
-            raise SonnetPilotBlocked("Operational spend stop after response")
+        # Restituire sempre una risposta gia' pagata per NON perdere
+        # provenance/usage. Se la soglia e' stata raggiunta, la PROSSIMA
+        # richiesta verra' bloccata prima dell'invio (non hard cap).
         return answer
 
     def bind_tools(self, tools):
@@ -168,6 +167,9 @@ def run_one_sonnet_v2_pilot_d(
         "output_tokens_observed_by_meter": metered_llm.output_tokens,
         "token_usage_complete_by_meter": metered_llm.usage_complete,
         "cost_estimate_usd_not_invoice": str(metered_llm.observed_cost_usd),
+        "operational_stop_threshold_reached": (
+            metered_llm.observed_cost_usd >= metered_llm.approved_limit
+        ),
         "usd_hard_cap_guaranteed": False,
         "automatic_retry": False,
         "ood_test_locked": True,
