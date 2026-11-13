@@ -281,7 +281,7 @@ def classify_d(harness):
         assert type(exc).__name__ == issue_kind
         msg = str(exc)
         # Classify known diagnostic prefixes without showing raw tool observations.
-    labels = (
+        labels = (
             ("Unmatched tool calls", "UNMATCHED_TOOL_CALLS"),
             ("Unmatched tool result", "UNMATCHED_TOOL_RESULT"),
             ("Ambiguous/missing legacy", "AMBIGUOUS_TOOL_RESULT"),
@@ -304,7 +304,6 @@ def classify_d(harness):
             ("Trajectory must be a bounded", "INVALID_TRAJECTORY_SHAPE"),
             ("Too many results for minimum", "EVIDENCE_TRUNCATION_GUARD"),
         )
-    
         for prefix_, label in labels:
             if msg.startswith(prefix_):
                 detail_code = label
