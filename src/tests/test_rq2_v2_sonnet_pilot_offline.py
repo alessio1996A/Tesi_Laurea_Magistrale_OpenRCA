@@ -232,5 +232,67 @@ class RQ2V2SonnetPilotOfflineTests(unittest.TestCase):
         self.assertFalse(limited.usage_complete)
 
 
+    def test_source_drift_after_claim_blocks_restart(self):
+        self._mock_release()
+        ledger = self._ledger()
+        ledger.claim_stage()
+        drift = dict(FAKE_BINDING, source_binding_sha256="d" * 64)
+        with patch.object(pilot, "source_binding", return_value=drift):
+            with self.assertRaisesRegex(
+                pilot.SonnetPilotBlocked, "Claim and current input/source drift"
+            ):
+                ledger.audit_restart()
+
+    def test_real_release_reader_checks_original_digest(self):
+        release = {
+            "schema": "rq2_v2_sonnet_pilot_release_v1",
+            "protocol": pilot.PROTOCOL, "stage_id": pilot.STAGE_ID,
+            "source_binding_sha256": FAKE_BINDING["source_binding_sha256"],
+            "code_commit": FAKE_BINDING["code_commit"],
+            "provider": "anthropic", "model_id": pilot.MODEL_ID,
+            "harness": "A1", "stage": "D",
+            "output_contract_mode": "v2_enforce",
+            "max_tool_rounds": 6, "recursion_limit": 30,
+            "max_retries": 0, "max_tokens": 4096,
+            "timeout_seconds": 300, "max_llm_requests": 7,
+            "authorization": "approved_for_one_pilot",
+            "api_budget_approved": True, "approved_usd_limit": 1.0,
+            "runtime_versions": dict(EXPECTED_COLAB_VERSIONS),
+            "ood_test_locked": True,
+        }
+        path = self.root / pilot.RELEASE_RELATIVE
+        path.parent.mkdir(parents=True)
+        original = pilot._canonical(release)
+        path.write_bytes(original)
+        pin = pilot._hash(original)
+        self.assertEqual(
+            pilot.read_frozen_release(
+                data_dir=self.root, binding=FAKE_BINDING,
+                release_sha256=pin,
+            )["stage_id"],
+            pilot.STAGE_ID,
+        )
+        release["approved_usd_limit"] = 2.0
+        path.write_bytes(pilot._canonical(release))
+        with self.assertRaisesRegex(
+            pilot.SonnetPilotBlocked, "Frozen release SHA mismatch"
+        ):
+            pilot.read_frozen_release(
+                data_dir=self.root, binding=FAKE_BINDING,
+                release_sha256=pin,
+            )
+
+    def test_existing_v1_sentinel_remains_byte_identical(self):
+        self._mock_release()
+        sentinel = self.root / "data/rq2/frozen.txt"
+        sentinel.parent.mkdir(parents=True)
+        sentinel.write_bytes(b"FROZEN_V1_NO_WRITES")
+        ledger = self._ledger()
+        ledger.claim_stage()
+        ledger.record_stage(diagnostic_run=self._run_fake())
+        self.assertEqual(sentinel.read_bytes(), b"FROZEN_V1_NO_WRITES")
+        self.assertEqual(sorted(p.name for p in sentinel.parent.iterdir()),
+                         ["frozen.txt"])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
