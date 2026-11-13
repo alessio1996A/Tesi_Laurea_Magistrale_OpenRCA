@@ -275,6 +275,48 @@ Attuale store V2 è ancora **synthetic-only**,
 non autorizza Market né provider. Undici OOD
 test LOCKED. Nessuna API eseguita qui.
 
+## Audit Gemini V1: regressione 852/852 PASS e Colab pronto
+
+L'utente ha riportato `Ran 852 tests in 78.413s / OK`
+in PyCharm il 13 novembre 2026, dopo
+`Ran 8 tests in 0.011s / OK` dell'audit mirato.
+La precedente regressione 844/844 è quindi
+superata e il nuovo totale di **852 PASS** è
+un'evidenza software (non accuratezza RCA).
+
+Documenti aggiornati:
+- `docs/ood/RQ2_GATE_852_852_PASS_GEMINI_READONLY_AUDIT_READY_2026-11-13.md`;
+- `docs/ood/RQ2_GEMINI_V1_COLAB_AUDIT_READONLY_DOPO_852_PASS_2026-11-13.md`.
+
+Quest'ultimo contiene una **singola cella Colab**,
+non ancora eseguita, con checkout separato
+in `/content`, PIN_COMMIT
+`489a53467087b8070c8909ceddad1d6aee74d02d`
+e AUDIT_BLOB
+`dd36792d8bd64ddfcd24e658d519f2e057b312ac`.
+Il programma usa esclusivamente le sorgenti
+GT-free e i record V1 già congelati, controlla
+**39 record/32 claim V1 complessivi** e
+**24 Gemini (22 complete, 1 invalid, 1 blocked)**,
+raccoglie `candidate`, `insufficient_evidence` e
+`requires_verification` reali e stampa un
+riepilogo senza raw, GT o segreti.
+
+**Prossimo passo preciso**: l'utente copia
+la cella dal documento in un nuovo Colab, la
+esegue UNA volta e riporta l'output.
+Non lanciare altre API: l'audit non ha bisogno
+di chiavi e non autorizza un provider.
+Se la cella si ferma a un controllo, ispezionare
+il traceback e non scrivere/rifare V1.
+Non partire col pilot Sonnet finché non è pronto
+lo store/journal V2 scientifico source-bound,
+un protocollo firmato, source/runtime pin
+e approvazione esplicita alla spesa.
+
+Per la futura migrazione di chat: questo documento
+e il report 852 sono il punto di ripartenza corrente.
+
 ## Decisioni ancora aperte
 
 Senza nuovi esperimenti reali NON è dimostrata
@@ -305,12 +347,20 @@ rilanciare il runner finto.
 > `experiment/rq2-provenance-v2-offline-2026-11-13`,
 > verifica HEAD/ultimo commit e report.
 > Non modificare V1 né inventare risultati.
-> L'ultima suite globale confermata è **844/844**
-> (13 novembre, 80.612 s, OK); l'integrazione
-> fake runner→V2→D/C/K→nuovo ledger è 3/3 PASS.
+> L'ultima suite globale confermata è **852/852**
+> (13 novembre, 78.413 s, OK); l'integrazione
+> fake runner→V2→D/C/K→nuovo ledger era 3/3 PASS.
+> Sono pronti in GitHub il report 852 e la cella
+> `RQ2_GEMINI_V1_COLAB_AUDIT_READONLY_DOPO_852_PASS_2026-11-13.md`,
+> che **non è ancora stata eseguita** in Colab.
 > Leggi anche
 > `docs/ood/RQ2_V2_844_844_GATE_TECNICO_CHIUSO_DECISIONE_SCIENTIFICA_2026-11-13.md`.
-> Il gate tecnico offline è chiuso e la scheda
+> Il gate tecnico offline è chiuso. L'utente vuole
+> concludere esperimenti reali, poi fare refactoring
+> con commenti italiani/pulizia, poi scrivere la tesi.
+> Prima eseguire audit Gemini V1 read-only da Colab,
+> leggere K reali, poi pianificare pilot Sonnet V2
+> con nuovo store reale e autorizzazione. La scheda
 > scientifica per il relatore è stata pubblicata:
 > `docs/ood/RQ2_SCHEDA_SCIENTIFICA_RELATORE_POST_844_PASS_2026-11-13.md`.
 > Procedi alla decisione metodologica fra studio
