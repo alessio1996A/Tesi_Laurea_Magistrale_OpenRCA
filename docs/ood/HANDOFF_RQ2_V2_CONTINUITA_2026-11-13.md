@@ -237,7 +237,7 @@ Nuovi file aggiunti sul branch:
   candidate/insufficient_evidence e preflight K;
   **zero API, zero scritture, zero GT**.
 - `src/tests/test_rq2_v1_gemini_readonly_audit.py`:
-  **8 test offline nuovi: prima esecuzione 7/8 PASS, 1 FAIL di sola asserzione**, corretta nel test, nuova esecuzione 8/8 ancora in attesa.
+  **8 test offline nuovi: dopo una prima esecuzione 7 PASS / 1 FAIL per una sola asserzione, correzione e RIESCUZIONE 8/8 PASS in 0.011 s (output utente)**. La suite globale nuova 852 è ancora da eseguire.
 - `docs/ood/RQ2_DECISIONE_GEMINI_COMPLETATO_E_PERCORSO_REALE_V2_2026-11-13.md`:
   motivazioni e prossimi gate.
 
@@ -252,9 +252,13 @@ negli otto summary dei casi. Report:
 `docs/ood/RQ2_GEMINI_READONLY_AUDIT_TEST_7PASS_1FAIL_ASSERTION_FIX_2026-11-13.md`.
 Non modificare codice audit o risultati V1
 per "riparare" la fixture. Nessuna API e nessuna GT.
+Il riepilogo 8/8 PASS è documentato in
+`docs/ood/RQ2_GEMINI_READONLY_AUDIT_8_8_PASS_2026-11-13.md`.
+Il confronto statico con i record/claim V1 non mostra
+incompatibilità note, ma la vera lettura degli artefatti
+su Drive resta da fare, solo dopo la suite globale.
 
-**Prossimo passo**: PyCharm 8 test mirati, poi
-suite globale (attesi **852** test = 844+8).
+**Prossimo passo**: suite globale in PyCharm (attesi **852** test = 844+8, non ancora eseguiti).
 Solo dopo effettuare audit Gemini V1 su Drive in
 Google Colab, senza chiavi/API. Non dichiarare
 nessun risultato dell'audit finché non viene eseguito.
