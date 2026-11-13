@@ -92,6 +92,7 @@ class _LimitedModel:
 
 def run_one_sonnet_v2_pilot_d(
     *, data_dir: Path, repo_dir: Path,
+    release_sha256: str | None = None,
     confirm_paid_api: bool = False,
 ) -> dict:
     """Una sola D nuova: release fonte/codice/runtime e claim PRIMA dell'API.
@@ -104,6 +105,7 @@ def run_one_sonnet_v2_pilot_d(
         raise SonnetPilotBlocked("Explicit paid API confirmation required")
     ledger = RQ2V2SonnetPilotLedger(
         data_dir=Path(data_dir), repo_dir=Path(repo_dir),
+        release_sha256=release_sha256,
     )
     binding, release = ledger._gate()  # fallisce se pin non approvato
     if release["code_commit"] != binding["code_commit"]:
@@ -142,12 +144,24 @@ def run_one_sonnet_v2_pilot_d(
     after = ledger.audit_restart()
     if after["unresolved_claim"] or after["status"] != receipt["status"]:
         raise SonnetPilotBlocked("Post-run readback failed; STOP")
+    # Una sequenza di call allo stesso tool nello stesso turno
+    # riproduce la difficolta' tecnica V1. Un D senza quella
+    # configurazione NON valida il caso problematico.
+    calls_before_result = []
+    reproduced = False
+    for item in result["tool_trajectory"]:
+        if item.get("tipo") == "tool_call":
+            calls_before_result.append(item.get("nome"))
+        elif item.get("tipo") == "tool_result":
+            reproduced |= len(calls_before_result) != len(set(calls_before_result))
+            calls_before_result = []
     return {
         "version": VERSION,
         "stage_id": STAGE_ID,
         "claim_sha256": claim["claim_sha256"],
         "record_sha256": receipt["record_sha256"],
         "status": receipt["status"],
+        "parallel_same_name_tool_calls_observed": reproduced,
         "evidence_bundle_sha256": receipt["evidence_bundle_sha256"],
         "observed_model_requests": metered_llm.calls,
         "input_tokens_observed_by_meter": metered_llm.input_tokens,
