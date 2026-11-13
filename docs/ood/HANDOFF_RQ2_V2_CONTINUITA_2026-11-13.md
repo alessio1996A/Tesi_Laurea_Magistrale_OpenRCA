@@ -106,8 +106,24 @@ reale viene aperto. Tre nuovi metodi:
 3. C con ID E999 inesistente ⇒ INVALID_OUTPUT,
    K BLOCKED_DEPENDENCY.
 
-**Stato:** codice GitHub preparato, test non ancora
-eseguito in PyCharm; non dichiarare pass.
+**Nuovo esito locale osservato:** la prima esecuzione del gate
+ha restituito `Ran 19 tests in 7.788s / OK`.
+La differenza rispetto ai tre test progettati dipendeva
+dall'import diretto della classe `RQ2OutputContractsTests`:
+`unittest` ha raccolto anche i suoi 16 test originali,
+oltre ai tre nuovi.
+**Quindi i tre nuovi test hanno passato la prima esecuzione**,
+ma i 19 non sono 19 nuovi test indipendenti.
+Il solo import è stato corretto nel commit
+`73eb3fb84652e11c708b00010d1ddcb5abc83fc0`
+usando `import test_rq2_output_contracts as contract_fixtures`.
+Report:
+`docs/ood/RQ2_V2_RUNNER_TO_NEW_LEDGER_19_PASS_IMPORTED_TEST_FIX_2026-11-13.md`.
+
+**Stato attuale:** è in attesa la riesecuzione mirata
+**dopo** il fix (attesi 3 test) e poi della suite
+globale (attesi 844). Non dichiarare questi PASS prima
+del log locale.
 
 ### Comandi PyCharm
 
@@ -122,8 +138,11 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_rq2_v2_runner_to_ledger_fake_e2e.py" -v
 ```
 
-Attesi **3** test. In caso di errori leggere il
-traceback e correggere SOLO nuovi file V2.
+Attesi **3** test dopo la correzione dell'import
+(il primo run precedente aveva 19 PASS includendo
+16 test già esistenti, duplicati).
+In caso di errori leggere il traceback e correggere
+SOLO nuovi file V2.
 Se OK, ripetere
 `python -m unittest discover -s src/tests -p "test_*.py" -v`.
 Previsti circa **844** test (841+3), da verificare.
