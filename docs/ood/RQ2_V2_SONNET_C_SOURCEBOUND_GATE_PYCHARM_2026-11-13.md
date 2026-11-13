@@ -58,3 +58,21 @@ python -m unittest discover -s src/tests -p "test_*.py" -v
 5. Mai toccare D, i 39 record V1, RQ1 scorer, gli 11 OOD test o GT.
 
 **Scadenza tesi:** 1 dicembre 2026. Dopo freeze: refactoring, commenti italiani, pulizia, scrittura.
+
+## Prima esecuzione PyCharm del gate 16 (osservata): 15 PASS / 1 ERROR
+
+Output dell'utente: `Ran 16 tests in 0.434s / FAILED (errors=1)`.
+I 15 test rimanenti risultavano OK. Il solo errore era
+`test_preview_validates_parent_bundle_package_and_hashes`:
+`evaluation.rq2_evidence_bundle.EvidenceBundleError: Unexpected bundle schema`.
+La fixture fake ometteva `schema_version`, richiesta correttamente dalla
+funzione `evidence_ids()`; **non** era un difetto del validatore o della
+provenance reale. È stata aggiunta alla sola fixture la versione importata
+da `evaluation.rq2_evidence_bundle.VERSION`. Nessun file produttivo,
+freeze V1/D, protocollo o API modificato. La correzione del test è nel
+commit `380360e5734dfd0eafe138edceff410c08ea5544`.
+
+**Stato successivo alla correzione: TEST DA RIESEGUIRE**.
+Non dichiarare PASS finché non arriva il nuovo output PyCharm:
+`Ran 16 tests ... OK`. Solo allora eseguire la suite completa,
+attesa `Ran 883 tests ... OK`.
