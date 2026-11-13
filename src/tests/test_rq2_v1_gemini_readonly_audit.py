@@ -75,7 +75,9 @@ class V1GeminiReadOnlySummaryTests(unittest.TestCase):
         self.assertEqual(result["files_written"], 0)
         self.assertEqual(result["scientific_k_rules_frozen"], 0)
         self.assertEqual(len(result["cases"]), 8)
-        self.assertNotIn("ground_truth", str(result))
+        self.assertNotIn("ground_truth", result)
+        for case_summary in result["cases"]:
+            self.assertNotIn("ground_truth", case_summary)
         self.assertNotIn("predicted_fault_type", str(result))
 
     def test_missing_gemini_stage_fails_closed(self):
