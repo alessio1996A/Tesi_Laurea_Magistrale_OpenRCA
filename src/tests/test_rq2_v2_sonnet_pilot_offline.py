@@ -216,7 +216,79 @@ class RQ2V2SonnetPilotOfflineTests(unittest.TestCase):
         self.assertFalse(outcome["usd_hard_cap_guaranteed"])
         self.assertFalse(outcome["c_k_executed"])
         self.assertFalse(self._ledger().audit_restart()["unresolved_claim"])
+        record = json.loads(self._ledger().record_path.read_bytes())
+        metering = record["diagnostic_run"]["metrics"]["rq2_v2_execution_meter"]
+        self.assertEqual(metering["schema"], "rq2_v2_sonnet_execution_meter_v1")
+        self.assertEqual(metering["observed_model_requests"], 2)
+        self.assertEqual(metering["input_tokens_observed"], outcome["input_tokens_observed_by_meter"])
+        self.assertEqual(metering["output_tokens_observed"], outcome["output_tokens_observed_by_meter"])
+        self.assertTrue(metering["token_usage_complete"])
+        self.assertEqual(
+            metering["cost_estimate_usd_not_invoice"],
+            outcome["cost_estimate_usd_not_invoice"],
+        )
+        self.assertFalse(metering["usd_hard_cap_guaranteed"])
         self.assertFalse((self.root / "data/rq2").exists())
+
+    def test_driver_missing_usage_persists_failure_and_attempt(self):
+        self._mock_release()
+
+        class NoUsageLLM(ParallelSameNameFakeLLM):
+            def invoke(self, messages):
+                answer = super().invoke(messages)
+                answer.usage_metadata = None
+                return answer
+
+        fake_model = NoUsageLLM()
+        with (
+            patch.object(driver, "assert_exact_runtime_snapshot"),
+            patch.object(
+                driver.metadata, "version",
+                side_effect=lambda package: EXPECTED_COLAB_VERSIONS[package],
+            ),
+            patch.object(driver, "crea_modello_rq2", return_value=fake_model),
+            patch.object(runner, "prepara_esperimento", side_effect=fake_preparation),
+        ):
+            outcome = driver.run_one_sonnet_v2_pilot_d(
+                data_dir=self.root, repo_dir=self.repo, confirm_paid_api=True,
+            )
+        self.assertEqual(outcome["status"], "EXECUTION_ERROR_REVIEW")
+        self.assertEqual(outcome["observed_model_requests"], 1)
+        self.assertFalse(outcome["token_usage_complete_by_meter"])
+        record = json.loads(self._ledger().record_path.read_bytes())
+        metering = record["diagnostic_run"]["metrics"]["rq2_v2_execution_meter"]
+        self.assertEqual(metering["observed_model_requests"], 1)
+        self.assertFalse(metering["token_usage_complete"])
+        self.assertIn("Missing trustworthy token usage", record["diagnostic_run"]["error"])
+        with self.assertRaisesRegex(pilot.SonnetPilotBlocked, "No retry"):
+            self._ledger().claim_stage()
+
+    def test_driver_operational_threshold_stop_persists_failure(self):
+        self._mock_release()
+        fake_model = ParallelSameNameFakeLLM()
+        tiny_limit = {**FAKE_RELEASE, "approved_usd_limit": 0.00001}
+        with (
+            patch.object(pilot, "read_frozen_release", return_value=tiny_limit),
+            patch.object(driver, "assert_exact_runtime_snapshot"),
+            patch.object(
+                driver.metadata, "version",
+                side_effect=lambda package: EXPECTED_COLAB_VERSIONS[package],
+            ),
+            patch.object(driver, "crea_modello_rq2", return_value=fake_model),
+            patch.object(runner, "prepara_esperimento", side_effect=fake_preparation),
+        ):
+            outcome = driver.run_one_sonnet_v2_pilot_d(
+                data_dir=self.root, repo_dir=self.repo, confirm_paid_api=True,
+            )
+        self.assertEqual(fake_model.invocations, 1)
+        self.assertEqual(outcome["status"], "EXECUTION_ERROR_REVIEW")
+        self.assertTrue(outcome["operational_stop_threshold_reached"])
+        record = json.loads(self._ledger().record_path.read_bytes())
+        metering = record["diagnostic_run"]["metrics"]["rq2_v2_execution_meter"]
+        self.assertEqual(metering["observed_model_requests"], 1)
+        self.assertTrue(metering["operational_stop_threshold_reached"])
+        self.assertIn("Operational spend stop reached", record["diagnostic_run"]["error"])
+        self.assertFalse(self._ledger().audit_restart()["unresolved_claim"])
 
     def test_missing_reliable_usage_aborts_next_request_no_retry(self):
         class NoUsageLLM(ParallelSameNameFakeLLM):
