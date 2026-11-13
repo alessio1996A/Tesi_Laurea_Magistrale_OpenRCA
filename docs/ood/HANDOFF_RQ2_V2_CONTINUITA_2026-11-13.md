@@ -75,6 +75,8 @@ del benchmark reale. Sono ancora in stato
 - 8/8 policy isolamento.
 - 16/16 nuovo store/journal sintetico V2.
 - **841/841 suite globale — 72.153 secondi — OK**.
+- **3/3 runner-to-new-V2-ledger fake E2E — 4.434 secondi — OK**,
+  dopo correzione dell'import; nuova suite globale ancora pending.
 
 Sono test software, non 841 diagnosi sul benchmark.
 GO solo offline, NO-GO API reali, NO-GO test OOD.
@@ -120,10 +122,16 @@ usando `import test_rq2_output_contracts as contract_fixtures`.
 Report:
 `docs/ood/RQ2_V2_RUNNER_TO_NEW_LEDGER_19_PASS_IMPORTED_TEST_FIX_2026-11-13.md`.
 
-**Stato attuale:** è in attesa la riesecuzione mirata
-**dopo** il fix (attesi 3 test) e poi della suite
-globale (attesi 844). Non dichiarare questi PASS prima
-del log locale.
+**Nuovo esito locale confermato dopo il fix:**
+`Ran 3 tests in 4.434s / OK`. Il problema dei 16
+test raccolti per errore è risolto. Il gate mirato
+runner → esecutore V2 → D/C/K → nuovo ledger
+sintetico è quindi **3/3 PASS**.
+Report: `docs/ood/RQ2_V2_RUNNER_TO_NEW_LEDGER_3_PASS_AFTER_IMPORT_FIX_2026-11-13.md`.
+
+**Stato attuale:** resta DA ESEGUIRE la suite
+globale aggiornata, con **844 test previsti**.
+Non dichiararla PASS finché non perviene il log.
 
 ### Comandi PyCharm
 
