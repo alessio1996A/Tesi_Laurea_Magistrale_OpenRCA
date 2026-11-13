@@ -124,6 +124,13 @@ def source_binding(*, data_dir: Path, repo_dir: Path) -> dict:
     root, repo = _safe_path(data_dir), _safe_path(repo_dir)
     if not root.is_dir() or not repo.is_dir():
         raise SonnetPilotBlocked("Missing data/repository directory")
+    # Prima del preflight escludere link simbolici anche negli input GT-free.
+    for source in (
+        root / "data", root / "data/processed",
+        root / "data/processed/split_market_v1.csv",
+        root / "data/processed/benchmark_inputs_market.csv",
+    ):
+        _safe_path(source)
     preview = preview_discovery_d_config(
         data_dir=root, case_id="cloudbed-1_q050", logical_model="sonnet",
         harness="A1", proposed_model_name=MODEL_ID,
@@ -155,7 +162,7 @@ def source_binding(*, data_dir: Path, repo_dir: Path) -> dict:
             check=True, capture_output=True, text=True, timeout=10,
         ).stdout.strip()
         dirty = subprocess.run(
-            ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"],
+            ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=normal"],
             check=True, capture_output=True, text=True, timeout=10,
         ).stdout.strip()
     except (subprocess.SubprocessError, OSError) as exc:
@@ -166,7 +173,7 @@ def source_binding(*, data_dir: Path, repo_dir: Path) -> dict:
         "protocol": PROTOCOL, "stage_id": STAGE_ID,
         "code_commit": head,
         "v2_graph_sha256": _hash(graph_file.read_bytes()),
-        "rq1_runner_blob_sha1": identity["rq1_source_sha256"][
+        "rq1_runner_sha256": identity["rq1_source_sha256"][
             "evaluation/experiment_runner.py"
         ],
         "split_sha256": preview["split_sha256"],
@@ -178,15 +185,15 @@ def source_binding(*, data_dir: Path, repo_dir: Path) -> dict:
     return {**bound, "source_binding_sha256": _digest(bound)}
 
 
-def read_frozen_release(*, data_dir: Path, binding: dict) -> dict:
+def read_frozen_release(*, data_dir: Path, binding: dict,
+                        release_sha256: str | None = None) -> dict:
     """Nessuna release attiva finché EXPECTED_RELEASE_SHA256 e' None."""
-    if EXPECTED_RELEASE_SHA256 is None or not HASH_RE.fullmatch(
-        EXPECTED_RELEASE_SHA256
-    ):
+    pin = release_sha256 if release_sha256 is not None else EXPECTED_RELEASE_SHA256
+    if type(pin) is not str or not HASH_RE.fullmatch(pin):
         raise SonnetPilotBlocked("NO_API: scientific release SHA not pinned")
     release_path = _safe_path(data_dir) / RELEASE_RELATIVE
     release = _read_json(release_path)
-    if _hash(_canonical(release)) != EXPECTED_RELEASE_SHA256:
+    if _hash(_canonical(release)) != pin:
         raise SonnetPilotBlocked("Frozen release SHA mismatch")
     required = {
         "schema", "protocol", "stage_id", "source_binding_sha256",
@@ -235,9 +242,16 @@ def read_frozen_release(*, data_dir: Path, binding: dict) -> dict:
 class RQ2V2SonnetPilotLedger:
     """Source-bound ledger reale: una D, claim prima delle richieste, no retry."""
 
-    def __init__(self, *, data_dir: Path, repo_dir: Path):
+    def __init__(self, *, data_dir: Path, repo_dir: Path,
+                 release_sha256: str | None = None):
         self.data_dir = _safe_path(data_dir)
         self.repo_dir = _safe_path(repo_dir)
+        # L'hash approvato si passa al momento del pilot: nessun commit
+        # di pin che alteri la HEAD scientifica gia' congelata.
+        self.release_sha256 = (
+            release_sha256 if release_sha256 is not None
+            else EXPECTED_RELEASE_SHA256
+        )
         self.root = self.data_dir / RELATIVE_ROOT
         self.claim_path = self.data_dir / CLAIM_RELATIVE
         self.record_path = self.data_dir / RECORD_RELATIVE
@@ -252,7 +266,10 @@ class RQ2V2SonnetPilotLedger:
 
     def _gate(self) -> tuple[dict, dict]:
         binding = source_binding(data_dir=self.data_dir, repo_dir=self.repo_dir)
-        release = read_frozen_release(data_dir=self.data_dir, binding=binding)
+        release = read_frozen_release(
+            data_dir=self.data_dir, binding=binding,
+            release_sha256=self.release_sha256,
+        )
         return binding, release
 
     def _verify_claim(self, *, required: bool = False) -> dict | None:
@@ -270,7 +287,7 @@ class RQ2V2SonnetPilotLedger:
             or claim["model_id"] != MODEL_ID
             or claim["attempt_number"] != 1
             or type(claim["attempt_number"]) is not int
-            or claim["release_sha256"] != EXPECTED_RELEASE_SHA256
+            or claim["release_sha256"] != self.release_sha256
             or claim["claim_sha256"] != _digest({
                 k: v for k, v in claim.items() if k != "claim_sha256"
             })
@@ -376,7 +393,7 @@ class RQ2V2SonnetPilotLedger:
             "schema": VERSION + "_claim", "stage_id": STAGE_ID,
             "model_id": MODEL_ID,
             "source_binding_sha256": binding["source_binding_sha256"],
-            "release_sha256": EXPECTED_RELEASE_SHA256,
+            "release_sha256": self.release_sha256,
             "attempt_number": 1,
         }
         claim = {**core, "claim_sha256": _digest(core)}
@@ -407,7 +424,9 @@ class RQ2V2SonnetPilotLedger:
         (self.root / "records").mkdir(parents=True, exist_ok=True, mode=0o700)
         _write_once(self.record_path, record)
         # Readback canonico obbligatorio, nessun claim "complete" prima.
-        assert self._verify_record(claim)["record_sha256"] == record["record_sha256"]
+        reread = self._verify_record(claim)
+        if reread is None or reread["record_sha256"] != record["record_sha256"]:
+            raise SonnetPilotBlocked("Readback digest mismatch after write")
         return {
             "stage_id": STAGE_ID, "status": status,
             "record_sha256": record["record_sha256"],
