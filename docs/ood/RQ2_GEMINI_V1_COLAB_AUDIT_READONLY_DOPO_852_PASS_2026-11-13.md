@@ -170,6 +170,8 @@ assert summary["by_record_status"] == {
     "INVALID_OUTPUT": 1,
     "BLOCKED_DEPENDENCY": 1,
 }
+assert summary["v1_total_recorded_all_providers"] == 39, "V1_RECORD_COUNT_DRIFT: STOP"
+assert summary["v1_total_claims_all_providers"] == 32, "V1_CLAIM_COUNT_DRIFT: STOP"
 assert summary["unresolved_claims"] == 0
 assert summary["scientific_k_rules_frozen"] == 0
 assert summary["can_run_ood_test"] is False
