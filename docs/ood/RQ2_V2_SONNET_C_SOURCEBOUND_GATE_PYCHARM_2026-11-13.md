@@ -28,10 +28,10 @@ I 3 troncamenti sono deliberate limitazioni del budget visibile delle osservazio
 `feature/rq2-v2-sonnet-c-sourcebound-2026-11-13`, basato sul commit D congelato `bf2b0a0...`.
 
 - `src/evaluation/rq2_v2_sonnet_c_sourcebound.py`: un solo stage C per `cloudbed-1_q050/sonnet/A1`, usa source binding GT-free attuale, verifica in sola lettura parent D release/claim/record usando hash storici **anche se il commit C nuovo è diverso da quello D**. Ricostruisce `prepare_cause_probe`, blocca se package/hash/8 evidenze/3 troncamenti/18084 caratteri variano. C ha nuovo protocollo, namespace dedicato, release SHA indipendente e stato `NO_API` per default. Nuovo claim `O_EXCL` prima della chiamata; validazione C con `validate_cause_probe`, output esatto, scelta diagnosis/abstain, provider error, token usage, prezzo stimato, readback e no retry. Niente K.
-- `src/tests/test_rq2_v2_sonnet_c_sourcebound_offline.py`: **14 nuovi test** con mock solo per source, parent, release e fake LLM; ledger e parser reali. Verificano consent, release, source/package, claim/restart, JSON corretto e non corretto, astensione, errori e usage, tampering, V1 assente.
+- `src/tests/test_rq2_v2_sonnet_c_sourcebound_offline.py`: **16 nuovi test** con mock solo per source, parent, release e fake LLM; ledger e parser reali. Verificano consent, release, source/package, claim/restart, JSON corretto e non corretto, astensione, errori e usage, tampering, costo ricalcolato, radici Git e Drive distinte e V1 assente.
 - Nessun altro file preesistente modificato, nessun risultato scientifico riscritto.
 
-**Importante:** i 14 test non sono ancora stati eseguiti; il baseline reale di PyCharm resta **867 PASS**. Atteso con i test nuovi: **14 mirati**, **881 globali** (se discovery invariata). Non dichiarare PASS prima di output utente.
+**Importante:** i 16 test non sono ancora stati eseguiti; il baseline reale di PyCharm resta **867 PASS**. Atteso con i test nuovi: **16 mirati**, **883 globali** (se discovery invariata). Non dichiarare PASS prima di output utente.
 
 ## Nuovo gate GitHub → PyCharm
 
@@ -44,7 +44,7 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_rq2_v2_sonnet_c_sourcebound_offline.py" -v
 ```
 
-Solo se i 14 passano:
+Solo se i 16 passano:
 ```powershell
 python -m unittest discover -s src/tests -p "test_*.py" -v
 ```
