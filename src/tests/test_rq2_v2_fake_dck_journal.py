@@ -37,7 +37,13 @@ import test_rq2_stage_binding as binding_fixture
 MODEL = "claude-sonnet-5-5"
 TOOL = "tool_get_node_metrics"
 USAGE = {"input_tokens": 30, "output_tokens": 10, "total_tokens": 40}
-ANSWER = '{"1":{"root cause reason":"synthetic hypothesis"}}'
+ANSWER = json.dumps({
+    "1": {
+        "root cause occurrence datetime": "2023-11-15 06:13:20",
+        "root cause component": "synthetic-component",
+        "root cause reason": "synthetic hypothesis",
+    }
+})
 
 
 @tool(TOOL)
