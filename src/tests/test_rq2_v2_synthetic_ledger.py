@@ -243,6 +243,66 @@ class RQ2V2SyntheticLedgerTests(unittest.TestCase):
                 self.journal.claim_stage(stage_id=stage_id("D"), model_id=MODEL)
         self.assertFalse(target.exists())
 
+    def test_d_invalid_status_with_valid_provenance_is_refused(self):
+        self.journal.claim_stage(stage_id=stage_id("D"), model_id=MODEL)
+        with self.assertRaisesRegex(RQ2V2StoreError, "status/provenance"):
+            self.journal.record_stage(
+                stage_id=stage_id("D"), model_id=MODEL,
+                status="INVALID_OUTPUT",
+                artifact={"diagnostic_run": diagnostic(valid=True)},
+            )
+        self.assertEqual(self.journal.audit_restart()["unresolved_manual_review"], 1)
+
+    def test_c_complete_status_with_invalid_json_is_refused(self):
+        self._record_d()
+        self.journal.claim_stage(stage_id=stage_id("C"), model_id=MODEL)
+        with self.assertRaisesRegex(RQ2V2StoreError, "status/contract"):
+            self.journal.record_stage(
+                stage_id=stage_id("C"), model_id=MODEL,
+                status="RECORDED_COMPLETE", artifact={"raw_response": "{broken"},
+            )
+        self.assertEqual(self.journal.audit_restart()["unresolved_manual_review"], 1)
+
+    def test_d_provider_error_is_preserved_and_blocks_children(self):
+        self.journal.claim_stage(stage_id=stage_id("D"), model_id=MODEL)
+        run = diagnostic()
+        run["error"] = "synthetic upstream 503"
+        self.journal.record_stage(
+            stage_id=stage_id("D"), model_id=MODEL,
+            status="PROVIDER_ERROR", artifact={"diagnostic_run": run},
+        )
+        for stage in ("C", "K"):
+            self.journal.record_stage(
+                stage_id=stage_id(stage), model_id=MODEL,
+                status="BLOCKED_DEPENDENCY", artifact={},
+            )
+        audit = self.journal.audit_restart()
+        self.assertEqual(audit["claims"], 1)
+        self.assertEqual(audit["stored_stage_records"], 3)
+        self.assertEqual(audit["unresolved_manual_review"], 0)
+
+    def test_c_provider_error_requires_error_text_and_blocks_k(self):
+        self._record_d()
+        self.journal.claim_stage(stage_id=stage_id("C"), model_id=MODEL)
+        with self.assertRaisesRegex(RQ2V2StoreError, "Provider failure"):
+            self.journal.record_stage(
+                stage_id=stage_id("C"), model_id=MODEL,
+                status="PROVIDER_ERROR", artifact={"raw_response": None},
+            )
+        self.journal.record_stage(
+            stage_id=stage_id("C"), model_id=MODEL,
+            status="PROVIDER_ERROR",
+            artifact={"raw_response": None, "provider_error": "synthetic timeout"},
+        )
+        self.journal.record_stage(
+            stage_id=stage_id("K"), model_id=MODEL,
+            status="BLOCKED_DEPENDENCY", artifact={},
+        )
+        audit = self.journal.audit_restart()
+        self.assertEqual(audit["claims"], 2)
+        self.assertEqual(audit["stored_stage_records"], 3)
+        self.assertEqual(audit["unresolved_manual_review"], 0)
+
     def test_claim_model_mismatch_rejected_without_files(self):
         with self.assertRaisesRegex(RQ2V2ClaimError, "model"):
             self.journal.claim_stage(
