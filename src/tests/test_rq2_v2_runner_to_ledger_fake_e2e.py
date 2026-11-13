@@ -36,7 +36,7 @@ from evaluation.rq2_v2_claim_journal import (
 from evaluation.rq2_v2_isolation_policy import DRAFT_PROTOCOL
 from output.v2_contract import infer_requested_faults
 
-from test_rq2_output_contracts import RQ2OutputContractsTests
+import test_rq2_output_contracts as contract_fixtures
 from test_rq2_v2_runner_fake_e2e import (
     FINAL_JSON, ParallelSameNameFakeLLM, TOOL_NAME, fake_node_metrics,
 )
@@ -190,7 +190,7 @@ class RQ2V2RunnerToLedgerFakeE2ETests(unittest.TestCase):
                     stage_id=sid(harness, "C"), model_id=MODEL,
                 )
                 # Il contenuto C proviene da fixture, NON da un secondo LLM.
-                c_raw = json.dumps(RQ2OutputContractsTests.cause())
+                c_raw = json.dumps(contract_fixtures.RQ2OutputContractsTests.cause())
                 self.journal.record_stage(
                     stage_id=sid(harness, "C"), model_id=MODEL,
                     status="RECORDED_COMPLETE",
@@ -220,7 +220,7 @@ class RQ2V2RunnerToLedgerFakeE2ETests(unittest.TestCase):
                     status="RECORDED_COMPLETE",
                     artifact={
                         "raw_response": json.dumps(
-                            RQ2OutputContractsTests.rule()
+                            contract_fixtures.RQ2OutputContractsTests.rule()
                         )
                     },
                 )
@@ -304,7 +304,7 @@ class RQ2V2RunnerToLedgerFakeE2ETests(unittest.TestCase):
         self.journal.claim_stage(
             stage_id=sid("A1", "C"), model_id=MODEL,
         )
-        bad_c = RQ2OutputContractsTests.cause()
+        bad_c = contract_fixtures.RQ2OutputContractsTests.cause()
         bad_c["evidence_ids"] = ["E999"]
         raw = json.dumps(bad_c)
         with self.assertRaisesRegex(
