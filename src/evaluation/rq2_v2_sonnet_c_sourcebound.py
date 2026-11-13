@@ -239,6 +239,28 @@ class CauseLedger:
 
     @staticmethod
     def _classify(rec: dict, package: dict) -> tuple[str, str | None, str | None]:
+        """Stato C fail-closed e contabilità controllata prima del readback."""
+        if (rec.get("observed_model_requests") != 1
+                or type(rec.get("raw_response")) not in (str, type(None))
+                or (rec.get("execution_error") is not None
+                    and (type(rec["execution_error"]) is not str
+                         or not rec["execution_error"].strip()))
+                or type(rec.get("token_usage_complete")) is not bool):
+            raise CauseStageBlocked("Malformed C provider receipt")
+        if rec["token_usage_complete"]:
+            tokens = (rec.get("input_tokens"), rec.get("output_tokens"))
+            if any(type(n) is not int or n < 0 for n in tokens):
+                raise CauseStageBlocked("Inconsistent C token usage")
+            expected_cost = str((
+                Decimal(tokens[0]) * INPUT_PRICE
+                + Decimal(tokens[1]) * OUTPUT_PRICE
+            ) / Decimal(1_000_000))
+            if rec.get("cost_estimate_usd_not_invoice") != expected_cost:
+                raise CauseStageBlocked("Inconsistent C cost estimate")
+        elif (rec.get("input_tokens") is not None
+              or rec.get("output_tokens") is not None
+              or rec.get("cost_estimate_usd_not_invoice") is not None):
+            raise CauseStageBlocked("Partial C usage must be explicit")
         if rec["execution_error"] is not None:
             return "EXECUTION_ERROR_REVIEW", None, "PROVIDER_ERROR"
         if rec["token_usage_complete"] is not True:
