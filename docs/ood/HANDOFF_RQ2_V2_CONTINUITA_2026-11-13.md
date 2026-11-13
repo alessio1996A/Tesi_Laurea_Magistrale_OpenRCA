@@ -215,6 +215,50 @@ Priorità attuale: **consultazione metodologica e
 stesura RQ1**, non nuovi test generici.
 Ultima suite globale provata resta **844/844 OK**.
 
+## Ripresa degli esperimenti reali: Gemini e Sonnet (13 novembre)
+
+L'utente ha confermato la priorità personale:
+**terminare la sperimentazione RQ2 reale → refactoring,
+commenti in italiano e pulizia codice → scrittura tesi**.
+È stata verificata la decisione **Gemini V1 NON va rifatto**:
+24/24 stage discovery archiviati, 22 `RECORDED_COMPLETE`,
+1 `INVALID_OUTPUT` C q032/A1_8R e 1 K
+`BLOCKED_DEPENDENCY` conseguente; 23 claim reali,
+363.753 token osservati. I record sono utilizzabili come
+evidenze tecniche discovery, non attestano accuratezza
+delle diagnosi né formalizzabilità delle K.
+Un nuovo esperimento Gemini V2 sarebbe una replica
+separata e va motivata, non una "riparazione" V1.
+
+Nuovi file aggiunti sul branch:
+- `src/evaluation/rq2_v1_gemini_readonly_audit.py`:
+  legge l'archivio V1 reale con i verificatori SHA
+  GT-free originali; output solo aggregati D/C/K,
+  candidate/insufficient_evidence e preflight K;
+  **zero API, zero scritture, zero GT**.
+- `src/tests/test_rq2_v1_gemini_readonly_audit.py`:
+  **8 test offline nuovi NON ancora eseguiti**.
+- `docs/ood/RQ2_DECISIONE_GEMINI_COMPLETATO_E_PERCORSO_REALE_V2_2026-11-13.md`:
+  motivazioni e prossimi gate.
+
+**Prossimo passo**: PyCharm 8 test mirati, poi
+suite globale (attesi **852** test = 844+8).
+Solo dopo effettuare audit Gemini V1 su Drive in
+Google Colab, senza chiavi/API. Non dichiarare
+nessun risultato dell'audit finché non viene eseguito.
+
+Se le K Gemini richiedono ancora verifica, NON
+promuoverle automaticamente a detector OOD.
+Pilot V2 da preregistrare e autorizzare, candidato:
+`cloudbed-1_q050 / Sonnet / A1 / D` con nuova
+identità V2, nuovo archivio source-bound e
+provenance `tool_call_id` reale. La D V1 corrispondente
+resta `INVALID_OUTPUT` e non viene ritentata:
+il pilot sarebbe un **nuovo protocollo**.
+Attuale store V2 è ancora **synthetic-only**,
+non autorizza Market né provider. Undici OOD
+test LOCKED. Nessuna API eseguita qui.
+
 ## Decisioni ancora aperte
 
 Senza nuovi esperimenti reali NON è dimostrata
