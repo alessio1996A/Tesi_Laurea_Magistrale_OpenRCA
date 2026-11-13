@@ -275,36 +275,66 @@ class RQ2V2SyntheticArtifactStore:
             raise RQ2V2StoreError("Attempted stage needs claim and artifact")
         reject_gt_keys(artifact)
 
-        # Un esito D technical complete richiede provenance tool verificata.
-        if preview["stage"] == "D" and status == "RECORDED_COMPLETE":
-            run = artifact.get("diagnostic_run")
-            if type(run) is not dict or run.get("error") is not None:
-                raise RQ2V2StoreError("Complete D requires successful run")
-            try:
-                build_evidence_bundle(
+        # Lo status tecnico deve corrispondere al contenuto osservato.
+        # Niente risultati inventati ne' reinterpretazioni post-hoc.
+        if preview["stage"] == "D" and status != "BLOCKED_DEPENDENCY":
+            if set(artifact) != {"diagnostic_run"}:
+                raise RQ2V2StoreError("D artifact schema mismatch")
+            run = artifact["diagnostic_run"]
+            if type(run) is not dict:
+                raise RQ2V2StoreError("D requires a run dictionary")
+            error = run.get("error")
+            if status == "PROVIDER_ERROR":
+                if type(error) is not str or not error.strip():
+                    raise RQ2V2StoreError("Provider failure requires a real error")
+            else:
+                if error is not None:
+                    raise RQ2V2StoreError("Unexpected error in D output")
+                try:
+                    build_evidence_bundle(
+                        run["tool_trajectory"], allowed_tool_names=ALLOWED_TOOLS
+                    )
+                except (KeyError, TypeError, ValueError):
+                    valid_provenance = False
+                else:
+                    valid_provenance = True
+                if (status == "RECORDED_COMPLETE") != valid_provenance:
+                    raise RQ2V2StoreError("D status/provenance mismatch")
+
+        if preview["stage"] in ("C", "K") and status != "BLOCKED_DEPENDENCY":
+            if set(artifact) - {"raw_response", "provider_error"}:
+                raise RQ2V2StoreError("Unexpected C/K artifact fields")
+            raw = artifact.get("raw_response")
+            provider_error = artifact.get("provider_error")
+            if status == "PROVIDER_ERROR":
+                if (
+                    raw is not None or type(provider_error) is not str
+                    or not provider_error.strip()
+                ):
+                    raise RQ2V2StoreError("Provider failure receipt required")
+            else:
+                if type(raw) is not str or provider_error is not None:
+                    raise RQ2V2StoreError("C/K output or error mismatch")
+                d_id = stage_id.rsplit(":", 1)[0] + ":D"
+                d = self.load(stage_id=d_id)
+                if d is None or d["status"] != "RECORDED_COMPLETE":
+                    raise RQ2V2StoreError("C/K needs complete D evidence")
+                run = d["artifact"]["diagnostic_run"]
+                bundle = build_evidence_bundle(
                     run["tool_trajectory"], allowed_tool_names=ALLOWED_TOOLS
                 )
-            except (KeyError, TypeError, ValueError) as exc:
-                raise RQ2V2StoreError("D tool provenance invalid") from exc
-        if preview["stage"] in ("C", "K") and status == "RECORDED_COMPLETE":
-            raw = artifact.get("raw_response")
-            d_id = stage_id.rsplit(":", 1)[0] + ":D"
-            d = self.load(stage_id=d_id)
-            if d is None or d["status"] != "RECORDED_COMPLETE":
-                raise RQ2V2StoreError("C/K needs complete D evidence")
-            run = d["artifact"]["diagnostic_run"]
-            bundle = build_evidence_bundle(
-                run["tool_trajectory"], allowed_tool_names=ALLOWED_TOOLS
-            )
-            validator = (
-                validate_cause_probe if preview["stage"] == "C"
-                else validate_candidate_rule
-            )
-            try:
-                validator(raw, allowed_evidence_ids=evidence_ids(bundle))
-            except (TypeError, ValueError) as exc:
-                raise RQ2V2StoreError("Invalid synthetic C/K contract") from exc
-
+                validator = (
+                    validate_cause_probe if preview["stage"] == "C"
+                    else validate_candidate_rule
+                )
+                try:
+                    validator(raw, allowed_evidence_ids=evidence_ids(bundle))
+                except (TypeError, ValueError):
+                    valid_contract = False
+                else:
+                    valid_contract = True
+                if (status == "RECORDED_COMPLETE") != valid_contract:
+                    raise RQ2V2StoreError("C/K status/contract mismatch")
         core = {
             "schema": VERSION, "protocol": DRAFT_PROTOCOL,
             "stage_id": stage_id, "model_id": model_id,
