@@ -58,6 +58,26 @@ class _LimitedModel:
             + Decimal(self.output_tokens) * OUTPUT_USD_PER_MTOK
         ) / Decimal(1_000_000)
 
+    def audit_snapshot(self) -> dict:
+        """Ricevuta serializzabile: osservazioni, NON fattura o hard cap.
+
+        Conservare nel record anche in caso di errore/usage incompleto:
+        le metriche del grafo potrebbero non includere un HTTP fallito.
+        """
+        return {
+            "schema": "rq2_v2_sonnet_execution_meter_v1",
+            "observed_model_requests": self.calls,
+            "input_tokens_observed": self.input_tokens,
+            "output_tokens_observed": self.output_tokens,
+            "token_usage_complete": self.usage_complete,
+            "cost_estimate_usd_not_invoice": str(self.observed_cost_usd),
+            "approved_operational_threshold_usd": str(self.approved_limit),
+            "operational_stop_threshold_reached": (
+                self.observed_cost_usd >= self.approved_limit
+            ),
+            "usd_hard_cap_guaranteed": False,
+        }
+
     def invoke_counted(self, runnable, *args, **kwargs):
         # Check prima di OGNI richiesta, senza retry.
         if self.calls >= MAX_CALLS:
@@ -137,8 +157,12 @@ def run_one_sonnet_v2_pilot_d(
         result = run_experiment(
             config, llm=metered_llm, verbose=False, salva=False,
         )
-    if type(result) is not dict:
+    if type(result) is not dict or type(result.get("metrics")) is not dict:
         raise SonnetPilotBlocked("Runner output missing; claim unresolved")
+    # Registrare le richieste HTTP osservate anche se il grafo termina
+    # con errore e le sue metriche non contabilizzano l'ultima risposta.
+    # Il ledger serializza questa ricevuta nel record con hash e readback.
+    result["metrics"]["rq2_v2_execution_meter"] = metered_llm.audit_snapshot()
     receipt = ledger.record_stage(diagnostic_run=result)
     after = ledger.audit_restart()
     if after["unresolved_claim"] or after["status"] != receipt["status"]:
