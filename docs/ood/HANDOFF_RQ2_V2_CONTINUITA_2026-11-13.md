@@ -88,9 +88,9 @@ Report principale:
 Confronto GitHub sulla base V1: 23 file aggiunti,
 0 file preesistenti modificati, prima del gate successivo.
 
-## Lavoro appena preparato: gate pending
+## Storico del gate runner→nuovo ledger (ora superato)
 
-**Nuovo test non ancora eseguito:**
+**Test eseguito e superato:**
 `src/tests/test_rq2_v2_runner_to_ledger_fake_e2e.py`.
 
 Unisce `run_experiment` V1, grafo LangGraph,
@@ -146,7 +146,7 @@ Non servono ulteriori test generici adesso: la priorità
 e la preparazione di un eventuale pilot minimo V2,
 ma senza autorizzazione a provider.
 
-### Comandi PyCharm
+### Comandi PyCharm eseguiti storicamente (NON ripetere senza motivo)
 
 Solo se branch giusto e working tree pulito:
 
@@ -181,6 +181,40 @@ ma **NO_GO_LIVE_API** e **NO_GO_OOD_TEST**.
 Le quattro discovery V1 già osservate non forniscono
 una replica indipendente di generalizzazione.
 
+## Scheda per il relatore pronta — dopo 844 PASS
+
+Il 13 novembre 2026 è stata preparata e pubblicata la
+scheda scientifica:
+
+`docs/ood/RQ2_SCHEDA_SCIENTIFICA_RELATORE_POST_844_PASS_2026-11-13.md`
+
+La scheda **non** è un nuovo protocollo, una preregistrazione
+firmata o una release e non modifica codice/dati.
+Riporta RQ1 reale (300 tentativi, 295 complete);
+RQ2 V1 discovery reale (39/72: 28 complete, 4 invalid,
+7 blocked; 823.656 token osservati);
+RQ2 V2 (844 test **software** passati, 0 run provider V2),
+e le tre domande della scientific review preesistente:
+RQ2-A fault-type OOD (correct/11, 10 gruppi test),
+RQ2-B proposte K e formalizzabilità,
+RQ2-C applicazione solo se regole deterministiche
+verificate e congelate.
+
+**Raccomandazione attuale:** discutere col relatore
+se la tesi possa riportare RQ2 come studio
+esplorativo/failure analysis, oppure richieda
+un singolo pilot V2 tecnico strettamente preregistrato
+(nuovo source-bound store/journal V2 reale ancora
+da realizzare). Non avviare automaticamente 72
+o 204 stage. Non accedere agli 11 OOD test prima
+di freeze scientifico appropriato.
+
+La scheda include un breve discorso orale e
+tre decisioni concrete da ottenere dal relatore.
+Priorità attuale: **consultazione metodologica e
+stesura RQ1**, non nuovi test generici.
+Ultima suite globale provata resta **844/844 OK**.
+
 ## Decisioni ancora aperte
 
 Senza nuovi esperimenti reali NON è dimostrata
@@ -196,6 +230,12 @@ Non implementare human-in-the-loop, per decisione
 del relatore. Non accumulare nuove campagne se
 compromettono la scrittura RQ1 e la scadenza tesi.
 
+Nella ripresa, leggere anzitutto anche
+`docs/ood/RQ2_SCHEDA_SCIENTIFICA_RELATORE_POST_844_PASS_2026-11-13.md`,
+preparata dopo il gate 844. La prossima attività è
+confrontarsi sulle decisioni della scheda, non
+rilanciare il runner finto.
+
 ## Prompt di ripresa in una nuova chat
 
 > Riprendiamo la tesi OpenRCA. Con connettore GitHub
@@ -210,10 +250,13 @@ compromettono la scrittura RQ1 e la scadenza tesi.
 > fake runner→V2→D/C/K→nuovo ledger è 3/3 PASS.
 > Leggi anche
 > `docs/ood/RQ2_V2_844_844_GATE_TECNICO_CHIUSO_DECISIONE_SCIENTIFICA_2026-11-13.md`.
-> Il gate tecnico offline è chiuso. Procedi alla
-> scheda scientifica per il relatore e alla definizione
-> del minimo esperimento reale solo se necessario,
-> senza API, senza OOD e senza modificare V1.
+> Il gate tecnico offline è chiuso e la scheda
+> scientifica per il relatore è stata pubblicata:
+> `docs/ood/RQ2_SCHEDA_SCIENTIFICA_RELATORE_POST_844_PASS_2026-11-13.md`.
+> Procedi alla decisione metodologica fra studio
+> esplorativo e un singolo pilot reale preregistrato,
+> solo se giustificato e autorizzato,
+> senza API adesso, senza OOD e senza modificare V1.
 > Continua con commit GitHub e PyCharm/PowerShell.
 
 In una chat successiva verificare HEAD perché
