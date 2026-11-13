@@ -14,6 +14,7 @@ from unittest.mock import patch
 from langchain_core.messages import AIMessage
 import evaluation.rq2_v2_sonnet_c_sourcebound as c
 from evaluation.rq2_provider_policy_source_audit import EXPECTED_COLAB_VERSIONS
+from evaluation.rq2_evidence_bundle import VERSION as EVIDENCE_BUNDLE_VERSION
 
 FAKE_BINDING = {
     "protocol": c.PROTOCOL,
@@ -149,7 +150,9 @@ class RQ2V2SonnetCOfflineTests(unittest.TestCase):
                 c.CauseLedger(data_dir=self.root, repo_dir=self.repo).claim_stage()
 
     def test_preview_validates_parent_bundle_package_and_hashes(self):
+        # La fixture deve rispettare lo schema reale controllato da evidence_ids().
         fake_bundle = {
+            "schema_version": EVIDENCE_BUNDLE_VERSION,
             "bundle_sha256": c.PARENT_BUNDLE_SHA256,
             "observations_count": 8, "truncated_count": 3,
             "evidence": [{"evidence_id": f"E{i:03d}"} for i in range(1, 9)],
