@@ -67,7 +67,7 @@ def reject_gt_keys(value) -> None:
 
 def synthetic_guard(data_dir: Path) -> None:
     """Rifiuta esplicitamente root reali e fonti OpenRCA; nessuna scrittura."""
-    if type(data_dir) is not Path or not data_dir.is_absolute():
+    if not isinstance(data_dir, Path) or not data_dir.is_absolute():
         raise RQ2V2StoreError("Absolute pathlib.Path root required")
     if ".." in data_dir.parts or not data_dir.is_dir() or data_dir.is_symlink():
         raise RQ2V2StoreError("Unsafe/nonexistent data root")
