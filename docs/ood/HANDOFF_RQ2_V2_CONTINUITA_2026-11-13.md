@@ -237,9 +237,21 @@ Nuovi file aggiunti sul branch:
   candidate/insufficient_evidence e preflight K;
   **zero API, zero scritture, zero GT**.
 - `src/tests/test_rq2_v1_gemini_readonly_audit.py`:
-  **8 test offline nuovi NON ancora eseguiti**.
+  **8 test offline nuovi: prima esecuzione 7/8 PASS, 1 FAIL di sola asserzione**, corretta nel test, nuova esecuzione 8/8 ancora in attesa.
 - `docs/ood/RQ2_DECISIONE_GEMINI_COMPLETATO_E_PERCORSO_REALE_V2_2026-11-13.md`:
   motivazioni e prossimi gate.
+
+Il test `test_exact_24_record_summary_distinguishes_all_outcomes`
+falliva per una ricerca di sottostringa `"ground_truth"`
+che intercettava il metadato lecito
+`"read_ground_truth": False` nel report.
+Nel commit `1cbcd88d838cbbeacfb012c8b33f35765641a543`
+è stata modificata **solo l'asserzione** per
+verificare l'assenza della chiave GT esatta, anche
+negli otto summary dei casi. Report:
+`docs/ood/RQ2_GEMINI_READONLY_AUDIT_TEST_7PASS_1FAIL_ASSERTION_FIX_2026-11-13.md`.
+Non modificare codice audit o risultati V1
+per "riparare" la fixture. Nessuna API e nessuna GT.
 
 **Prossimo passo**: PyCharm 8 test mirati, poi
 suite globale (attesi **852** test = 844+8).
