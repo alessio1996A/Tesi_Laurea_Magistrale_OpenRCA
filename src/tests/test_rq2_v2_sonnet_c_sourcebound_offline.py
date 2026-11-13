@@ -248,6 +248,22 @@ class RQ2V2SonnetCOfflineTests(unittest.TestCase):
         with self.assertRaisesRegex(c.CauseStageBlocked, "C record corrupt"):
             ledger.audit_restart()
 
+    def test_rehashed_forged_cost_is_still_rejected(self):
+        self._run(FakeLLM())
+        ledger = self._ledger()
+        rec = c._read_json(ledger.record_path)
+        rec["cost_estimate_usd_not_invoice"] = "0"
+        rec["record_sha256"] = c._digest({
+            k: v for k, v in rec.items() if k != "record_sha256"
+        })
+        ledger.record_path.write_bytes(c._canonical(rec))
+        with self.assertRaisesRegex(c.CauseStageBlocked, "cost estimate"):
+            ledger.audit_restart()
+
+    def test_c_source_and_repo_must_be_distinct(self):
+        with self.assertRaisesRegex(c.CauseStageBlocked, "Separate Drive"):
+            c.preview_c(data_dir=self.root, repo_dir=self.root)
+
     def test_source_drift_after_claim_detected(self):
         self._mock_gate()
         ledger = self._ledger()
