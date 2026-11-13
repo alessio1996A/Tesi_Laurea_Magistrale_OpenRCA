@@ -317,6 +317,64 @@ e approvazione esplicita alla spesa.
 Per la futura migrazione di chat: questo documento
 e il report 852 sono il punto di ripartenza corrente.
 
+## Gemini Colab audit REALE completato (13 novembre 2026)
+
+**Output dell'utente:** `STATUS: GEMINI_V1_24_READONLY_AUDIT_OK`.
+Cella eseguita con `GIT_HEAD=489a53467087b8070c8909ceddad1d6aee74d02d`,
+`AUDIT_SOURCE_BLOB=dd36792d8bd64ddfcd24e658d519f2e057b312ac`,
+dipendenze installate solo in `/content`.
+`V1_TOTAL_RECORDS_ALL_PROVIDERS=39`,
+`V1_TOTAL_CLAIMS_ALL_PROVIDERS=32`,
+`UNRESOLVED_CLAIMS=0`,
+`GROUND_TRUTH_READ=FALSE`, `API_CALLS=0`,
+`V1_WRITES=0`, `OOD_TEST=LOCKED`.
+
+**Risultato Gemini 24/24**:
+22 `RECORDED_COMPLETE`, 1 `INVALID_OUTPUT`
+(q032/A1_8R/C), 1 `BLOCKED_DEPENDENCY` (K conseguente).
+**C: 3 diagnosis, 4 abstain, 1 invalid_output.**
+**K: 2 candidate, 5 insufficient_evidence, 1 blocked.**
+Le uniche due K `candidate` sono:
+`cloudbed-2_q026/A1/K` e `cloudbed-2_q045/A1/K`;
+entrambe `requires_verification`, non congelate.
+Nessuna K pronta per OOD, nessun scoring GT di C.
+
+Report registrato:
+`docs/ood/RQ2_GEMINI_V1_AUDIT_REALE_24_24_K_2_CANDIDATE_2026-11-13.md`.
+
+La cella Gemini read-only è **GIÀ ESEGUITA**
+e NON va rilanciata senza un motivo scientifico nuovo.
+Gemini V1 **non si ripete/riscrive**.
+
+## Candidato prossimo pilot autentico Sonnet V2
+
+Specifiche dettagliate:
+`docs/ood/RQ2_V2_SONNET_PILOT_D_SOURCE_BOUND_SPEC_CANDIDATE_2026-11-13.md`.
+
+È stato scelto ex ante come candidato
+`cloudbed-1_q050 / sonnet / A1 / D` soltanto
+(è già nota una D V1 con ambiguous same-name
+tool calls, ma il record V1 resta immutabile).
+Il pilot sarebbe un **nuovo protocollo V2**,
+non retry/repair di V1 né test di generalizzazione.
+
+**STATO: NO_API, NON ESEGUIBILE**. Mancano:
+nuovo source-bound release/store/journal V2
+per Market reale con SHA GT-free e claims,
+integrazione live source-pin dell'esecutore
+V2, test fake fail-closed, runtime/budget
+congelato e consenso esplicito a una sola
+D con costo provider. Lo store V2 attuale
+richiede il marker `synthetic-only`: NON
+aggirarlo, non copiarlo su Drive.
+
+L'utente vuole finire gli esperimenti reali,
+poi refactoring con commenti italiani e pulizia,
+infine scrivere tesi. Scadenza 1 dicembre.
+La prossima fase di codice deve puntare
+direttamente alla release source-bound
+V2 e non ad altri test generici.
+
 ## Decisioni ancora aperte
 
 Senza nuovi esperimenti reali NON è dimostrata
@@ -350,16 +408,22 @@ rilanciare il runner finto.
 > L'ultima suite globale confermata è **852/852**
 > (13 novembre, 78.413 s, OK); l'integrazione
 > fake runner→V2→D/C/K→nuovo ledger era 3/3 PASS.
-> Sono pronti in GitHub il report 852 e la cella
-> `RQ2_GEMINI_V1_COLAB_AUDIT_READONLY_DOPO_852_PASS_2026-11-13.md`,
-> che **non è ancora stata eseguita** in Colab.
+> L'audit Gemini V1 READ-ONLY è stato eseguito
+> con successo in Colab: 24/24 stage, 22 complete,
+> 1 invalid, 1 blocked; C 3 diagnosis/4 abstain/1 invalid;
+> K 2 candidate/5 insufficient/1 blocked,
+> nessuna K frozen. No API, no GT, no V1 writes.
+> Leggi
+> `docs/ood/RQ2_GEMINI_V1_AUDIT_REALE_24_24_K_2_CANDIDATE_2026-11-13.md`
+> e
+> `docs/ood/RQ2_V2_SONNET_PILOT_D_SOURCE_BOUND_SPEC_CANDIDATE_2026-11-13.md`.
 > Leggi anche
 > `docs/ood/RQ2_V2_844_844_GATE_TECNICO_CHIUSO_DECISIONE_SCIENTIFICA_2026-11-13.md`.
 > Il gate tecnico offline è chiuso. L'utente vuole
 > concludere esperimenti reali, poi fare refactoring
 > con commenti italiani/pulizia, poi scrivere la tesi.
-> Prima eseguire audit Gemini V1 read-only da Colab,
-> leggere K reali, poi pianificare pilot Sonnet V2
+> Gemini V1 read-only Colab già completato;
+> ora implementare e validare pilot Sonnet V2
 > con nuovo store reale e autorizzazione. La scheda
 > scientifica per il relatore è stata pubblicata:
 > `docs/ood/RQ2_SCHEDA_SCIENTIFICA_RELATORE_POST_844_PASS_2026-11-13.md`.
