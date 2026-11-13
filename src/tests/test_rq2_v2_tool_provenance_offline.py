@@ -63,7 +63,20 @@ class _SyntheticGraph:
         assert stream_mode == "updates"
         assert config["recursion_limit"] == 30
         assert state["tool_rounds"] == 0
-        yield {"agente": {"messages": [_ai(self.calls)], "tool_rounds": 1}}
+        if any(call.get("id") is None for call in self.calls):
+            # Un messaggio senza id e' un caso degradato: AIMessage
+            # puo' normalizzare/scartare tool_calls non conformi.
+            # Qui testiamo esplicitamente il comportamento difensivo
+            # dell'esecutore, NON il parser Pydantic di LangChain.
+            msg = SimpleNamespace(
+                tool_calls=copy.deepcopy(self.calls),
+                usage_metadata=dict(USAGE),
+                content="",
+            )
+        else:
+            # Casi ordinari: usa un vero AIMessage.
+            msg = _ai(self.calls)
+        yield {"agente": {"messages": [msg], "tool_rounds": 1}}
         yield {"tools": {"messages": self.results}}
         yield {"agente": {
             "messages": [AIMessage(content=FINAL, usage_metadata=dict(USAGE))],
@@ -187,6 +200,10 @@ class RQ2V2ToolProvenanceOfflineTests(unittest.TestCase):
             ),
             richiesta="Synthetic RCA request", verbose=False,
         )
+        self.assertEqual(
+            [event["tipo"] for event in result["tool_trajectory"]],
+            ["tool_call", "tool_call", "tool_result", "tool_result"],
+        )
         self.assertTrue(all("tool_call_id" not in ev
                             for ev in result["tool_trajectory"]))
         with self.assertRaisesRegex(EvidenceBundleError, "Ambiguous"):
@@ -221,6 +238,10 @@ class RQ2V2ToolProvenanceOfflineTests(unittest.TestCase):
             _SyntheticGraph([_call("A", None)],
                             [_tool_result("A", None)]),
             richiesta="Synthetic RCA request", verbose=False,
+        )
+        self.assertEqual(
+            [event["tipo"] for event in result["tool_trajectory"]],
+            ["tool_call", "tool_result"],
         )
         bundle = build_evidence_bundle(
             result["tool_trajectory"], allowed_tool_names={TOOL}
