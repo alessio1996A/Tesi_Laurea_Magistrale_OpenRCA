@@ -307,3 +307,44 @@ Poi proseguire con G4B: un solo journal/dispatcher scientifico comune,
 source-bound e con quote API, provato prima con fake LLM sull'intera
 matrice; non confondere G4A con autorizzazione API. Opzione B non avviata,
 11 casi test OOD intatti.
+
+## 13. G4A PASS e G4B blueprint proposto (14 novembre, 18:44 Europe/Rome)
+
+**Output utente G4A:** `Ran 18 tests in 0.353s; OK`.
+Questo conferma la suite con **source preview mockata**, non una lettura
+reale del manifest/split tramite G4A. Totali G1 25, G2 9, G3A 23,
+G3B 9, G4A 18 = **84 metodi PASS** su cinque suite, senza API.
+I dataset frozen e i test OOD restano intatti.
+
+Nuovi file:
+`src/evaluation/rq2_v2_unified_release_blueprint.py`,
+`src/tests/test_rq2_v2_unified_release_blueprint_offline.py`
+(**18 unit test SCRITTI, da eseguire in PyCharm**). Generano
+descrizione non eseguibile degli **180 stage** con stessa provenienza,
+i cinque agenti, tre modelli e quattro discovery. Ogni modello
+ha 20 D + 20 C + 20 K; le 5 varianti condividono la stessa policy
+C/K, D conserva la propria architettura e budget 6 round,
+planning 4+2. Invocazioni logiche massime candidate:
+ReAct D 7, Planning D 5, C/K 1 a stage, somma upper bound logico
+**492**, NON cap HTTP o USD. Remote retries/timeout sono ancora
+incerti (factory Google candidate passa `max_retries=1`).
+Nessuna credenziale, SDK o Market letto, niente store scientifico.
+
+**Distinzione necessaria:** la vecchia funzione
+`rq2_budget_preflight.estimate_campaign_cost` presume la coorte RQ2
+V1 (30/30/8 stage per modello), non può essere applicata alla Opzione A
+5-harness. Per questa usare i conteggi 20/20/20 per modello.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4A_PASS_G4B_BLUEPRINT_180_STAGE_GATE_2026-11-14.md`.
+
+**Prossimo comando PyCharm, status clean:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_release_blueprint_offline.py" -v
+```
+Attesi 18 PASS, **non ancora attestati**. Successivamente
+verifica GT-free G4A su CSV veri e realizzazione ledger/dispatcher
+source-bound scientifici con blocchi, fake regression e controllo
+no-retry/concorrenza. G4B NON è una release e non permette API.
