@@ -18,6 +18,7 @@ source-bound, verificare trasporti e approvazione API separatamente.
 from __future__ import annotations
 
 from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import os
@@ -128,7 +129,7 @@ def _write_once(path: Path, obj: dict) -> None:
         os.fsync(stream.fileno())
 
 
-def _meter(m: object) -> None:
+def _meter(m: object, *, allow_zero_requests: bool) -> None:
     # Un HTTP fallito puo' avere token non misurati, MAI inventare 0
     # come totale fatturato certificato.
     if type(m) is not dict or set(m) != {
@@ -140,7 +141,7 @@ def _meter(m: object) -> None:
     if (
         m["schema"] != "rq2_v2_unified_stage_meter_v0"
         or type(m["observed_model_requests"]) is not int
-        or m["observed_model_requests"] < 1
+        or m["observed_model_requests"] < (0 if allow_zero_requests else 1)
         or any(type(m[key]) is not int or m[key] < 0
                for key in ("input_tokens_observed", "output_tokens_observed"))
         or type(m["usage_complete"]) is not bool
@@ -150,6 +151,17 @@ def _meter(m: object) -> None:
         or len(m["cost_estimate_usd_not_invoice"]) > 50
     ):
         raise UnifiedScientificLedgerBlocked("Malformed/incomplete stage meter")
+    cost = m["cost_estimate_usd_not_invoice"]
+    if cost == "UNKNOWN":
+        if m["usage_complete"] is True:
+            raise UnifiedScientificLedgerBlocked("Unknown cost with complete usage")
+    else:
+        try:
+            parsed = Decimal(cost)
+        except InvalidOperation as exc:
+            raise UnifiedScientificLedgerBlocked("Non-numeric cost") from exc
+        if not parsed.is_finite() or parsed < 0:
+            raise UnifiedScientificLedgerBlocked("Negative/nonfinite cost")
 
 
 def _validate_artifact(row: dict, status: str, artifact: dict,
@@ -160,7 +172,7 @@ def _validate_artifact(row: dict, status: str, artifact: dict,
         return
     if type(artifact) is not dict or "stage_meter" not in artifact:
         raise UnifiedScientificLedgerBlocked("Attempted stage missing meter")
-    _meter(artifact["stage_meter"])
+    _meter(artifact["stage_meter"], allow_zero_requests=status=="PROVIDER_ERROR")
     stage = row["stage"]
     if status == "PROVIDER_ERROR":
         if set(artifact) != {"stage_meter", "provider_error"} or (
