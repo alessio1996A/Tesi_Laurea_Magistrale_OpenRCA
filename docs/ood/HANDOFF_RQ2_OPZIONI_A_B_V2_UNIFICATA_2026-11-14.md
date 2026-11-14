@@ -139,3 +139,38 @@ Per dettagli e limiti vedi
 della matrice unificata), l'Opzione B resta successiva con tutti gli
 11 test OOD bloccati. Non scambiare 180 stage pianificati per output reali,
 né 9 test G2 per 15 esperimenti pagati.
+
+## 8. G3A — esito Windows non-PASS, fixture corretta (14 novembre)
+
+Output PyCharm test G3A originale:
+```text
+Ran 19 tests in 121.164s
+FAILED (failures=1, errors=6)
+```
+Sei errori nel test dei 15 arm: Planning e PAVE per tutti e tre i modelli;
+il FAIL `27 != 45` è derivato dai sei arm mancanti. Diagnosi verificata
+tramite codice: `fake_run` ometteva `origine`, obbligatoria per i due
+harness con planner. **Nessun problema dimostrato nei grafi reali o nei
+provider**. Corretto **solo il test** aggiungendo `"origine":"llm"`
+per Planning e PAVE e un test negativo fail-closed che rifiuta origin
+missing. File `src/tests/test_rq2_v2_unified_synthetic_journal.py`,
+**nuova suite 20 test NON ancora eseguita dall'utente**. I gate G1 e G2
+restano validi.
+
+Documento completo:
+`docs/ood/RQ2_V2_UNIFIED_G3A_WINDOWS_FIXTURE_ORIGIN_FAILURE_2026-11-14.md`.
+
+**Attenzione alle prestazioni:** 121.164 secondi sul journal sintetico sono
+troppi. Le verifiche integrali `audit_restart` per ogni stage potrebbero
+essere costose; profilare/ottimizzare dopo aver ristabilito la correttezza,
+senza allentare l'integrita' o il no-retry.
+
+**Prossimo comando:**
+```powershell
+git status --short
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_synthetic_journal.py" -v
+```
+Attesi `Ran 20 tests` e `OK`, non ancora attestati. Nessuna API/GT/OOD
+e nessuna autorizzazione per G4 o G5.
