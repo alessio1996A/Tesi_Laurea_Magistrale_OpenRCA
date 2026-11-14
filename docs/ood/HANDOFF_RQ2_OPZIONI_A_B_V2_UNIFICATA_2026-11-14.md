@@ -203,3 +203,34 @@ Crea 15 stage sintetici in TemporaryDirectory, stampa tempi e 22 hot spots.
 Non sostituisce i controlli, non chiama API e non accede ai dati reali.
 Dopo output, correggere efficienza solo con prova di equivalenza
 integrale, no bypass O_EXCL/sha/orphan/race. Opzione B ancora sospesa.
+
+## 10. Profiler Windows confermato, ottimizzazione G3A in attesa dei test
+
+Output autentico profiler sintetico utente (stessa macchina Windows):
+`STATUS: OFFLINE_PROFILE_INTEGRITY_OK`, 15/15 records,
+`PROFILE_TOTAL_SEC: 31.956`, `ALL_STAGES_SEC: 29.887`,
+`FINAL_AUDIT_SEC: 2.067`, 31 invocazioni
+`audit_restart` (30.085s cumulativi), 213431 invocazioni `stat`
+(24.280s cumulativi), 5676 chiamate `_paths` (23.710s cumulativi).
+Non sommare tempi cumulativi sovrapposti.
+
+Modifica **solo** journal sintetico unificato: memoizzazione limitata a
+ogni singolo audit (dopo verifica SHA/parent/claim/provenance) e guardia
+di namespace prima della scansione, senza memo persistente, senza
+modificare D/C/K/RQ1/API. Aggiunti 3 nuovi test di anti-regressione
+(read bound, corruption after successful audit, claim tampering).
+Suite G3A ora **23 test da eseguire**, NON ancora PASS.
+Documento specifico:
+`docs/ood/RQ2_V2_UNIFIED_G3A_PROFILER_REAL_RESULTS_AND_LOCAL_AUDIT_MEMO_2026-11-14.md`.
+
+**Prossimi comandi PyCharm**, repository su branch unificato e
+`git status --short` vuoto:
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_synthetic_journal.py" -v
+python -B src/tests/profile_rq2_v2_unified_journal_offline.py
+```
+Confrontare la nuova misura contro i 31.956s originali e
+`Ran 23 tests ... OK`, senza inventare speedup prima dell'output.
+G3B fake runner→journal e G4/G5 release/API ancora bloccati.
