@@ -272,3 +272,38 @@ Se G3B passa, il successivo passo e' sviluppare uno solo dispatcher
 source-bound (nuovo codice/release separate dai dati frozen), con
 concorrenza, error accounting, dry-run Colab e policy spesa prefreeze.
 Opzione B sempre riservata; 11 OOD test locked.
+
+## 12. G3B PASS; G4A source-bound offline predisposto (14 novembre)
+
+**Output PyCharm fornito dall'utente:** `Ran 9 tests in 23.395s; OK` 
+per `src/tests/test_rq2_v2_unified_runner_to_journal_fake_e2e.py`.
+Questa suite ha superato le 15 combinazioni di agenti/modelli nel test
+centrale e 45 stadi D/C/K **sintetici** registrati con il journal comune.
+**G3B integrazione FAKE PASS**, non una campagna su provider remoti.
+Complessivamente G1 25, G2 9, G3A 23, G3B 9 metodi unittest superati
+nelle rispettive suite; non rappresentano incidenti reali.
+
+**Nuovo sottogate G4A:** creati
+`src/evaluation/rq2_v2_unified_release_preflight.py` e
+`src/tests/test_rq2_v2_unified_release_preflight_offline.py` (18 test
+scritti, **NON ancora eseguiti**). Validano parita' dei 5 harness/3 model
+IDs/4 discovery, SHA split+manifest GT-free, sorgenti RQ1 frozen,
+impronte delle sorgenti V2, prompt C/K, contratto D e flag OOD LOCKED.
+Anche un report pienamente verificato resta `NO_RELEASE_NO_API`, senza
+ledger production, dispatcher/SDK, budget approvato o release scientifica.
+Lo store synthetic-only **NON** viene promosso a ledger live.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G3B_PASS_G4A_SOURCE_BOUND_OFFLINE_GATE_2026-11-14.md`.
+
+**Prossimi comandi PyCharm** (controllare prima che git status sia vuoto):
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_release_preflight_offline.py" -v
+```
+Attesi 18 test e `OK`, non ancora attestati. 
+Poi proseguire con G4B: un solo journal/dispatcher scientifico comune,
+source-bound e con quote API, provato prima con fake LLM sull'intera
+matrice; non confondere G4A con autorizzazione API. Opzione B non avviata,
+11 casi test OOD intatti.
