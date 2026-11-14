@@ -66,3 +66,40 @@ File già aggiunti su branch: `src/evaluation/rq2_v2_unified_discovery_plan.py`,
 ## 5. Future chat — promemoria da incollare
 
 > Sto proseguendo la tesi magistrale OpenRCA Harness Engineering. Leggi INTEGRALMENTE questo handoff GitHub `docs/ood/HANDOFF_RQ2_OPZIONI_A_B_V2_UNIFICATA_2026-11-14.md` sul branch `feature/rq2-v2-unified-five-harness-three-models-2026-11-14` e il protocollo associato. Opzione A è la priorità: RQ2-V2 unificata per 5 harness × 3 LLM, 4 discovery, D-C-K, 180 stage pianificati, **senza generalizzazione e senza API finché non superati i gate**. Opzione B è successiva: validazione e test OOD di regole frozen, 11 test locked, eventuale nuova coorte indipendente. RQ1 frozen; RQ2 V1 39/72 stage storici e pilot Sonnet V2 preservati. Non riscrivere agenti originali né fare retry non tracciati. Procedi dai 25 test PyCharm del nuovo branch, poi G2 fake full-matrix. Confronti devono essere scientificamente equi, dati GT-free, commenti/refactoring in italiano al termine.
+
+## 6. Avanzamento G1/G2 — 14 novembre 2026, aggiornamento della chat
+
+**Nuova evidenza fornita dall'utente:** `Ran 25 tests in 0.277s; OK` per
+`src/tests/test_rq2_v2_unified_discovery_offline.py`. **G1 PASS 25/25**,
+piano delle 180 stage ed audit statico di provenance. Questo NON e' un
+test E2E di 15 provider/harness e NON autorizza API.
+
+**G2 codice scritto, ma test ancora da eseguire dall'utente:**
+`src/tests/test_rq2_v2_unified_graph_fake_e2e.py`, **9 test method**
+(compreso uno che percorre **15 combinazioni** harness×modello con
+`run_experiment` e reali grafi LangGraph). Il `prepara_esperimento`
+e' sostituito in modo controllato con dati sintetici; i tool sono
+realmente eseguiti in ToolNode, ma rispondono da fixture e non leggono
+Market/GT. La selezione del motore ReAct V2 avviene con patch in RAM;
+Planning/PAVE usano il loro esecutore autentico e le verifiche
+deterministiche. C e K usano gli **adapter e parser reali** con risposte
+di un LLM FAKE tool-free, non i dispatcher pagati.
+Test esercitano stesso-name parallel tool IDs, planner origin,
+content blocks Anthropic, `abstain`, `insufficient_evidence`,
+C invalida/ID E999 blocca K, task-aware D output invalido non riparato,
+nessun file/GT/API reale. Il risultato positivo non proverebbe il
+comportamento dei provider remoti né il ledger comune production G3.
+
+**Prossimo test mirato:**
+```powershell
+git status --short
+git fetch origin feature/rq2-v2-unified-five-harness-three-models-2026-11-14
+git switch feature/rq2-v2-unified-five-harness-three-models-2026-11-14
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_graph_fake_e2e.py" -v
+```
+Attesi **9 test** (con una suite a 15 subtest), ma **NON dire PASS** prima
+di leggere l'output effettivo. Se fallisce, distinguere un difetto del
+fixture da un problema di compatibilita' del grafo e correggere su commit
+tracciato, senza modificare la RQ1 congelata.
