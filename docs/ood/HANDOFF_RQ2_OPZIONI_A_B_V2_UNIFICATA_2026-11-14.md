@@ -377,3 +377,50 @@ nessuna release scientifica firmata né ledger/dispatcher live comune;
 Opzione B ancora sospesa. Dopo la verifica dei CSV reali costruire
 ledger/dispatcher scientifici source-bound, prove provider fake e
 guard di budget / no retry, quindi chiedere consenso esplicito API.
+
+## 15. G4C Colab terminale OK (JSON omesso) e G4D ledger preflight draft — 14 novembre 2026
+
+Utente ha riportato dopo cella Colab GT-free:
+```text
+FOUND: data/processed/split_market_v1.csv
+FOUND: data/processed/benchmark_inputs_market.csv
+CODE_COMMIT: 33d5d8b28494d5bf41168d0a709854aa3134ea6a
+=== 3/3: RQ2 V2 UNIFIED SOURCE GATE — NO API ===
+G4 REAL GT-FREE SOURCE PREFLIGHT: TERMINATO (0 API)
+```
+L'originale cella usa `subprocess.run(check=True)`, e la stampa della
+riga finale mostra che non e' emerso un errore di processo. **Manca
+tuttavia il JSON atteso**, che documenterebbe hash split/manifest, prompt
+C/K e blueprint, per cui non dichiarare gli hash G4C certificati
+dall'output incollato. Volendo recuperare il report senza clone né
+alcuna API, nella stessa sessione Colab e dopo aver eseguito la cella
+originale, rieseguire solo:
+```python
+subprocess.run([sys.executable, "-B", "-c", code],
+               cwd=REPO, env=env, check=True)
+```
+Dovrebbe stampare integralmente il JSON. Nessun Market.zip, scorer o
+credenziale LLM coinvolti. Non ripristinare vecchi protocolli per
+aggirare il controllo.
+
+**G4D implementato SOLO come GUARD DI LETTURA, non ledger live:**
+`src/evaluation/rq2_v2_unified_scientific_ledger_preflight.py`;
+`src/tests/test_rq2_v2_unified_scientific_ledger_preflight_offline.py`
+con **19 unittest SCRITTI, in attesa dell'output PyCharm**. Namespace
+scientifico proposto `data/rq2_v2_unified_scientific_v1`, assente
+allo stato attuale. La guardia richiede commit Git **pin esterno** e
+checkout clean, file sorgenti/source SHA e blueprint, GT-free e OOD
+locked; rifiuta directory preoccupate, symlink e campi che autorizzano
+API. Non crea release, claim, file, token, client o API.
+
+Documento di stato:
+`docs/ood/RQ2_V2_UNIFIED_G4C_COLAB_EXIT_G4D_SCIENTIFIC_LEDGER_PREFLIGHT_2026-11-14.md`.
+
+**Comando PyCharm G4D (git status clean):**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_ledger_preflight_offline.py" -v
+```
+Attesi 19, non ancora PASS. Vecchi 102 test PASS. Nessun nuovo
+esperimento pagato e 11 OOD test rimangono locked.
