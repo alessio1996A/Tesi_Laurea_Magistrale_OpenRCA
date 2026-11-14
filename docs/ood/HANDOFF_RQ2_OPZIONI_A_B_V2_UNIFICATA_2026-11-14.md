@@ -468,3 +468,54 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_rele
 Attesi 18, non attestati. G1+G2+G3A+G3B+G4A+G4B 102
 PASS, G4D 17 PASS+2 skipped, G4E 18 pending. Fase Option A
 non ha nuovi run pagati; Opzione B e test OOD ancora chiusi.
+
+## 17. G4C JSON reale e G4E 18/18 PASS; G4F ledger create-only — 14 novembre
+
+**Nuova evidenza utente:**
+`Ran 18 tests in 0.651s; OK` (G4E, release contract offline).
+Ricevuto anche **JSON Colab G4C completo**, riferito a checkout
+`33d5d8b28494d5bf41168d0a709854aa3134ea6a`, con
+`status=RQ2_V2_UNIFIED_REAL_GT_FREE_SOURCE_PREFLIGHT_OK_NO_API`:
+- source plan SHA256:
+`e6f797c4ca01ed422b80e928854469b9f8c7f7cc4215835bf91f9f7305425a00`;
+- blueprint SHA256:
+`a2874e9771eb50899afd15d55cecf239493f44077e16e937b5276f8a07e8fb61`;
+- split `c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724`;
+- manifest `5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13`;
+- C prompt SHA `81a5800500b3fafc23af4b7643e79a3d206c3ca6c80f6924514001ec85dc2a42`;
+- K prompt SHA `0935e2b7232715b623bb174f0a059387659f8d9bc7939804c8a372d8aa27ba71`.
+4 discovery, 11 OOD locked, 5 harness, 3 modelli, 60/60/60
+D/C/K = 180 stage. 492 invoke massime candidate NON richieste HTTP
+garantite. API 0, nessuna release frozen.
+Report completo:
+`docs/ood/RQ2_V2_UNIFIED_G4C_G4E_VERIFIED_SHA_REPORT_2026-11-14.md`.
+
+**Nuovo G4F: vero ledger scientifico create-only in CODICE, ancora
+NON VALIDATO DALL'UTENTE**:
+`src/evaluation/rq2_v2_unified_scientific_ledger.py`
++ `src/tests/test_rq2_v2_unified_scientific_ledger_offline.py`
+(**22 test da eseguire**). Richiede release scientifica preesistente
+SHA approvato esternamente e Git commit esatto clean, ripete
+source-bound GT-free e blueprint, isola namespace scientifico,
+scrive claim/record O_EXCL+fsync+readback, verifica stage D/C/K e
+provenance, parent SHA, meter usage/costo e no-retry. Ha un
+lock OS per singola operazione da testare sul filesystem reale Drive
+prima del freeze. **Nessun LLM/API nel modulo**.
+La release e il pin presenti nei test sono **FAKE** e restano dentro
+TemporaryDirectory: non si è creato alcun claim scientifico vero.
+Non usare questo ledger su Drive fino all'avvenuta verifica completa
+e al freeze del codice/approvazione. La vera release non esiste.
+
+Dettagli:
+`docs/ood/RQ2_V2_UNIFIED_G4F_REAL_LEDGER_IMPLEMENTED_NO_API_GATE_2026-11-14.md`.
+
+**Prossimi comandi PyCharm** dopo `git status --short` pulito:
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_ledger_offline.py" -v
+```
+Attesi 22 test, non attestati. Poi **un solo dispatcher D/C/K**
+con fake SDK + prove error/metering e lockdown provider; non avviare
+API reali, non sbloccare OOD. Infine freeze e pilot esplicitamente
+autorizzato. Non confondere i precedenti test offline con run reali.
