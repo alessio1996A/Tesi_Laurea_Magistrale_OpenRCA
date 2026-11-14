@@ -424,3 +424,47 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_ledg
 ```
 Attesi 19, non ancora PASS. Vecchi 102 test PASS. Nessun nuovo
 esperimento pagato e 11 OOD test rimangono locked.
+
+## 16. G4C returncode0, G4D 17 PASS 2 SKIP e G4E release-contract pending — 14 novembre
+
+Nuovi output concreti:
+`CompletedProcess(... returncode=0)` in Colab eseguendo lo script
+GT-free `preview_unified_source_bound`→`build_unified_release_blueprint`
+sul checkout `33d5d8...`; gli assert su 180 stage, 492 invoke graph e
+blocchi API/OOD sono stati completati. **JSON con valori SHA omesso
+dal testo condiviso**, da acquisire con `capture_output=True` (vedi
+documento G4E sotto).
+
+PyCharm G4D:
+`Ran 19 tests in 0.485s; OK (skipped=2)`.
+**17 test effettivamente PASS**, due verifiche symlink Windows non
+eseguite; non dichiarare 19 PASS. La guardia scientific namespace è
+ancora read-only, non un ledger.
+
+**G4E nuovo codice**: 
+`src/evaluation/rq2_v2_unified_scientific_release_contract.py`
+e
+`src/tests/test_rq2_v2_unified_scientific_release_contract_offline.py`
+(**18 test da eseguire**). Verificatore puro di FUTURA release
+source/blueprint-bound e hash release/commit esterno, con budget
+e approvazione esplicita, flag retry/timeout/meter/single-writer
+obbligatori, 11 test locked. Anche quando restituisce OK
+`can_create_scientific_claim=False`,
+`can_execute_api=False`, `production_ledger_implemented=False`.
+Le approvazioni negli UNITTEST sono **INVENTATE**: non autorizzano la
+campagna reale; il modulo non apre file, firma release o usa API.
+Non sostituisce l'implementazione successiva del ledger create-only
+e del dispatcher unico.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4E_RELEASE_CONTRACT_GATE_2026-11-14.md`.
+
+**Prossimo comando PyCharm, git status pulito:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_release_contract_offline.py" -v
+```
+Attesi 18, non attestati. G1+G2+G3A+G3B+G4A+G4B 102
+PASS, G4D 17 PASS+2 skipped, G4E 18 pending. Fase Option A
+non ha nuovi run pagati; Opzione B e test OOD ancora chiusi.
