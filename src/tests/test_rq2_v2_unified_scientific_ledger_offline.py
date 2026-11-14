@@ -360,8 +360,8 @@ class ScientificLedgerFixtureTests(unittest.TestCase):
         with self.assertRaises(ledger.UnifiedScientificLedgerBlocked):
             self.new_ledger()
 
-    def test_lock_contention_rejected_without_overwrite(self):
-        # Impedisce anche una lock path non sicura: non toccare claim.
+    def test_unsafe_writer_lock_path_rejected_without_overwrite(self):
+        # Una directory al posto del lock file e' un errore fail closed.
         bad = self.data / ledger.LOCK_FILE
         bad.mkdir()
         with self.assertRaisesRegex(
@@ -371,6 +371,16 @@ class ScientificLedgerFixtureTests(unittest.TestCase):
                 stage_id=sid(), model_id=model_id("gemini"),
             )
         self.assertFalse((self.data / ledger.CLAIMS).exists())
+
+    def test_second_writer_lock_attempt_rejected(self):
+        # Solo conflitto locale: non certifica la semantica FUSE di Drive.
+        path = self.data / ledger.LOCK_FILE
+        with ledger._writer_lock(path):
+            with self.assertRaisesRegex(
+                ledger.UnifiedScientificLedgerBlocked, "Writer lock unavailable"
+            ):
+                with ledger._writer_lock(path):
+                    self.fail("Second concurrent writer entered the lock")
 
     def test_wrong_scientific_status_never_creates_file(self):
         with self.assertRaises(ledger.UnifiedScientificLedgerBlocked):
