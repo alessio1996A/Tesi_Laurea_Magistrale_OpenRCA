@@ -45,9 +45,13 @@ def fake_run(model="gemini", harness="A0", *, json_valid=True):
         "max_tool_rounds": 6,
         "json_status": "valid_json" if json_valid else "invalid_v2_task_output",
         "raw_response": (
-            '{"1":{"root cause reason":"synthetic"}}'
-            if json_valid else "INVALID SYNTHETIC JSON"
+            json.dumps({"1": {
+                "root cause occurrence datetime": "1970-01-01 00:20:00",
+                "root cause component": "synthetic-node-1",
+                "root cause reason": "synthetic hypothesis, not GT",
+            }}) if json_valid else "INVALID SYNTHETIC JSON"
         ),
+        "output_contract_v2": {"valid": json_valid},
         "error": None,
         "metrics": {"token_usage_complete": True},
         "tool_trajectory": [
