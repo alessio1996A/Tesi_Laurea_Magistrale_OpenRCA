@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from evaluation.rq2_v2_artifact_store import (
-    MARKER, MARKER_BYTES, RQ2V2StoreError,
+    MARKER, MARKER_BYTES, RQ2V2StoreError, read_canonical,
 )
 from evaluation.rq2_v2_unified_discovery_plan import (
     DISCOVERY, HARNESSES, MODELS, TEST, VERSION,
@@ -209,6 +209,48 @@ class UnifiedJournalG3Tests(unittest.TestCase):
         self.assertEqual(report["claims"], 2)
         self.assertEqual(report["stored_stage_records"], 0)
         self.assertEqual(report["unresolved_claims_for_manual_review"], 2)
+
+    def test_audit_reads_each_stored_file_bounded_times(self):
+        # Regressione prestazionale strutturale: NO soglia temporale flaky.
+        # Tre stage per un arm producono esattamente sei file (claim/record);
+        # l'audit deve convalidarli tutti senza rileggerli ricorsivamente.
+        self.save_d()
+        self.save_c()
+        self.save_k()
+        with patch(
+            "evaluation.rq2_v2_unified_synthetic_journal.read_canonical",
+            wraps=read_canonical,
+        ) as reader:
+            audit = self.journal.audit_restart()
+        self.assertEqual(audit["claims"], 3)
+        self.assertEqual(audit["stored_stage_records"], 3)
+        self.assertLessEqual(reader.call_count, 18)
+
+    def test_new_audit_detects_disk_corruption_after_previous_pass(self):
+        # La memoization e' locale al singolo audit: mai oltre il confine
+        # di una operazione o di un riavvio.
+        self.save_d()
+        self.save_c()
+        self.save_k()
+        self.assertEqual(self.journal.audit_restart()["matched_claim_records"], 3)
+        path = _stage_path(self.root, sid(stage="D"), RECORDS, "V2U_RECORD_")
+        original = path.read_bytes()
+        self.assertIn(b"synthetic", original)
+        path.write_bytes(original.replace(b"synthetic", b"tampered", 1))
+        with self.assertRaises(UnifiedRQ2JournalError):
+            self.journal.audit_restart()
+
+    def test_new_audit_detects_claim_corruption_after_previous_pass(self):
+        self.save_d()
+        self.assertEqual(self.journal.audit_restart()["matched_claim_records"], 1)
+        path = _stage_path(self.root, sid(), CLAIMS, "V2U_CLAIM_")
+        original = path.read_bytes()
+        self.assertIn(b"SYNTHETIC_NO_API_AUTHORITY", original)
+        path.write_bytes(original.replace(
+            b"SYNTHETIC_NO_API_AUTHORITY", b"FORGED_API_AUTHORITY", 1,
+        ))
+        with self.assertRaises(UnifiedRQ2JournalError):
+            self.journal.audit_restart()
 
     def test_ood_stage_is_rejected(self):
         with self.assertRaises(UnifiedRQ2JournalError):
