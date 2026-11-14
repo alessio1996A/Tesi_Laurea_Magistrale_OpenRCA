@@ -209,14 +209,19 @@ class UnifiedRunnerToJournalFakeTests(unittest.TestCase):
         )
         self.assertEqual(k_fake.calls, 1)
         self.assertEqual(k_info[0], "str" if model == "gemini" else "list")
-        validate_candidate_rule(
-            k_raw, allowed_evidence_ids=evidence_ids(bundle)
-        )
+        try:
+            validate_candidate_rule(
+                k_raw, allowed_evidence_ids=evidence_ids(bundle)
+            )
+        except (TypeError, ValueError):
+            k_status = "INVALID_OUTPUT"
+        else:
+            k_status = "RECORDED_COMPLETE"
         self.journal.record_stage(
-            stage_id=k_id, model_id=model_id, status="RECORDED_COMPLETE",
+            stage_id=k_id, model_id=model_id, status=k_status,
             artifact={"raw_response": k_raw},
         )
-        return {"D": d_status, "C": c_status, "K": "RECORDED_COMPLETE"}
+        return {"D": d_status, "C": c_status, "K": k_status}
 
     def test_all_15_real_graph_d_to_common_journal_dck(self):
         # 15 sottotest x 3 stage = 45 record, senza provider, GT o Market.
@@ -290,6 +295,49 @@ class UnifiedRunnerToJournalFakeTests(unittest.TestCase):
             self.journal.load_claim(stage_id=sid("haiku", "A1_8R", "K"))
         )
         self.assertEqual(self.journal.audit_restart()["claims"], 2)
+
+    def test_invalid_k_reference_is_recorded_without_fake_repair(self):
+        invalid_k = fixtures.synthetic_k()
+        invalid_k["evidence_ids"] = ["E999"]
+        outcome = self._record_pipeline(
+            "gemini", "A1_PAVE", k_data=invalid_k,
+        )
+        self.assertEqual(outcome, {
+            "D": "RECORDED_COMPLETE", "C": "RECORDED_COMPLETE",
+            "K": "INVALID_OUTPUT",
+        })
+        rec = self.journal.load_record(
+            stage_id=sid("gemini", "A1_PAVE", "K"),
+        )
+        self.assertEqual(rec["status"], "INVALID_OUTPUT")
+        self.assertIn("E999", rec["artifact"]["raw_response"])
+        report = self.journal.audit_restart()
+        self.assertEqual(report["claims"], 3)
+        self.assertEqual(report["stored_stage_records"], 3)
+
+    def test_fake_provider_failure_in_d_blocks_c_k_without_retry(self):
+        model, harness = "haiku", "A0"
+        name = self._model_id(model)
+        d_id, c_id, k_id = (
+            sid(model, harness, stage) for stage in ("D", "C", "K")
+        )
+        # Fallimento artificiale, senza alcuna richiesta al provider.
+        self.journal.claim_stage(stage_id=d_id, model_id=name)
+        self.journal.record_stage(
+            stage_id=d_id, model_id=name, status="PROVIDER_ERROR",
+            artifact={"provider_error": "FAKE HTTP 503: no network call"},
+        )
+        for st_id in (c_id, k_id):
+            self.journal.record_stage(
+                stage_id=st_id, model_id=name,
+                status="BLOCKED_DEPENDENCY", artifact={},
+            )
+        audit = self.journal.audit_restart()
+        self.assertEqual(audit["claims"], 1)
+        self.assertEqual(audit["stored_stage_records"], 3)
+        self.assertIsNone(self.journal.load_claim(stage_id=c_id))
+        self.assertIsNone(self.journal.load_claim(stage_id=k_id))
+        self.assertFalse(audit["automatic_retry_allowed"])
 
     def test_c_abstains_k_insufficient_is_real_valid_outcome(self):
         states = self._record_pipeline(
