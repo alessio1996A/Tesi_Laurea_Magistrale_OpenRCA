@@ -35,7 +35,9 @@ def model_id(model):
 
 
 def fake_run(model="gemini", harness="A0", *, json_valid=True):
-    return {
+    # Il grafo verify_graph emette sempre una provenienza esplicita:
+    # queste fixture devono rispettarne lo stesso contratto tecnico.
+    run = {
         "case_id": DISCOVERY[0],
         "variant": harness,
         "variant_scheme": "current",
@@ -63,6 +65,10 @@ def fake_run(model="gemini", harness="A0", *, json_valid=True):
              "tool_call_id": "synthetic-1"},
         ],
     }
+    if harness in ("A1_8R_Planning", "A1_PAVE"):
+        for event in run["tool_trajectory"]:
+            event["origine"] = "llm"
+    return run
 
 
 def cause(*, invalid_ref=False, abstain=False):
@@ -177,6 +183,32 @@ class UnifiedJournalG3Tests(unittest.TestCase):
         self.assertFalse((self.root / "data/rq2").exists())
         self.assertFalse((self.root / "data/results").exists())
         self.assertFalse((self.root / "Market.zip").exists())
+
+    def test_planning_missing_origin_is_rejected_fail_closed(self):
+        # Il controllo deve continuare a rifiutare dati privi di origine,
+        # non attribuire automaticamente un tool al modello/planner.
+        for harness in ("A1_8R_Planning", "A1_PAVE"):
+            with self.subTest(harness=harness):
+                stage_id = sid(harness=harness)
+                run = fake_run(harness=harness)
+                for event in run["tool_trajectory"]:
+                    event.pop("origine")
+                self.journal.claim_stage(
+                    stage_id=stage_id, model_id=model_id("gemini"),
+                )
+                with self.assertRaisesRegex(
+                    UnifiedRQ2JournalError, "D status/provenance/output mismatch"
+                ):
+                    self.journal.record_stage(
+                        stage_id=stage_id,
+                        model_id=model_id("gemini"),
+                        status="RECORDED_COMPLETE",
+                        artifact={"diagnostic_run": run},
+                    )
+        report = self.journal.audit_restart()
+        self.assertEqual(report["claims"], 2)
+        self.assertEqual(report["stored_stage_records"], 0)
+        self.assertEqual(report["unresolved_claims_for_manual_review"], 2)
 
     def test_ood_stage_is_rejected(self):
         with self.assertRaises(UnifiedRQ2JournalError):
