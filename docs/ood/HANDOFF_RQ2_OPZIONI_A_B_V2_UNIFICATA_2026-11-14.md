@@ -348,3 +348,32 @@ Attesi 18 PASS, **non ancora attestati**. Successivamente
 verifica GT-free G4A su CSV veri e realizzazione ledger/dispatcher
 source-bound scientifici con blocchi, fake regression e controllo
 no-retry/concorrenza. G4B NON è una release e non permette API.
+
+## 14. G4B PASS; prossima prova Colab GT-free unificata (14 novembre)
+
+**Output PyCharm G4B utente:** `Ran 18 tests in 0.485s; OK`.
+Le sei suite G1 (25) + G2 (9) + G3A (23) + G3B (9) + G4A (18)
++ G4B (18) sono **102 metodi di unittest PASS**. G4B usa
+`fake_verified_g4a()`, quindi non significa che il nuovo protocollo
+abbia già letto i CSV reali split/manifest.
+
+La verifica successiva e' il preflight **Colab reale, read-only,
+GT-free** già predisposto in:
+`docs/ood/RQ2_V2_UNIFIED_G4B_PASS_COLAB_GT_FREE_SOURCE_READONLY_2026-11-14.md`.
+Il documento contiene **una sola cella Colab** completa e pronta, senza
+dipendenze pip né SDK: monta Drive, verifica i due CSV congelati,
+clona/fetch branch unificato in checkout Colab **separato** e pulito,
+esegue `preview_unified_source_bound` e
+`build_unified_release_blueprint` in subprocess `PYTHONPATH=src`.
+Output atteso: `RQ2_V2_UNIFIED_REAL_GT_FREE_SOURCE_PREFLIGHT_OK_NO_API`,
+hash source plan e blueprint, SHA manifest/split, 4 discovery,
+11 test OOD locked, 60 D+60 C+60 K. NON legge Market.zip/GT/scorer,
+NON chiama LLM, NON scrive su Drive e NON apre test OOD come osservazioni.
+**Non dichiarare PASS prima dell'output Colab reale**.
+
+I 102 test PASS sono risultato di verifiche sintetiche; non sono
+102 run su incidenti OpenRCA. Nessuna campagna reale Option A eseguita,
+nessuna release scientifica firmata né ledger/dispatcher live comune;
+Opzione B ancora sospesa. Dopo la verifica dei CSV reali costruire
+ledger/dispatcher scientifici source-bound, prove provider fake e
+guard di budget / no retry, quindi chiedere consenso esplicito API.
