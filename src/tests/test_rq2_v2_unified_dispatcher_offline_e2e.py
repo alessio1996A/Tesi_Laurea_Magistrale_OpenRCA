@@ -98,7 +98,7 @@ class OfflineLangGraphFakeGateway(OfflineFakeGateway):
             )
         prepared.assert_called_once_with(config)
         sdk.assert_not_called()
-        self.assertEqual_case(result, case_id, model, harness)
+        self.assert_equal_case(result, case_id, model, harness)
         count = fake.exploration_calls + fake.final_calls
         assert count == (3 if is_planner else 2), count
         # Le osservazioni vengono create dal fake LLM; non sono
