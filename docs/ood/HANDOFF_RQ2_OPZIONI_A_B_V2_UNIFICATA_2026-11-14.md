@@ -234,3 +234,41 @@ python -B src/tests/profile_rq2_v2_unified_journal_offline.py
 Confrontare la nuova misura contro i 31.956s originali e
 `Ran 23 tests ... OK`, senza inventare speedup prima dell'output.
 G3B fake runner→journal e G4/G5 release/API ancora bloccati.
+
+## 11. G3A performance PASS, G3B runner→journal integrato fake (14 novembre)
+
+**Output reale utente:** `Ran 23 tests in 20.434s; OK`.
+Il profiler Windows sintetico identico a prima mostra
+`STATUS: OFFLINE_PROFILE_INTEGRITY_OK`,
+`PROFILE_TOTAL_SEC: 3.546` (prima 31.956s),
+`FINAL_AUDIT_SEC: 0.096` (prima 2.067s),
+`Path.stat: 17219` (prima 213431), 15 claim/record, 0 orfani.
+La scansione con cache temporanea locale è quindi confermata nei test
+G3A; controlli di corruzione e no-retry restano PASS.
+**Non** assumere che questo misuri la scalabilità a 180 stage o race
+multi-processo.
+
+**Nuovo codice G3B, test NON ancora eseguito:** 
+`src/tests/test_rq2_v2_unified_runner_to_journal_fake_e2e.py`
+(9 metodi unittest; uno attraversa 15 arm × D/C/K, fino a 45 stage
+archiviati). Usa `run_experiment` + LangGraph veri con fake LLM/tool,
+C/K adapters veri, content blocks Claude fake, claim pre-run,
+journal create-only unificato, invalid D/C/K, astensioni, provider error
+simulato e orphan claim no retry. **Il test simula l'orchestrazione,
+NON è il dispatcher live**. Nessun Market, GT, API, OOD o Drive.
+
+Documento aggiornamento:
+`docs/ood/RQ2_V2_UNIFIED_G3A_PROFILE_PASS_G3B_RUNNER_JOURNAL_FAKE_GATE_2026-11-14.md`.
+
+**Prossimo comando PyCharm:**
+```powershell
+git status --short
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_runner_to_journal_fake_e2e.py" -v
+```
+Attesi `Ran 9 tests` e `OK`, non ancora attestati.
+Se G3B passa, il successivo passo e' sviluppare uno solo dispatcher
+source-bound (nuovo codice/release separate dai dati frozen), con
+concorrenza, error accounting, dry-run Colab e policy spesa prefreeze.
+Opzione B sempre riservata; 11 OOD test locked.
