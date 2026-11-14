@@ -627,3 +627,55 @@ Contenuto preciso:
 `docs/ood/RQ2_V2_UNIFIED_G4G_PASS_NEXT_SINGLE_LIVE_DISPATCHER_2026-11-14.md`.
 **G4G concluso; nessun test aggiuntivo richiesto all'utente ora**.
 Opzione B e 11 OOD sempre LOCKED.
+
+## 21. User authorizes continuation; G4H one-stage source-bound preview added (14 Nov)
+
+Utente ha confermato di voler proseguire dopo G4G
+`Ran 17 tests in 22.415s; OK`. L'assistente ha ricontrollato
+i moduli RQ2 esistenti e ha deciso **non** duplicare i probe
+`rq2_langchain_fake_http_invoke` (gia' riusciti in Colab il 12/11
+con socket deny-all e 503 fake) o la vecchia RQ2 V1.
+
+**Nuovo blocco G4H aggiunto al branch:**
+`src/evaluation/rq2_v2_unified_live_stage_preflight.py` e
+`src/tests/test_rq2_v2_unified_live_stage_preflight_offline.py`
+(**19 test scritti, NON ancora eseguiti**). La funzione
+`preview_one_unified_stage` istanzia il ledger scientifico G4F
+solo per fonte/provenienza e verifica release/commit/GT-free,
+stage discovery mai claimed/recorded, nessun orphan, instruction
+letta **dal manifest GT-free** (non fornita dal chiamante),
+`ExperimentConfig` RQ1 V2 e, per C/K, package costruito
+esclusivamente dai record immutabili validi e prompt C/K SHA-pinned.
+Non esegue tool, Market, SDK, reti, claim, file o API; ritorna flag
+`can_execute_api=False`, `can_create_scientific_claim=False`.
+I test G4H usano manifest/release fake in TemporaryDirectory.
+
+**Correzione separata G4F:** la `stage_meter` adesso permette
+`cost_estimate_usd_not_invoice="UNKNOWN"` anche quando le
+quantita' token sono complete, perche' token non sono fattura:
+mai registrare costo zero fittizio. Questo modifica il ledger
+G4F e richiede regressione dopo G4H, NON e' stato ancora ritestato
+dall'utente.
+
+Dettagli:
+`docs/ood/RQ2_V2_UNIFIED_G4G_PASS_G4H_SOURCE_BOUND_STAGE_PREFLIGHT_2026-11-14.md`.
+
+**Prossimo comando PyCharm:**
+```powershell
+git status --short
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_preflight_offline.py" -v
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_ledger_offline.py" -v
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_dispatcher_offline_e2e.py" -v
+```
+Attesi rispettivamente 19, 22, 17 test, ma tutti PENDING dopo
+l'ultimo commit. Nessun SDK reale, nessuna chiamata pagata,
+Opzione B e 11 test OOD sempre bloccati.
+
+**G4I successivo:** implementare dispatcher effettivo source-bound
+per singolo stage D/C/K con blocco pre-API e fake provider injection
+nel medesimo codice che poi usera' il provider; ampliare
+SOURCE_PATHS includendo G4F/G4H e dispatcher, test Drive/FUSE,
+meter/retry/timeout e real freeze SHA, poi chiedere esplicita
+autorizzazione ad UN SOLO pilot pagato.
