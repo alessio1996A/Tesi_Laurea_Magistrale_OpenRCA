@@ -11,6 +11,7 @@ e' una condizione DA INVESTIGARE, MAI un'autorizzazione a ritentare.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -132,10 +133,31 @@ def _validate_payload(stage: str, status: str, artifact: dict,
             prov = False
         else:
             prov = True
+        # Una etichetta 'valid_json' non costituisce da sola una prova:
+        # controlliamo il contenuto JSON e l'audit task-aware del runner.
+        # In questa sandbox non si consulta nessuna ground truth.
+        raw = run.get("raw_response")
+        try:
+            parsed = json.loads(raw) if type(raw) is str else None
+        except (ValueError, TypeError, RecursionError):
+            parsed = None
+        d_output_valid = (
+            type(parsed) is dict and bool(parsed)
+            and all(
+                type(key) is str and key.isdigit()
+                and type(fault) is dict
+                and {
+                    "root cause occurrence datetime",
+                    "root cause component",
+                    "root cause reason",
+                }.issubset(fault)
+                for key, fault in parsed.items()
+            )
+            and type(run.get("output_contract_v2")) is dict
+            and run["output_contract_v2"].get("valid") is True
+        )
         result_valid = (
-            prov and run.get("json_status") == "valid_json"
-            and type(run.get("raw_response")) is str
-            and bool(run["raw_response"].strip())
+            prov and run.get("json_status") == "valid_json" and d_output_valid
         )
         if (status == "RECORDED_COMPLETE") != result_valid:
             raise UnifiedRQ2JournalError("D status/provenance/output mismatch")
@@ -420,15 +442,16 @@ class UnifiedRQ2SyntheticJournal:
             if claim["dependencies"] != deps:
                 raise UnifiedRQ2JournalError("Dependency SHA changed after claim")
             claim_sha = claim["claim_sha256"]
+        # Rifiutare etichette/GT prima di qualunque ispezione del payload.
+        try:
+            reject_gt_keys(artifact)
+        except RQ2V2StoreError as exc:
+            raise UnifiedRQ2JournalError("Forbidden GT/scoring field") from exc
         _validate_payload(
             item["stage"], status, artifact, item,
             self.load_record(stage_id=stage_id.rsplit(":", 1)[0] + ":D")
             if item["stage"] != "D" else None,
         )
-        try:
-            reject_gt_keys(artifact)
-        except RQ2V2StoreError as exc:
-            raise UnifiedRQ2JournalError("Forbidden GT/scoring field") from exc
         core = {
             "schema": VERSION + "_record",
             "protocol": PROTOCOL,
