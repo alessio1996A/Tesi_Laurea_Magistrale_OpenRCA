@@ -241,6 +241,46 @@ class UnifiedFakeDispatcherScientificLedgerTests(unittest.TestCase):
         self.assertEqual(gateway.calls, {"D": 1, "C": 1, "K": 1})
         self.assertEqual(self.ledger.audit_restart()["claims"], 3)
 
+    def test_native_tool_id_mismatch_is_invalid_not_diagnosis(self):
+        class WrongToolId(OfflineLangGraphFakeGateway):
+            def run_d(self, *, case_id, model, harness):
+                result = super().run_d(
+                    case_id=case_id, model=model, harness=harness,
+                )
+                result.output["tool_trajectory"][0]["tool_call_id"] = (
+                    "forged-unpaired-native-id"
+                )
+                return result
+
+        gateway = WrongToolId(root=self.data)
+        outcome = self.run_one(gateway=gateway)
+        self.assertEqual(outcome["stage_status"], {
+            "D": "INVALID_OUTPUT", "C": "BLOCKED_DEPENDENCY",
+            "K": "BLOCKED_DEPENDENCY",
+        })
+        self.assertEqual(self.ledger.audit_restart()["records"], 3)
+
+    def test_broken_meter_leaves_claim_for_manual_review(self):
+        class BrokenMeter(OfflineLangGraphFakeGateway):
+            def run_d(self, *, case_id, model, harness):
+                result = super().run_d(
+                    case_id=case_id, model=model, harness=harness,
+                )
+                result.meter["observed_model_requests"] = -1
+                return result
+
+        with self.assertRaises(UnifiedScientificLedgerBlocked):
+            self.run_one(gateway=BrokenMeter(root=self.data))
+        audit = self.reopen().audit_restart()
+        self.assertEqual(audit["claims"], 1)
+        self.assertEqual(audit["records"], 0)
+        self.assertEqual(audit["orphan_claims"], 1)
+
+    def test_external_nonfake_gateway_rejected_preclaim(self):
+        with self.assertRaises(OfflineDispatchBlocked):
+            self.run_one(gateway=object())
+        self.assertEqual(self.ledger.audit_restart()["claims"], 0)
+
     def test_invalid_d_output_blocks_later_stages(self):
         gateway = OfflineLangGraphFakeGateway(
             root=self.data, d_json="invalid json fake",
