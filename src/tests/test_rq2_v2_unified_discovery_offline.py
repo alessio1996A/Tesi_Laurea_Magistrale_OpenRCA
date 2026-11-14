@@ -150,7 +150,7 @@ class UnifiedRQ2PlanTests(unittest.TestCase):
     def test_source_verified_only_after_original_source_check(self):
         source = verified_preview()
         with patch.object(plan, "preview_market", return_value=source) as check:
-            out = plan.preview_gt_free_sources(Path("/tmp/synthetic"))
+            out = plan.preview_gt_free_sources(Path.cwd())
         self.assertTrue(check.called)
         self.assertTrue(out["split_manifest_source_verified"])
         self.assertFalse(out["scientific_release_frozen"])
@@ -171,7 +171,7 @@ class UnifiedRQ2PlanTests(unittest.TestCase):
                 source[mutation[0]] = mutation[1]
                 with patch.object(plan, "preview_market", return_value=source):
                     with self.assertRaises(plan.UnifiedRQ2PlanError):
-                        plan.preview_gt_free_sources(Path("/tmp/synthetic"))
+                        plan.preview_gt_free_sources(Path.cwd())
 
     def test_rejects_relative_source_path(self):
         with self.assertRaises(plan.UnifiedRQ2PlanError):
