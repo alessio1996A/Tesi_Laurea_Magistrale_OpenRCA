@@ -208,9 +208,15 @@ class UnifiedRQ2SyntheticJournal:
             "V2U_CLAIM_" if claim else "V2U_RECORD_",
         )
 
-    def load_claim(self, *, stage_id: str) -> dict | None:
-        _paths(self.root)
+    def load_claim(self, *, stage_id: str, _memo: dict | None = None) -> dict | None:
+        # Memo esclusivo di un singolo audit completo; nessun caching
+        # fra operazioni o fra restart. Anche la prossima audit_restart()
+        # dovra' rileggere e validare i file dal disco.
+        if _memo is None:
+            _paths(self.root)
         item = _entry(stage_id)
+        if _memo is not None and stage_id in _memo["claims"]:
+            return _memo["claims"][stage_id]
         obj = _read(self._path(stage_id, claim=True))
         if obj is None:
             return None
@@ -239,11 +245,16 @@ class UnifiedRQ2SyntheticJournal:
             or obj["claim_sha256"] != digest(core)
         ):
             raise UnifiedRQ2JournalError("Corrupt claim or protocol identity")
+        if _memo is not None:
+            _memo["claims"][stage_id] = obj
         return obj
 
-    def load_record(self, *, stage_id: str) -> dict | None:
-        _paths(self.root)
+    def load_record(self, *, stage_id: str, _memo: dict | None = None) -> dict | None:
+        if _memo is None:
+            _paths(self.root)
         item = _entry(stage_id)
+        if _memo is not None and stage_id in _memo["records"]:
+            return _memo["records"][stage_id]
         obj = _read(self._path(stage_id, claim=False))
         if obj is None:
             return None
@@ -274,21 +285,21 @@ class UnifiedRQ2SyntheticJournal:
         except RQ2V2StoreError as exc:
             raise UnifiedRQ2JournalError("Forbidden GT in stored record") from exc
         for pid in item["depends_on"]:
-            parent = self.load_record(stage_id=pid)
+            parent = self.load_record(stage_id=pid, _memo=_memo)
             if (
                 parent is None or obj["dependencies"][pid] != parent["record_sha256"]
                 or parent["model_id"] != item["model_id"]
             ):
                 raise UnifiedRQ2JournalError("Broken parent SHA reference")
         parents = [
-            self.load_record(stage_id=pid) for pid in item["depends_on"]
+            self.load_record(stage_id=pid, _memo=_memo) for pid in item["depends_on"]
         ]
         bad_parent = bool(parents) and any(
             p["status"] != "RECORDED_COMPLETE" for p in parents
         )
         if (obj["status"] == "BLOCKED_DEPENDENCY") != bad_parent:
             raise UnifiedRQ2JournalError("Blocked status disagrees with parents")
-        claim = self.load_claim(stage_id=stage_id)
+        claim = self.load_claim(stage_id=stage_id, _memo=_memo)
         if obj["status"] == "BLOCKED_DEPENDENCY":
             if claim is not None or obj["claim_sha256"] is not None:
                 raise UnifiedRQ2JournalError("Blocked record has claim")
@@ -299,15 +310,21 @@ class UnifiedRQ2SyntheticJournal:
         stem = stage_id.rsplit(":", 1)[0]
         d_rec = (
             obj if item["stage"] == "D"
-            else self.load_record(stage_id=stem + ":D")
+            else self.load_record(stage_id=stem + ":D", _memo=_memo)
         )
         _validate_payload(
             item["stage"], obj["status"], obj["artifact"], item, d_rec,
         )
+        if _memo is not None:
+            _memo["records"][stage_id] = obj
         return obj
 
     def audit_restart(self) -> dict:
         _paths(self.root)
+        # Verifica TUTTI i file a OGNI audit; dentro la stessa scansione
+        # ogni record e' letto e convalidato una sola volta. Non si elimina
+        # alcun controllo su SHA, parent, provenance, claim o payload.
+        _memo = {"claims": {}, "records": {}}
         count_claim, count_record, unresolved, matched = 0, 0, 0, 0
         for folder, claim, prefix in (
             (CLAIMS, True, "V2U_CLAIM_"),
@@ -330,10 +347,10 @@ class UnifiedRQ2SyntheticJournal:
                 if type(sid) is not str or self._path(sid, claim=claim) != path:
                     raise UnifiedRQ2JournalError("Unplanned filename/record ID")
                 if claim:
-                    self.load_claim(stage_id=sid)
+                    self.load_claim(stage_id=sid, _memo=_memo)
                     count_claim += 1
                 else:
-                    self.load_record(stage_id=sid)
+                    self.load_record(stage_id=sid, _memo=_memo)
                     count_record += 1
 
         # Un claim orfano non viene cancellato né riciclato, nemmeno se
@@ -342,15 +359,15 @@ class UnifiedRQ2SyntheticJournal:
         if location.exists():
             for path in location.iterdir():
                 sid = _read(path)["stage_id"]
-                claim_obj = self.load_claim(stage_id=sid)
+                claim_obj = self.load_claim(stage_id=sid, _memo=_memo)
                 for pid, sha in claim_obj["dependencies"].items():
-                    parent = self.load_record(stage_id=pid)
+                    parent = self.load_record(stage_id=pid, _memo=_memo)
                     if (
                         parent is None or parent["record_sha256"] != sha
                         or parent["status"] != "RECORDED_COMPLETE"
                     ):
                         raise UnifiedRQ2JournalError("Claim parent drift")
-                rec = self.load_record(stage_id=sid)
+                rec = self.load_record(stage_id=sid, _memo=_memo)
                 if rec is None:
                     unresolved += 1
                 else:
