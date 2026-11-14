@@ -174,3 +174,32 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_synthetic_journ
 ```
 Attesi `Ran 20 tests` e `OK`, non ancora attestati. Nessuna API/GT/OOD
 e nessuna autorizzazione per G4 o G5.
+
+## 9. G3A 20/20 PASS e profiling delle performance (14 novembre)
+
+Output autentico PyCharm utente: `Ran 20 tests in 250.763s; OK`.
+Il fix fixture `origine="llm"` per Planning/PAVE è quindi passato, incluso
+il test negativo che rifiuta la stessa traiettoria senza origine. **G3A
+correttezza PASS**. Precedenti: G1 25/25 PASS; G2 9/9 PASS. Non attribuire
+il test G3A a run reali, provider API o test OOD. **G3B** orchestratore
+fake runner→journal unificato non ancora realizzato.
+
+Criticità: 250.763s per suite synthetic (costo operativo eccessivo).
+Ipotesi da verificare con cProfile: `audit_restart` invocato prima
+di ogni claim/record, con ricariche ricorsive di parent e SHA.
+Documentazione:
+`docs/ood/RQ2_V2_UNIFIED_G3A_20_PASS_PERFORMANCE_PROFILE_2026-11-14.md`.
+
+Nuovo profiler source-free, non eseguito:
+`src/tests/profile_rq2_v2_unified_journal_offline.py`.
+**Comando PyCharm:**
+```powershell
+git status --short
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -B src/tests/profile_rq2_v2_unified_journal_offline.py
+```
+Crea 15 stage sintetici in TemporaryDirectory, stampa tempi e 22 hot spots.
+Non sostituisce i controlli, non chiama API e non accede ai dati reali.
+Dopo output, correggere efficienza solo con prova di equivalenza
+integrale, no bypass O_EXCL/sha/orphan/race. Opzione B ancora sospesa.
