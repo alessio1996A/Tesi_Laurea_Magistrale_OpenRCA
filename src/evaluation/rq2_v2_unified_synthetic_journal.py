@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from evaluation.rq2_evidence_bundle import (
@@ -47,16 +48,22 @@ class UnifiedRQ2JournalError(ValueError):
     """Identita', vincoli, integrita' o stato non rispettati."""
 
 
+@lru_cache(maxsize=1)
+def _planned_rows() -> dict[str, dict]:
+    # Piano deterministico identico per tutti i journal, nessuna I/O.
+    return {
+        row["stage_id"]: row
+        for row in build_offline_discovery_plan()["entries"]
+    }
+
+
 def _entry(stage_id: str) -> dict:
     if type(stage_id) is not str:
         raise UnifiedRQ2JournalError("Stage ID must be text")
-    matches = [
-        row for row in build_offline_discovery_plan()["entries"]
-        if row["stage_id"] == stage_id
-    ]
-    if len(matches) != 1:
+    row = _planned_rows().get(stage_id)
+    if row is None:
         raise UnifiedRQ2JournalError("Unknown/locked unified V2 stage")
-    return matches[0]
+    return row
 
 
 def _paths(root: Path) -> None:
