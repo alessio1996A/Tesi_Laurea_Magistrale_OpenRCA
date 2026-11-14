@@ -45,7 +45,7 @@ class UnifiedScientificLedgerBlocked(RuntimeError):
 
 def _strict_absolute(root: Path, label: str) -> Path:
     if (
-        type(root) is not Path
+        not isinstance(root, Path)
         or not root.is_absolute()
         or ".." in root.parts
         or root.is_symlink()
