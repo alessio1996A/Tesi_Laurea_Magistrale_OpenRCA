@@ -103,3 +103,39 @@ Attesi **9 test** (con una suite a 15 subtest), ma **NON dire PASS** prima
 di leggere l'output effettivo. Se fallisce, distinguere un difetto del
 fixture da un problema di compatibilita' del grafo e correggere su commit
 tracciato, senza modificare la RQ1 congelata.
+
+## 7. Avanzamento G2 PASS e G3A codice (14 novembre 2026, seconda verifica)
+
+**Output PyCharm utente verificato:** `Ran 9 tests in 0.455s; OK` per
+`src/tests/test_rq2_v2_unified_graph_fake_e2e.py`. G2 PASS per la suite
+synthetic real-LangGraph: un test percorre 5 harness × 3 provider labels
+(15 arm) e le altre prove coprono pairing tool IDs, planner, C/K fixture,
+invalid output e astensioni. Non prova trasporto reale SDK/API né qualità
+del knowledge transfer.
+
+**G3A nuovo codice non ancora testato:** `src/evaluation/rq2_v2_unified_synthetic_journal.py`
+e `src/tests/test_rq2_v2_unified_synthetic_journal.py` (19 test method).
+È un journal create-only **per fixture** di una nuova release V2 unificata,
+NON uno store live; riusa il guard di synthetic-only data root e non
+possiede un dispatcher provider. Copre le 15 combinazioni D/C/K, con
+claim O_EXCL, SHA su piano/stage/parents, blocked without claim, K astensione,
+record invalid preservati, orphan claim e nessun auto-retry. Il G3B production
+release/source-bound e l'E2E fake-runner→journal unificato ancora mancano.
+
+**Prossimo comando PyCharm:**
+```powershell
+git status --short
+git fetch origin feature/rq2-v2-unified-five-harness-three-models-2026-11-14
+git switch feature/rq2-v2-unified-five-harness-three-models-2026-11-14
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_synthetic_journal.py" -v
+```
+Attesi 19; non dichiarare superati senza esito utente.
+Per dettagli e limiti vedi
+`docs/ood/RQ2_V2_UNIFIED_G2_PASS_G3_SYNTHETIC_LEDGER_GATE_2026-11-14.md`.
+
+**NOTA DI CONTINUITÀ:** l'Opzione A e' in corso (nessuna nuova run provider
+della matrice unificata), l'Opzione B resta successiva con tutti gli
+11 test OOD bloccati. Non scambiare 180 stage pianificati per output reali,
+né 9 test G2 per 15 esperimenti pagati.
