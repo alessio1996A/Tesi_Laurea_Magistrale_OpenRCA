@@ -53,6 +53,8 @@ class UnifiedStagePreviewBlocked(RuntimeError):
 def _source_instruction(*, data_dir: Path, case_id: str) -> str:
     """Solo CSV manifest GT-free. Non apre Market.zip, GT o scorers."""
     path = data_dir / "data/processed/benchmark_inputs_market.csv"
+    if any(part.is_symlink() for part in (data_dir / "data", path.parent)):
+        raise UnifiedStagePreviewBlocked("Symlinked GT-free manifest parent")
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 10_000_000:
         raise UnifiedStagePreviewBlocked("GT-free manifest absent/unsafe")
     try:
