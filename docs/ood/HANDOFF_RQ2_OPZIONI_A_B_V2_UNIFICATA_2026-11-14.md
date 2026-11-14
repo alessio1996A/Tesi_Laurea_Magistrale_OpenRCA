@@ -590,3 +590,40 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_dispatcher_offl
 G4G **ancora NON PASS**, test da rieseguire su TemporaryDirectory
 nuova. Se appare una failure successiva differente, diagnosi prima
 di nuove modifiche. Nessuna API/OOD abilitata.
+
+## 20. G4G PASS 17/17; priorita' nuovo dispatcher reale UNICO — 14 novembre 2026
+
+**Esito reale PyCharm:** `Ran 17 tests in 22.415s; OK`,
+dopo la correzione di una sola chiamata `assert_equal_case` nella
+fixture G4G. Il runner RQ1/ToolNode/verify_graph con fake LLM,
+orchestrazione D→C→K e ledger scientifico G4F create-only sono
+integrati in TemporaryDirectory: 15 combinazioni × 3 stage=45 record
+nel test principale. Fallimento precedente G4G era solo typo fixture
+seguito dal blocco previsto sui claim orfani; protezioni intatte.
+
+**Non ripetere gli audit SDK gia' superati**: dalla documentazione
+`docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md` risulta
+che il 12/11 l'utente aveva gia' ottenuto PASS con HTTP 503 finto,
+socket deny-all, Google e Anthropic sync `invoke` (con/senza tools),
+un solo fake send per invoke. Pinned source e timeout/retry
+configurati localmente; streaming/async e timeout sotto socket stall
+non dimostrati. Anche i moduli `rq2_model_factory.py`,
+`rq2_discovery_d_provider_transport.py`,
+`rq2_ck_provider_transport.py` esistono gia' ma sono
+legati al protocollo/stage store RQ2 V1; il passaggio a ledger G4F
+richiede un **solo adattamento** correttamente source-bound, non
+una nuova infrastruttura parallela.
+
+**Decisione per la prossima implementazione:** dispatcher LIVE RQ2-V2
+unico per 180 stage *discovery* con stage singolo autorizzato,
+preflight reale source/commit/release, claim pre-API, D via
+`run_experiment` originale, C/K via prompt tool-free e
+`rq2_model_factory` versionato, registrazione errori/meter/parent
+in G4F senza retry. Verificare il suo esatto percorso con fake
+factory prima del pilot. Inserire ledger, contract, dispatcher e
+factory nel source inventory finale, rifare SHA/Git pin e verifica
+concorrenza Drive. Nessuna API ancora autorizzata.
+Contenuto preciso:
+`docs/ood/RQ2_V2_UNIFIED_G4G_PASS_NEXT_SINGLE_LIVE_DISPATCHER_2026-11-14.md`.
+**G4G concluso; nessun test aggiuntivo richiesto all'utente ora**.
+Opzione B e 11 OOD sempre LOCKED.
