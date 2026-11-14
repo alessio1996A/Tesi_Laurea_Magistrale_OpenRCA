@@ -271,15 +271,29 @@ class Q045DevelopmentSourceAuditTests(unittest.TestCase):
         self.assertFalse(hasattr(module, "predict_ood"))
 
     def test_wrong_dev_source_symlink_is_refused(self):
+        # Simuliamo un link simbolico: su Windows la sua creazione reale
+        # puo' richiedere privilegi e fallire con WinError 1314.
+        # Il file deve esistere realmente, cosi' l'errore dipende dal
+        # controllo is_symlink(), non da un file sorgente mancante.
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             fixture(root)
             split_path = root / "data/processed/split_market_v1.csv"
-            new_path = root / "split_backup.csv"
-            split_path.rename(new_path)
-            split_path.symlink_to(new_path)
-            with self.assertRaisesRegex(DevelopmentLogAuditError, "symlinked"):
-                audit(root)
+            self.assertTrue(split_path.is_file())
+            self.assertFalse(split_path.is_symlink())
+
+            original_is_symlink = Path.is_symlink
+
+            def simulate_symlink(path):
+                if path == split_path:
+                    return True
+                return original_is_symlink(path)
+
+            with patch.object(Path, "is_symlink", new=simulate_symlink):
+                with self.assertRaisesRegex(
+                    DevelopmentLogAuditError, "symlinked"
+                ):
+                    audit(root)
 
 
 if __name__ == "__main__":
