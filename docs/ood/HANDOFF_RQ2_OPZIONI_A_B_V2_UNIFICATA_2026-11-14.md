@@ -519,3 +519,41 @@ Attesi 22 test, non attestati. Poi **un solo dispatcher D/C/K**
 con fake SDK + prove error/metering e lockdown provider; non avviare
 API reali, non sbloccare OOD. Infine freeze e pilot esplicitamente
 autorizzato. Non confondere i precedenti test offline con run reali.
+
+## 18. G4F 22 PASS e G4G fake-only dispatcher su ledger scientifico (14 novembre 2026)
+
+**Esito reale utente PyCharm:** `Ran 22 tests in 22.053s; OK`
+per `src/tests/test_rq2_v2_unified_scientific_ledger_offline.py`.
+G4F **PASS su TemporaryDirectory con release fittizia**, inclusi
+O_EXCL claim/record, SHA parent, readback, errori, astensione, no
+auto-retry e lock OS locale. Non prova un lock efficace su Drive/FUSE,
+né una release approvata, né la disponibilità remota degli LLM.
+
+**Nuovo G4G aggiunto**, NON ancora testato:
+`src/evaluation/rq2_v2_unified_dispatcher_offline.py`
+`src/tests/test_rq2_v2_unified_dispatcher_offline_e2e.py`
+(**17 metodi unittest da lanciare**). Test centrale: tutti i 15 arm
+su un caso fittizio × D/C/K = 45 record nel ledger **G4F scientifico**,
+con reali `run_experiment`, ReAct/verify LangGraph e ToolNode ma
+LLM/telemetria fake. Il modulo G4G è un **orchestratore FAKE-ONLY**,
+non il dispatcher provider di produzione: richiede marker sintetico e
+release di prova con `approval_reference=SYNTHETIC_APPROVAL_NOT_REAL`,
+rifiuta un root che contenga Market.zip/data processed e non importa
+client SDK. Verifiche negative D/C/K invalidi, provider failure fake,
+ID nativi incoerenti, meter errato, claim orfano, nessun retry,
+OOD LOCKED e no API. **Tutti i 17 test G4G sono PENDING**.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4F_PASS_G4G_FAKE_DISPATCH_SCIENTIFIC_LEDGER_GATE_2026-11-14.md`.
+
+**Comando PyCharm, git status pulito:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_dispatcher_offline_e2e.py" -v
+```
+Attesi 17 e OK, non attestati. Dopo il passaggio G4G occorre creare
+il vero dispatcher comune e certificarne retry/timeout/uso/costi/lock
+prima del freeze e di qualsiasi API. Gli hash della G4C provano il
+preflight del vecchio HEAD, non includono G4F/G4G. Opzione B e
+11 OOD sempre chiusi.
