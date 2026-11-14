@@ -152,9 +152,11 @@ def _meter(m: object, *, allow_zero_requests: bool) -> None:
     ):
         raise UnifiedScientificLedgerBlocked("Malformed/incomplete stage meter")
     cost = m["cost_estimate_usd_not_invoice"]
+    # La completezza dei TOKEN non certifica il PREZZO applicato: il
+    # costo puo' essere sconosciuto anche con usage_metadata completo.
+    # Non registrare mai 0 USD per mascherare listini non verificati.
     if cost == "UNKNOWN":
-        if m["usage_complete"] is True:
-            raise UnifiedScientificLedgerBlocked("Unknown cost with complete usage")
+        pass
     else:
         try:
             parsed = Decimal(cost)
