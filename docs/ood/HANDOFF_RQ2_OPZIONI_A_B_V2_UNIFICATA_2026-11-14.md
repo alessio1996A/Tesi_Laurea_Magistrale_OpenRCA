@@ -557,3 +557,36 @@ il vero dispatcher comune e certificarne retry/timeout/uso/costi/lock
 prima del freeze e di qualsiasi API. Gli hash della G4C provano il
 preflight del vecchio HEAD, non includono G4F/G4G. Opzione B e
 11 OOD sempre chiusi.
+
+## 19. G4G: prima suite FALLITA per typo fixture, fix 1 riga — 14 novembre
+
+Output Windows/PyCharm completo da file incollato utente:
+`Ran 17 tests in 3.162s; FAILED (failures=1, errors=25)`.
+La causa iniziale e' localizzata: nel fake gateway
+`src/tests/test_rq2_v2_unified_dispatcher_offline_e2e.py`, alla
+riga 101, `self.assertEqual_case(...)` richiama un metodo inesistente.
+Il metodo dichiarato e' `assert_equal_case(...)`. La prima D crea
+il claim prima del fake-runner, poi l'AttributeError blocca la
+scrittura del record; il journal G4F rileva il claim orfano e blocca
+correttamente tutte le 14 subtest seguenti `Unresolved claim:
+manual review, no new stage`. Il fallimento finale `1 != 45`
+e' quindi una cascata del primo errore, NON un motivo per rilassare
+il controllo no-retry.
+
+**Fix GitHub solo test:** sostituito il nome metodo alla chiamata,
+commit `9c494ed8f6d1aad93bdf057e7f4eb88c8eef3d07`.
+Nessun cambiamento a ledger G4F, dispatcher, RQ1, hash,
+prompt, dati frozen o policy di sicurezza.
+
+Report:
+`docs/ood/RQ2_V2_UNIFIED_G4G_FAKE_GATE_WINDOWS_FAILURE_FIX_2026-11-14.md`.
+
+**Prossimo comando PyCharm su checkout clean:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_dispatcher_offline_e2e.py" -v
+```
+G4G **ancora NON PASS**, test da rieseguire su TemporaryDirectory
+nuova. Se appare una failure successiva differente, diagnosi prima
+di nuove modifiche. Nessuna API/OOD abilitata.
