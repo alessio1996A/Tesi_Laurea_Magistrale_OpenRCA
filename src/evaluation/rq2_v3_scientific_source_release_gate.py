@@ -67,7 +67,7 @@ def _digest(value: object) -> str:
 
 
 def _runtime_attestation(*, data_dir: Path, repo_dir: Path,
-                         expected_commit: str, release_sha256: str,
+                         expected_commit: str, inventory_sha256: str,
                          runtime_versions: dict) -> dict:
     """Mandatory future SDK+Drive verifier; absence is intentional NO-GO."""
     try:
@@ -81,7 +81,7 @@ def _runtime_attestation(*, data_dir: Path, repo_dir: Path,
     return verify_v3_live_runtime_gate(
         data_dir=data_dir, repo_dir=repo_dir,
         expected_source_commit=expected_commit,
-        expected_release_sha256=release_sha256,
+        expected_source_inventory_sha256=inventory_sha256,
         expected_runtime_versions=runtime_versions,
     )
 
@@ -227,13 +227,13 @@ def verify_v3_source_release(*, data_dir: Path, repo_dir: Path,
     receipt = _runtime_attestation(
         data_dir=data, repo_dir=repo,
         expected_commit=expected_commit,
-        release_sha256=approved_release_sha256,
+        inventory_sha256=release["source_inventory_sha256"],
         runtime_versions=runtime,
     )
     required = {
         "status": "V3_SDK_DRIVE_RUNTIME_GATE_VERIFIED",
         "source_commit": expected_commit,
-        "release_sha256": approved_release_sha256,
+        "source_inventory_sha256": release["source_inventory_sha256"],
         "runtime_versions": runtime,
         "sdk_retries_disabled_verified": True,
         "per_request_timeout_verified": True,
