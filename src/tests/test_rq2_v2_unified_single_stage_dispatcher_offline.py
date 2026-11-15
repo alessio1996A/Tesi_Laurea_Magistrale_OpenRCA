@@ -17,6 +17,7 @@ from unittest.mock import patch
 import evaluation.rq2_v2_unified_scientific_ledger as ledger_code
 import evaluation.rq2_v2_unified_single_stage_dispatcher as dispatcher
 from evaluation.rq2_probe_adapter import CAUSE_SYSTEM, RULE_SYSTEM
+from evaluation.rq2_langchain_parameter_mock_probe import RQ2BridgeMockBlocked
 from evaluation.rq2_v2_unified_discovery_plan import DISCOVERY, TEST
 from evaluation.rq2_v2_unified_scientific_release_contract import (
     canonical_release, release_digest,
@@ -268,6 +269,25 @@ class SourceBoundSingleStageFakeTests(unittest.TestCase):
             self.run_stage(gateway=BadMeter(root=self.data))
         self.assertEqual(self.ledger.audit_restart()["orphan_claims"], 1)
 
+    def test_complete_token_usage_may_have_unknown_cost(self):
+        # Token completi NON dimostrano il prezzo effettivamente applicato.
+        class UnknownPrice(OfflineLangGraphFakeGateway):
+            def run_d(self, *, case_id, model, harness):
+                result = super().run_d(
+                    case_id=case_id, model=model, harness=harness,
+                )
+                result.meter["cost_estimate_usd_not_invoice"] = "UNKNOWN"
+                return result
+
+        response = self.run_stage(gateway=UnknownPrice(root=self.data))
+        self.assertEqual(response["record_status"], "RECORDED_COMPLETE")
+        saved = self.ledger.load_record(stage_id=sid())
+        self.assertTrue(saved["artifact"]["stage_meter"]["usage_complete"])
+        self.assertEqual(
+            saved["artifact"]["stage_meter"]["cost_estimate_usd_not_invoice"],
+            "UNKNOWN",
+        )
+
     def test_missing_fake_marker_blocks_before_claim(self):
         (self.data / MARKER).unlink()
         with self.assertRaises(UnifiedSingleStageBlocked):
@@ -332,9 +352,9 @@ class SourceBoundSingleStageFakeTests(unittest.TestCase):
         class SneakyGateway(OfflineLangGraphFakeGateway):
             def run_d(self, *, case_id, model, harness):
                 socket.create_connection(("example.invalid", 443))
-                self.fail("Should not reach network")
+                raise AssertionError("Network should have been denied")
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(RQ2BridgeMockBlocked):
             self.run_stage(gateway=SneakyGateway(root=self.data))
         self.assertEqual(self.ledger.audit_restart()["orphan_claims"], 1)
 
