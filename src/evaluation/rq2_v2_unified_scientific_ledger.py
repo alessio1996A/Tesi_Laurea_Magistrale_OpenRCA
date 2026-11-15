@@ -746,7 +746,7 @@ def create_authorized_scientific_release_once(
         raise UnifiedScientificLedgerBlocked("Scientific release already exists")
     try:
         root.mkdir(mode=0o700)
-        with _writer_lock(root / LOCK_FILE):
+        with _writer_lock(data / LOCK_FILE):
             (root / "claims").mkdir(mode=0o700)
             (root / "records").mkdir(mode=0o700)
             release_path = data / RELEASE_FILE
