@@ -43,3 +43,48 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_pref
 
 ## Stato
 Nessuna API reale, nessuna nuova campagna scientifica Opzione A, nessuna firma di release nuova; 11 casi OOD e Opzione B bloccati. G4I resta il passo successivo dopo PASS G4H.
+
+## Seconda prova G4H — 15 novembre, test negativo ordinato male
+
+**Output reale dell'utente, dopo fix hash nella fixture:**
+```text
+Ran 20 tests in 7.460s
+
+FAILED (failures=1)
+```
+Tutti i 19 metodi preesistenti, inclusi i due test **positivi C e K**,
+sono PASS. L'unica failure e' il nuovo
+`test_actual_prompt_drift_still_fails_closed_for_both_stages`,
+sottotest C: il test chiama `save_d(); save_c()` PRIMA di chiedere
+`preview(stage="C")`. Il gate rifiuta giustamente C con
+`Stage already claimed or recorded`, prima ancora di calcolare
+SHA dei prompt. La fixture si aspettava invece l'errore testuale
+`Frozen C/K prompt SHA drift`. Non c'e' evidenza di drift dei
+prompt reali, e nessuna modifica del codice di produzione e' richiesta.
+
+**Seconda correzione chirurgica GitHub:** commit
+`ce0001abe1980664f97203e48bc607e233e7cbdf`, unico file
+`src/tests/test_rq2_v2_unified_live_stage_preflight_offline.py`.
+La nuova sequenza del test negativo:
+1. salva D valido; con C ancora **non claimed**, altera solo
+   `live_stage_preflight.CAUSE_SYSTEM` e verifica errore SHA C;
+   controlla che non siano stati scritti claim C;
+2. salva C valido; con K ancora **non claimed**, altera solo
+   `live_stage_preflight.RULE_SYSTEM` e verifica errore SHA K;
+   controlla che non siano stati scritti claim K.
+
+Le precondizioni di entrambi gli stage sono ora soddisfatte, cosi'
+l'esecuzione raggiunge effettivamente il controllo SHA. Il blocco
+sugli stage gia' registrati **non e' stato rimosso**, come non sono
+stati modificati source SHA, ledger, dispatcher, OOD o RQ1.
+
+**Test ancora PENDING:** 20 metodi G4H dopo questa correzione.
+```powershell
+git status --short
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_preflight_offline.py" -v
+```
+Non occorre rieseguire G4F/G4G; nelle ultime prove sono
+`22/22 OK` e `17/17 OK` senza variazioni al loro codice.
+Nessuna API autorizzata.
