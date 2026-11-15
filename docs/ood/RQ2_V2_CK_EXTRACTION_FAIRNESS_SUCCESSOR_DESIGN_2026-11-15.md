@@ -27,6 +27,14 @@ I test su `src/tests/test_rq2_v2_ck_candidate_transport_integration_offline.py` 
 
 **Vincolo del freeze:** il vecchio `src/evaluation/rq2_v2_unified_release_preflight.py` include `evaluation/rq2_ck_provider_transport.py` e `evaluation/rq2_v2_unified_live_dispatcher.py` nell'inventario SHA. La release congelata non può autorizzare né certificare il nuovo trasporto solo perché esiste un file candidato; la verifica source-bound deve includere esplicitamente ogni componente del nuovo percorso di esecuzione. Non modificare la vecchia release G4E/G4L o la sua directory.
 
+## Gap di provenienza identificato nell'interfaccia esistente
+
+L'adattatore congelato `normalize_ck_call()` accetta la ricevuta del trasporto successore, ma costruisce un artifact C/K con i soli campi `raw_response` e `stage_meter`. Di conseguenza, i metadati aggiunti alla ricevuta (`content_extraction_policy`, `response_content_kind`, `text_blocks_observed`, `nontext_blocks_observed`) **non sopravvivono alla registrazione sul ledger V2**. Questo è un rischio di auditabilità; non è un errore di validazione JSON e non conferisce alcun permesso di cambiare il ledger congelato.
+
+Nuovo test mirato: `src/tests/test_rq2_v2_ck_candidate_ledger_compatibility_offline.py`. Usa un ledger/release interamente sintetici in TemporaryDirectory, verifica D→C→K sui tre modelli, C invalida→K bloccata senza retry e documenta esplicitamente la perdita dei metadati. **Stato: in attesa dell'esito PyCharm**.
+
+Per il successore scientifico occorre un contratto/ledger **versionato e separato** che conservi queste diagnostiche in una struttura validata, senza salvare thinking, firme o altri dati sensibili; tutti i record del successore devono avere una policy dichiarata e identica per modello. La compatibilità con lo schema V2 non equivale a disponibilità di provenienza sufficiente.
+
 ## Requisiti GO/NO-GO prima della futura campagna reale
 
 1. **GO tecnico:** nuovi test passati e controlli anti-regressione selettivi su trasporto, parser, output-contract, contatori, gestione errori e no-auto-retry.
