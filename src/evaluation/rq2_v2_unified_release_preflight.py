@@ -47,6 +47,24 @@ SOURCE_PATHS = (
     "harness/investigation_planner.py",
     "harness/structural_temporal_verifier.py",
     "output/v2_task_contract.py",
+    # RQ2-V2: componente di release + vera persistenza/dispatch.
+    # Le SHA qui sono una PREVIEW: il freeze definitivo sara'
+    # associato a un commit clean e approvazione esterna separata.
+    "evaluation/rq2_v2_unified_release_preflight.py",
+    "evaluation/rq2_v2_unified_release_blueprint.py",
+    "evaluation/rq2_v2_unified_scientific_release_contract.py",
+    "evaluation/rq2_v2_unified_scientific_ledger_preflight.py",
+    "evaluation/rq2_v2_unified_scientific_ledger.py",
+    "evaluation/rq2_v2_unified_live_stage_preflight.py",
+    "evaluation/rq2_v2_unified_single_stage_dispatcher.py",
+    "evaluation/rq2_v2_unified_provider_result_adapter.py",
+    "evaluation/rq2_v2_unified_live_dispatcher.py",
+    # Factory RQ2-only e trasporto sincrono C/K gia' collaudati.
+    "evaluation/rq2_model_factory.py",
+    "evaluation/rq2_ck_provider_transport.py",
+    "evaluation/rq2_budget_preflight.py",
+    "evaluation/rq2_provider_policy_source_audit.py",
+    "evaluation/rq2_sdk_retry_mock_probe.py",
 )
 
 
