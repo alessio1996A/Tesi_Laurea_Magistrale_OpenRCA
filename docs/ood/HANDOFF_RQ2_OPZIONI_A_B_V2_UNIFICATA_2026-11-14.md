@@ -756,3 +756,52 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_pref
 Ultime regressioni G4F 22 PASS e G4G 17 PASS; non serve
 ripeterle perche' la sola variazione funzionale e' nel test G4H.
 API e 11 OOD ancora bloccati. Dopo G4H preparare G4I.
+
+## 24. G4H 20/20 PASS; G4I dispatcher per singolo stage fake-only — 15 novembre
+
+**Esito PyCharm utente dopo correzione dell'ordine nel test negativo:**
+`Ran 20 tests in 7.090s; OK` — **G4H PASS**.
+I test SHA dei prompt C/K rimangono attivi e verificati anche contro
+tamper. Ultime regressioni G4F 22/22 e G4G 17/17 PASS. Nessuna
+modifica agli archivi scientifici congelati RQ1/RQ2 V1.
+
+**Nuovo G4I aggiunto, NON ancora eseguito in PyCharm**:
+`src/evaluation/rq2_v2_unified_single_stage_dispatcher.py`
+`src/tests/test_rq2_v2_unified_single_stage_dispatcher_offline.py`
+(**24 metodi PENDING**).
+
+Diversamente dall'orchestratore G4G a tripla, G4I coordina
+UN SOLO stage D/C/K per chiamata. Rilegge G4H (source-bound
+manifest GT-free, release/commit, parent D/C immutabili),
+ricostruisce C/K con prompt SHA esatto, scrive claim tramite
+ledger G4F **prima** dell'LLM fake, vieta le socket tramite
+`network_forbidden()`, registra record/stati/errori nel G4F.
+Se D/C fallisce, registra gli stage figli come
+`BLOCKED_DEPENDENCY` senza nuovi claim/chiamate; errori
+inattesi dopo claim lasciano orphan, stop al retry. Testano tre
+bracci di modelli/harness con veri grafi RQ1 e backend fake,
+provider error, SHA package mutato, root non temporanea,
+marker assente, file Market vietato, OOD, e token completi ma
+prezzo sconosciuto.
+
+**G4I NON HA BACKEND API REALE**. Richiede marker fisico
+`.rq2_v2_unified_single_stage_fake_only`, root sotto il
+TemporaryDirectory OS e una release **FAKE** con riferimento
+`SYNTHETIC_APPROVAL_NOT_REAL`. Il gateway dei test usa fake LLM,
+non provider remoti. Nessun nuovo consenso a chiamate a pagamento.
+Non prendere G4I come release scientifica.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4H_PASS_G4I_SINGLE_STAGE_FAKE_DISPATCH_2026-11-15.md`.
+
+**Prossimo comando PyCharm (git status pulito):**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_single_stage_dispatcher_offline.py" -v
+```
+Attesi `Ran 24 tests` e `OK` ma NON ancora provati.
+Se fallisce, riportare il traceback prima di modificare codice.
+Poi adapter provider reale, lock Drive, metering/timeout, nuovo
+source inventory completo + SHA e approvazione esplicita del
+singolo pilot, non 180 stage API. 11 OOD ancora locked.
