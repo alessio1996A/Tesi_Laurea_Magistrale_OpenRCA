@@ -679,3 +679,43 @@ nel medesimo codice che poi usera' il provider; ampliare
 SOURCE_PATHS includendo G4F/G4H e dispatcher, test Drive/FUSE,
 meter/retry/timeout e real freeze SHA, poi chiedere esplicita
 autorizzazione ad UN SOLO pilot pagato.
+
+## 22. G4H Windows prima prova 17 OK/2 errori SHA FIXTURE; G4F/G4G PASS (15 novembre)
+
+**Output utente da log PyCharm (reale):**
+- G4H: `Ran 19 tests in 4.967s — FAILED (errors=2)`. Due soli
+  errori nella preview positiva degli stage C e K:
+  `UnifiedStagePreviewBlocked: Frozen C/K prompt SHA drift`.
+- G4F: `Ran 22 tests in 20.972s — OK`.
+- G4G: `Ran 17 tests in 19.580s — OK`.
+
+**Diagnosi:** G4H in `setUp` eredita `source_fixture()` del G4E,
+che imposta C/K prompt SHA all'hash **FAKE_SHA** generico per test
+contratto. Ma G4H invoca davvero `prepare_cause_probe` e
+`prepare_candidate_rule`, la cui fonte sono gli immutati
+`CAUSE_SYSTEM` e `RULE_SYSTEM`. Il gate SHA correttamente
+rifiuta il release finto incongruente. **Non modificare il controllo
+G4H né i prompt reali**.
+
+**Fix GitHub mirato** soltanto
+`src/tests/test_rq2_v2_unified_live_stage_preflight_offline.py`:
+la `setUp` sostituisce i due fake prompt hash con lo SHA256 calcolato
+dai due prompt REALI prima di costruire blueprint e release fake.
+Aggiunto test negativo `test_actual_prompt_drift_still_fails_closed_for_both_stages`
+per dimostrare che un prompt veramente alterato continua a fallire.
+Commit fix: `bbdfcff3d1628db409072835cc13440f195d2d1f`.
+G4H ora contiene **20 metodi**, PENDING verifica dell'utente;
+nessun file di codice G4H produttivo, ledger G4F/G4G, RQ1 o
+sorgente GT-free alterato.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4H_WINDOWS_PROMPT_SHA_FIX_2026-11-15.md`.
+
+**Prossimo comando PyCharm su checkout pulito:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_preflight_offline.py" -v
+```
+Attesi 20 e OK, **non attestati**. G4F 22 PASS e G4G 17 PASS
+attestati sul codice corrente. Nessuna API/OOD autorizzata.
