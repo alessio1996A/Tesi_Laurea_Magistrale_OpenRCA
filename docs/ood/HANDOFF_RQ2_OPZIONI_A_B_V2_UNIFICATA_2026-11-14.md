@@ -976,3 +976,38 @@ Attesi 18 e OK, non attestati. Se compaiono failure runtime
 differenti, valutare primo traceback, NON dichiarare G4K PASS.
 G4A 19 test PASS senza bisogno di nuova esecuzione. Nessuna API
 reale, autorizzazione o test OOD.
+
+## 29. G4K 18/18 PASS; G4A 19/19 PASS; prossimo Colab reale 29 source (15 novembre)
+
+**Output reale utente PyCharm:** dopo fix puramente sintattico fixture
+G4K, `Ran 18 tests in 6.276s; OK`. Il dispatcher
+`rq2_v2_unified_live_dispatcher.py` continua ad avere
+`LIVE_API_ENABLED=False`; tutti i test G4K usano mock per runner
+e trasporti, release sintetica in TemporaryDirectory.
+L'altra suite `test_rq2_v2_unified_release_preflight_offline.py`
+ha riportato `Ran 19 tests in 0.379s; OK`, quindi
+G4A inventario **29 sorgenti** PASS. Totale ultime sette suite
+G4F/G4G/G4H/G4I/G4J/G4K/G4A: **145 PASS** (offline).
+
+**Nessuna nuova chiamata API della RQ2-V2 unificata** e nessuna
+autorizzazione spesa. Il documento
+`docs/ood/RQ2_V2_UNIFIED_G4K_PASS_NEXT_REAL_29_SOURCE_COLAB_PREFLIGHT_2026-11-15.md`
+registra il prossimo passo: **preflight Colab READ-ONLY sulla HEAD
+esatta PINNATA esternamente**, usando i veri CSV GT-free in
+`/content/drive/MyDrive/Tesi_OpenRCA/data/processed/`.
+La nuova cella ChatGPT deve:
+- clone/fetch sul checkout temporaneo separato,
+  confermare `FETCH_HEAD==EXPECTED_COMMIT` PRIMA del checkout,
+  verificare Git clean;
+- importare solo source preflight e blueprint,
+  richiedere 29 source, SHA source, split/manifest, prompt C/K,
+  4 discovery, 11 OOD metadata locked, `can_execute_api=False`;
+- stampare JSON con SHA aggregated e nessuna richiesta API,
+  no claim, no scientific release, no GT;
+- STOP su qualunque mismatch. Non forzare file, hash o branch.
+
+Il precedente G4C reale `33d5d8...` con 15 sorgenti rimane
+prova storica, NON valida il nuovo checkout. Dopo JSON reale:
+verifica lock Drive/FUSE su scratch, runtime/timeout e tariffe,
+freeze e autorizzazione del singolo pilot D. I test OOD/Opzione B
+restano LOCKED 11/11; niente scoring o GT.
