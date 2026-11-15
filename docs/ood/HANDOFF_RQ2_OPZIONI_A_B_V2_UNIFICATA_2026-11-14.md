@@ -1132,3 +1132,48 @@ Restano PASS il Colab source preflight 29 file sul commit
 stessa sessione. `LIVE_API_ENABLED=False`; 0/180 stage reali,
 11 OOD locked. Dopo ripristino eventuale: audit runtime,
 policy retry/timeout, release pin finale, consenso singolo pilot.
+
+## 33. RQ2-V2 isolated Colab SDK snapshot PASS (15 novembre)
+
+**Output utente realmente attestato** nella nuova sessione Colab:
+`=== SDK SNAPSHOT ISOLATO: PASS ===`,
+`runtime_snapshot_ready=true`,
+`frozen_rq1_factory_unchanged=true`,
+`provider_requests_sent=0`, `can_execute_api=false`.
+Python 3.13.18, `pip --target` in
+`/content/rq2_v2_pinned_sdk_py313`, nessun aggiornamento global
+Colab e nessuna modifica Drive. Audit nel subprocess
+`PYTHONPATH=DEPS:REPO/src`.
+**6/6 versioni MATCH**: langchain-core=1.7.1,
+langgraph=1.2.18, langchain-anthropic=1.7.7,
+langchain-google-genai=4.4.2, anthropic=2.6.0,
+google-genai=2.34.0.
+**4/4 SHA sorgenti SDK MATCH**:
+anthropic `a42ef507300287261fe0b215023672a97f8a9b01216a135d614bbede72fff680`;
+google-genai `b179b80a126a35c98b98aeefa701950304c38c8a1e117136a2270a0901fd93e4`;
+langchain-anthropic `c55a0cb8fed75b3d310dbddf03a455f95c3c1d47aab650317bf3c9e4bab62544`;
+langchain-google-genai `589106719f2038805a27ddd0c44c23d5e4a4486ea0d7116b38a83d37722ac27f`.
+Il precedente failure usando Python Colab GLOBALE e' spiegato
+dalla mancanza dei pacchetti isolati, non da drift RQ1.
+`READY` marker scritto SOLO nel `DEPS` /content temporaneo.
+
+**Report:**
+`docs/ood/RQ2_V2_UNIFIED_COLAB_SDK_PINNED_SNAPSHOT_PASS_2026-11-15.md`.
+
+**ATTENZIONE:** legacy `rq2_langchain_bridge_source_trace.py`
+ha assert testuale `RELEASE_SHA256 = None` su
+`rq2_ck_provider_transport.py`, ma il branch RQ2 corrente
+presenta release V1 pin storico. NON forzare quel vecchio
+guard per eseguire un test legacy in RQ2-V2; non toccare
+V1, RQ1 o il protocollo scientifico frozen.
+Il prossimo controllo mirato e' `assert_exact_runtime_snapshot()`
+del RQ2-only `rq2_model_factory` e, se utile, SDK-only
+`rq2_sdk_retry_mock_probe.run_offline_mock_probe`
+con Google retry_ARGS in-memory e Anthropic HTTP finto.
+Sempre `PYTHONPATH=DEPS:REPO/src`, checkout commit testato
+`601dc7...`, no live SDK provider request.
+
+G4K live remains `LIVE_API_ENABLED=False`. Dopo audit SDK:
+freeze di nuovo commit finale, review prezzo/budget,
+approval SHA release e user consent per UN pilot D,
+no 11 OOD; zero run RQ2-V2 API.
