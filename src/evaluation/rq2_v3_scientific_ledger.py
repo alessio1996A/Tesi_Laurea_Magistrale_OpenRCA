@@ -169,17 +169,22 @@ class V3ScientificLedger:
         """
         try:
             from evaluation.rq2_v3_scientific_source_release_gate import (
-                verify_v3_source_release,
+                V3SourceReleaseBlocked, verify_v3_source_release,
             )
         except ImportError as exc:
             raise V3ScientificLedgerBlocked(
                 "V3 source/release gate not installed: NO-GO"
             ) from exc
-        return verify_v3_source_release(
-            data_dir=self.data, repo_dir=self.repo, release=release,
-            expected_commit=self.expected_commit,
-            approved_release_sha256=self.release_sha,
-        )
+        try:
+            return verify_v3_source_release(
+                data_dir=self.data, repo_dir=self.repo, release=release,
+                expected_commit=self.expected_commit,
+                approved_release_sha256=self.release_sha,
+            )
+        except V3SourceReleaseBlocked as exc:
+            raise V3ScientificLedgerBlocked(
+                "V3 source/release verification failed: NO-GO"
+            ) from exc
 
     def _gate(self) -> None:
         try:
