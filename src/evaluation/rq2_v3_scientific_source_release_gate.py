@@ -23,6 +23,7 @@ from evaluation.rq2_v2_unified_scientific_ledger import (
 )
 from evaluation.rq2_v2_unified_scientific_ledger_preflight import (
     _repository_commit, _strict_absolute,
+    UnifiedScientificLedgerBlocked as V2PreflightBlocked,
 )
 from evaluation.rq2_v3_scientific_source_inventory import (
     VERSION as INVENTORY_VERSION, STATUS as INVENTORY_STATUS,
@@ -100,7 +101,7 @@ def verify_v3_source_release(*, data_dir: Path, repo_dir: Path,
         data = _strict_absolute(data_dir, "data root")
         repo = _strict_absolute(repo_dir, "repository root")
         head, status = _repository_commit(repo)
-    except UnifiedScientificLedgerBlocked as exc:
+    except (UnifiedScientificLedgerBlocked, V2PreflightBlocked) as exc:
         raise V3SourceReleaseBlocked("Unsafe data/repo or unavailable Git identity") from exc
     if head != expected_commit or status:
         raise V3SourceReleaseBlocked("Source commit drift or dirty Git checkout")
