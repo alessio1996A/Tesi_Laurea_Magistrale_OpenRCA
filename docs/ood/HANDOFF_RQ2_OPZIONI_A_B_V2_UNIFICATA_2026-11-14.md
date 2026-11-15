@@ -1044,3 +1044,51 @@ create-only su **scratch MyDrive esterna a Tesi_OpenRCA**, valutare
 se la semantica consente ledger create-only su Drive, runtime e tariffe,
 nuova approvazione SHA esterno finale, quindi consenso specifico per
 UN pilot D. 11 OOD sempre locked. NON modificare code RQ1 frozen.
+
+## 31. Colab Drive/FUSE scratch esclusività PASS (15 novembre 2026)
+
+**Output reale dell'utente:**
+`status=DRIVE_SAME_RUNTIME_SINGLE_WRITER_SCRATCH_PASS_NO_API`;
+`concurrent_processes=8`;
+`exclusive_file_creators=1`;
+`lock_second_process_denied=true`;
+`lock_released_and_reacquired=true`;
+`other_colab_sessions_or_vms_verified=false`;
+`model_requests_sent=0`;
+`data_root_modified=false`;
+`SCRATCH_REMOVED=True`.
+
+Sono PASS una prova `fcntl.flock(LOCK_EX|LOCK_NB)` con un
+secondo processo negato e reacquire dopo unlock, e una
+`os.open(O_CREAT|O_EXCL)` tra otto processi sullo stesso
+Drive MyDrive scratch; una sola creazione, sette esclusioni.
+La scratch era
+`/content/drive/MyDrive/rq2_v2_lock_probe_vxgwo2a8`
+ed è stata eliminata automaticamente. I risultati scientifici,
+Market e i namespace RQ2 reali NON sono stati modificati.
+
+**Limite**: solo isolamento nella stessa VM/sessione di Colab.
+Non certifica semantica cross-VM/cross-session, remote durability,
+startup recoverability, hard cap monetario o idempotenza remota.
+Decisione operativa: UN SOLO processo/writer Colab per un singolo
+stage, nessuna seconda sessione concorrente; orphan => audit manuale,
+non retry automatico. Il test PASS non abilita API e non crea release.
+
+Report:
+`docs/ood/RQ2_V2_UNIFIED_COLAB_DRIVE_SCRATCH_LOCK_PASS_2026-11-15.md`.
+
+**Preflight scientifico reale precedente** (29 file, manifest+split GT-free)
+`HEAD=601dc7c2f971b919962ff190e6feb192c4dd237a`,
+`source_inventory_sha256=32457ec256e0fc430580f6d2205a50983811784f5ce87917ca3d2f79ea0fbe9e`,
+`blueprint_sha256=d5bfe9872b2497bea19b3aec7f4c93635f3444679e11856b9a5975c8a2a929da`,
+`can_execute_api=false`, 11 OOD locked, nessuna release.
+La documentazione successiva avanza il branch ma NON rimpiazza
+il commit effettivamente verificato.
+
+**Next**: audit stdlib read-only di versioni e SHA delle sorgenti
+SDK effettivamente installate nel runtime Colab attuale, senza
+pip/SDK client/rete; fermarsi se versioni assenti/diverse e non
+installare automaticamente. Seguiranno pin SDK + policy retry/timeout
+su mock transport, stima spesa, release G4F e consenso esplicito
+stage D prima di UNA API pagata. RQ2 V2 = 0/180 stage API reali;
+Opzione B = 11 OOD LOCKED.
