@@ -257,6 +257,45 @@ class V3ScientificReceiptAdapterOfflineTests(unittest.TestCase):
                 captured=capture(metering),
             )
 
+    def test_readback_rejects_unredacted_provider_errors_and_wrong_parent(self):
+        diag = source_d()
+        bad = copy.deepcopy(diag)
+        bad["error"] = "Timeout synthetic_secret"
+        bad["raw_response"] = None
+        bad["metrics"]["token_usage_complete"] = False
+        d = normalize_v3_d_capture(
+            stage_id=sid(), logical_model="gemini",
+            captured=capture(bad),
+        )
+        poisoned = copy.deepcopy(d["artifact"])
+        poisoned["provider_error"] = "RAW SECRET FROM AN SDK"
+        with self.assertRaises(V3ScientificReceiptBlocked):
+            validate_v3_scientific_artifact(
+                stage_id=sid(), logical_model="gemini",
+                status="PROVIDER_ERROR", artifact=poisoned,
+            )
+
+        ck = normalize_v3_ck_call(
+            stage_id=sid(stage="C"), logical_model="gemini",
+            call=ck_call(None, error="PROVIDER_ERROR:TimeoutError"),
+            diagnostic_run=diag,
+        )
+        poisoned = copy.deepcopy(ck["artifact"])
+        poisoned["provider_error"] = "PROVIDER_ERROR:Timeout SECRET"
+        with self.assertRaises(V3ScientificReceiptBlocked):
+            validate_v3_scientific_artifact(
+                stage_id=sid(stage="C"), logical_model="gemini",
+                status="PROVIDER_ERROR", artifact=poisoned,
+                diagnostic_run=diag,
+            )
+
+        wrong_source = source_d(model="haiku")
+        with self.assertRaises(V3ScientificReceiptBlocked):
+            normalize_v3_ck_call(
+                stage_id=sid(stage="C"), logical_model="gemini",
+                call=ck_call(cause()), diagnostic_run=wrong_source,
+            )
+
     def test_sdk_mock_transport_then_v3_receipt_is_pure_and_metered(self):
         model = "gemini"
         spec = CANDIDATE_MODELS[model]
