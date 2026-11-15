@@ -73,18 +73,23 @@ def _runtime_attestation(*, data_dir: Path, repo_dir: Path,
     """Mandatory future SDK+Drive verifier; absence is intentional NO-GO."""
     try:
         from evaluation.rq2_v3_scientific_live_stage_preflight import (
-            verify_v3_live_runtime_gate,
+            V3LiveRuntimeBlocked, verify_v3_live_runtime_gate,
         )
     except ImportError as exc:
         raise V3SourceReleaseBlocked(
             "V3 SDK/Drive runtime verifier not implemented: NO-GO"
         ) from exc
-    return verify_v3_live_runtime_gate(
-        data_dir=data_dir, repo_dir=repo_dir,
-        expected_source_commit=expected_commit,
-        expected_source_inventory_sha256=inventory_sha256,
-        expected_runtime_versions=runtime_versions,
-    )
+    try:
+        return verify_v3_live_runtime_gate(
+            data_dir=data_dir, repo_dir=repo_dir,
+            expected_source_commit=expected_commit,
+            expected_source_inventory_sha256=inventory_sha256,
+            expected_runtime_versions=runtime_versions,
+        )
+    except V3LiveRuntimeBlocked as exc:
+        raise V3SourceReleaseBlocked(
+            "V3 SDK/Drive evidence incomplete: NO-GO"
+        ) from exc
 
 
 def verify_v3_source_release(*, data_dir: Path, repo_dir: Path,
