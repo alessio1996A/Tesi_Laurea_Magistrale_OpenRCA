@@ -358,6 +358,34 @@ def _check_same_runtime_drive_scratch(*, data: Path) -> dict:
     }
 
 
+def _check_usage_meter_semantics() -> dict:
+    """Verify incomplete usage stays UNKNOWN, not falsely priced at zero."""
+    from evaluation.rq2_v2_unified_provider_result_adapter import (
+        _from_metrics, _from_usage,
+    )
+    d = _from_metrics({
+        "llm_calls": 1, "token_usage_complete": False,
+        "input_tokens": None, "output_tokens": None,
+    }, can_be_zero=False)
+    ck = _from_usage({
+        "complete": False, "input_tokens": None, "output_tokens": None,
+    }, attempts=1)
+    for value in (d, ck):
+        if (
+            value.get("schema") != "rq2_v2_unified_stage_meter_v0"
+            or value.get("observed_model_requests") != 1
+            or value.get("usage_complete") is not False
+            or value.get("cost_estimate_usd_not_invoice") != "UNKNOWN"
+            or value.get("usd_hard_cap_guaranteed") is not False
+        ):
+            raise V3LiveRuntimeBlocked("Unknown usage is not preserved safely")
+    return {
+        "missing_usage_cost_recorded_as": "UNKNOWN",
+        "stage_budget_is_hard_cap": False,
+        "one_stage_approval_required": True,
+    }
+
+
 def verify_v3_live_runtime_gate(*, data_dir: Path, repo_dir: Path,
                                 expected_source_commit: str,
                                 expected_source_inventory_sha256: str,
@@ -390,6 +418,7 @@ def verify_v3_live_runtime_gate(*, data_dir: Path, repo_dir: Path,
     # The probes themselves enforce fake credentials/transport and exact pin.
     transport = _check_sync_sdk_proofs(repo=repo, commit=expected_source_commit)
     drive = _check_same_runtime_drive_scratch(data=data)
+    usage = _check_usage_meter_semantics()
     # Usage is recorded as UNKNOWN when not measured; it is NEVER a hard cap,
     # and the V3 dispatcher requires a new one-stage approval for every call.
     core = {
@@ -406,6 +435,8 @@ def verify_v3_live_runtime_gate(*, data_dir: Path, repo_dir: Path,
         "drive_scope": "SAME_COLAB_RUNTIME_ONE_SERIAL_WRITER_ONLY",
         "transport_observed": transport,
         "drive_observed": drive,
+        "usage_observed": usage,
+        "usage_scope": "UNKNOWN_PRESERVED_PER_STAGE_CONSENT_NO_HARD_CAP",
         "async_streaming_tested": False,
         "full_stage_timeout_guaranteed": False,
         "usd_hard_cap_guaranteed": False,
