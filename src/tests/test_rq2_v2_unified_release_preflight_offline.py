@@ -88,6 +88,30 @@ class UnifiedReleaseSourcePreviewTests(unittest.TestCase):
         self.assertEqual(src.call_count, len(gate.SOURCE_PATHS))
         return result
 
+    def test_final_scientific_dispatcher_source_inventory_includes_all(self):
+        # Nessuna release RQ2-V2 reale senza i nuovi percorsi eseguibili.
+        must_hash = {
+            "evaluation/rq2_v2_unified_release_preflight.py",
+            "evaluation/rq2_v2_unified_release_blueprint.py",
+            "evaluation/rq2_v2_unified_scientific_release_contract.py",
+            "evaluation/rq2_v2_unified_scientific_ledger_preflight.py",
+            "evaluation/rq2_v2_unified_scientific_ledger.py",
+            "evaluation/rq2_v2_unified_live_stage_preflight.py",
+            "evaluation/rq2_v2_unified_single_stage_dispatcher.py",
+            "evaluation/rq2_v2_unified_provider_result_adapter.py",
+            "evaluation/rq2_v2_unified_live_dispatcher.py",
+            "evaluation/rq2_model_factory.py",
+            "evaluation/rq2_ck_provider_transport.py",
+            "evaluation/rq2_budget_preflight.py",
+            "evaluation/rq2_provider_policy_source_audit.py",
+            "evaluation/rq2_sdk_retry_mock_probe.py",
+        }
+        self.assertTrue(must_hash <= set(gate.SOURCE_PATHS))
+        self.assertEqual(len(gate.SOURCE_PATHS), len(set(gate.SOURCE_PATHS)))
+        report = self._preview()
+        self.assertEqual(set(report["source_files_sha256"]), set(gate.SOURCE_PATHS))
+        self.assertIs(report["can_execute_api"], False)
+
     def test_five_harness_three_llm_four_cases_exact(self):
         report = self._preview()
         self.assertEqual(report["logical_stages"], 180)
