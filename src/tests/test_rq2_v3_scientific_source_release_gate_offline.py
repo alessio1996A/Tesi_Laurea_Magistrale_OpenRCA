@@ -313,6 +313,36 @@ class V3ScientificSourceReleaseGateOfflineTests(unittest.TestCase):
                     self.verify()
         self.runtime_mock.return_value = self.attestation
 
+    def test_rehashed_overclaims_cannot_become_release_proofs(self):
+        baseline_receipt = copy.deepcopy(self.attestation)
+        baseline_release = copy.deepcopy(self.release)
+        for key, value in (
+            ("async_streaming_tested", True),
+            ("full_stage_timeout_guaranteed", True),
+            ("usd_hard_cap_guaranteed", True),
+            ("sync_mock_scope", "ALL_HTTP_STATUSES_PROVEN"),
+            ("drive_scope", "ALL_COLAB_VMS_VERIFIED"),
+            ("usage_scope", "USD_COST_HARD_CAPPED"),
+        ):
+            with self.subTest(key=key):
+                modified = copy.deepcopy(baseline_receipt)
+                modified[key] = value
+                modified["attestation_sha256"] = _sha({
+                    k: v for k, v in modified.items()
+                    if k != "attestation_sha256"
+                })
+                self.runtime_mock.return_value = modified
+                self.release["runtime_attestation_sha256"] = (
+                    modified["attestation_sha256"]
+                )
+                self.rewrite_release()
+                with self.assertRaises(gate.V3SourceReleaseBlocked):
+                    self.verify()
+        self.attestation = baseline_receipt
+        self.release = baseline_release
+        self.runtime_mock.return_value = self.attestation
+        self.rewrite_release()
+
     def test_runtime_verifier_absence_and_errors_never_fall_back(self):
         self.runtime_mock.side_effect = gate.V3SourceReleaseBlocked(
             "Synthetic SDK and Drive proof absent"
