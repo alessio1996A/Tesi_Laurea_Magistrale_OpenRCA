@@ -1300,3 +1300,15 @@ L'utente conferma per la fase finale, **dopo raccolta/audit/freeze dati**: refac
 Prossimo gate prioritario: preregistrazione indipendente della valutazione conservativa K (grounding E###, non-contraddizione segnali/condizioni, formalizzabilita' che non equivale a JSON valido), con test offline source-bound/GT-free; poi freeze 29-source + release G4E/G4F. Confermato dal confronto GitHub: i 29 sorgenti `src/` di produzione non sono cambiati dal preflight precedente, i nuovi test 503/429/stallo sono offline e passati; non ripetere tutti i test.
 
 Nota dettagliata: `docs/ood/RQ2_V2_RESEARCH_NEXT_STEPS_POST_RESULTS_REFACTOR_2026-11-15.md`. `LIVE_API_ENABLED=False`, 0/180 stage reali, 11 OOD LOCKED.
+
+## 39. Rubrica K preregistrata per confronto Opzione A — NON ancora testata (15 novembre)
+
+L'utente ha confermato l'impostazione: 4 discovery per la Opzione A, 11 OOD TEST esclusi, 5 harness e 3 modelli con D→C→K. Paper/trascrizioni precedenti non necessari adesso; chiederli solo per indicazioni del relatore non gia' documentate. In prossimita' del cambio chat aggiornare questo handoff con ultimo HEAD, esiti test ed esatta azione successiva.
+
+**Prima dei nuovi output live** e' stata preregistrata la rubrica:
+`docs/ood/RQ2_V2_K_QUALITY_RUBRIC_PREREG_2026-11-15.md`.
+Il codice che la applica e' `src/evaluation/rq2_v2_k_quality_rubric.py`, SOLO post-run offline, non dentro D/C/K. Il test nuovo e' `src/tests/test_rq2_v2_k_quality_rubric_offline.py` (**18 test sintetici DA ESEGUIRE in PyCharm; non dichiararli superati**). `src/evaluation/rq2_v2_unified_release_preflight.py` include ora la rubrica in `SOURCE_PATHS`: numero di sorgenti nel prossimo preflight **30, non piu' 29**. Gli hash storici rimangono evidenza congelata del precedente checkout, non devono essere alterati.
+
+**Semantica della rubrica:** `CANDIDATE` non significa corretta; validazione dei riferimenti E### dalla traiettoria originale, osservazioni non vuote/troncate, metriche/unità letteralmente visibili (sempre senza garanzia fisica), contraddizioni aritmetiche `all`, `REQUIRES_VERIFICATION` vs `NOT_FORMALIZABLE_CONTRADICTION`; `INSUFFICIENT_EVIDENCE` distinto da `INVALID_OUTPUT`. L'analizzatore restituisce sempre `diagnostic_correctness_verified=false`, `physical_units_verified=false`, `causal_transfer_verified=false`, `ood_test_performed=false`. Gli stati upstream `BLOCKED_DEPENDENCY`/`PROVIDER_ERROR` provengono dal ledger, non si inventano raw K. Nessuna esecuzione di pseudocodice, provider, GT, Market o file scientifici. Le 180 run rimangono non autorizzate, `LIVE_API_ENABLED=False`.
+
+**Prossima azione singola:** verificare la nuova suite su PyCharm e poi source preflight/blueprint offline mirati sul cambiamento 29→30, senza rieseguire l'intera batteria storica. Se PASS, nuovo preflight Colab GT-free con SHA e 30 sorgenti; solo dopo congelare release/policy e chiedere approvazione pilota D. Prima di Colab e' ancora necessario approvare la versione di HEAD corretta.
