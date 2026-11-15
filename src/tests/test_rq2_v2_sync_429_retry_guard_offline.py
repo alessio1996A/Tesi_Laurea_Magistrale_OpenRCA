@@ -5,6 +5,7 @@ integration itself is deferred to the exact pinned Colab snapshot.
 """
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -85,9 +86,20 @@ class RQ2V2Sync429RetryGuards(unittest.TestCase):
             google.assert_not_called()
             anthropic.assert_not_called()
 
-    def test_successful_mock_does_not_imply_live_consent(self):
-        self.assertIn("NO_API", "SYNC_HTTP_429_MOCK_ONE_SEND_EACH_NO_API_NOT_RELEASED")
-        self.assertNotIn("LIVE_API_ENABLED = True", subject.__doc__ or "")
+    def test_real_dispatcher_source_remains_hard_disabled(self):
+        path = Path(__file__).resolve().parents[1] / (
+            "evaluation/rq2_v2_unified_live_dispatcher.py"
+        )
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        flags = [
+            node.value.value for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name)
+                    and target.id == "LIVE_API_ENABLED"
+                    for target in node.targets)
+            and isinstance(node.value, ast.Constant)
+        ]
+        self.assertEqual(flags, [False])
 
 
 if __name__ == "__main__":
