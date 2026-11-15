@@ -8,6 +8,7 @@ sostituita con una fixture nel test. Non certifica file Drive reali.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import tempfile
 import unittest
@@ -22,6 +23,7 @@ from evaluation.rq2_v2_unified_release_blueprint import (
     build_unified_release_blueprint,
 )
 from evaluation.rq2_v2_unified_discovery_plan import DISCOVERY, TEST
+from evaluation.rq2_probe_adapter import CAUSE_SYSTEM, RULE_SYSTEM
 from evaluation.rq2_v2_unified_live_stage_preflight import (
     UnifiedStagePreviewBlocked, preview_one_unified_stage,
     _source_instruction,
@@ -55,6 +57,14 @@ class UnifiedStageSourcePreviewTests(unittest.TestCase):
         self.data.mkdir()
         (self.repo / "src").mkdir(parents=True)
         source = source_fixture()
+        # Il fake release deve vincolare i prompt REALMENTE usati dagli
+        # adapter C/K, non l'hash fittizio dei file sorgente.
+        source["C_system_prompt_sha256"] = hashlib.sha256(
+            CAUSE_SYSTEM.encode("utf-8")
+        ).hexdigest()
+        source["K_system_prompt_sha256"] = hashlib.sha256(
+            RULE_SYSTEM.encode("utf-8")
+        ).hexdigest()
         blueprint = build_unified_release_blueprint(source_preview=source)
         release = release_fixture(source, blueprint)
         self.sha = release_digest(release)
@@ -159,6 +169,29 @@ class UnifiedStageSourcePreviewTests(unittest.TestCase):
             set(report["parent_record_sha256"]), {sid(stage="C")},
         )
         self.assertEqual(self.journal.audit_restart()["claims"], 2)
+
+    def test_actual_prompt_drift_still_fails_closed_for_both_stages(self):
+        # Con la fixture allineata, una modifica REALE al system prompt
+        # deve continuare a fallire, senza scrivere nuovi claim.
+        self.save_d()
+        self.save_c()
+        prior_claims = self.journal.audit_restart()["claims"]
+        for stage, prompt_name in (
+            ("C", "CAUSE_SYSTEM"), ("K", "RULE_SYSTEM"),
+        ):
+            with self.subTest(stage=stage):
+                with patch(
+                    "evaluation.rq2_v2_unified_live_stage_preflight."
+                    + prompt_name,
+                    "ALTERED_SYSTEM_PROMPT_MUST_NOT_BE_ACCEPTED",
+                ):
+                    with self.assertRaisesRegex(
+                        UnifiedStagePreviewBlocked, "prompt SHA drift",
+                    ):
+                        self.preview(stage=stage)
+        self.assertEqual(
+            self.journal.audit_restart()["claims"], prior_claims
+        )
 
     def test_each_preview_is_read_only(self):
         before = sorted(
