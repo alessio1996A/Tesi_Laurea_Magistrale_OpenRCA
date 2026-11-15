@@ -1,6 +1,6 @@
 # RQ2-V2 — G4L: preparazione release writer create-only (HARD-DISABLED)
 
-**Data:** 15 novembre 2026. **Stato:** codice nuovo su branch di preparazione, **test PyCharm NON ancora eseguiti**; nessuna release scientifica, nessun consenso economico e nessuna chiamata API.
+**Data:** 15 novembre 2026. **Stato:** codice nuovo su branch di preparazione, **9/9 test PyCharm PASS (output utente: `Ran 9 tests in 10.624s — OK`)**; nessuna release scientifica, nessun consenso economico e nessuna chiamata API.
 
 ## Motivazione e perimetro
 
@@ -9,7 +9,7 @@ Il G4K `src/evaluation/rq2_v2_unified_live_dispatcher.py` aveva gia' superato 18
 Su **nuovo branch** `feature/rq2-v2-scientific-release-writer-prep-2026-11-15`, nato dal commit documentale `f08737dcfce20ef84bebc70ea1c1446c09c28bd7`:
 - Aggiunta nello stesso file source-bound esistente `src/evaluation/rq2_v2_unified_scientific_ledger.py` la funzione `create_authorized_scientific_release_once`, con `SCIENTIFIC_RELEASE_WRITE_ENABLED=False` per default. La funzione blocca ogni invocazione immediatamente, prima di leggere o scrivere il filesystem.
 - Un eventuale futuro sblocco, NON autorizzato oggi, obbligherebbe G4D reale (HEAD clean, namespace assente), 6 SDK pinned/4 SHA runtime, G4A source-bound GT-free, G4B blueprint, contratto G4E e digest SHA esterno, budget/referenza reali, creazione O_EXCL + fsync + readback, lock e nessun retry su fallimento.
-- Nuovo file `src/tests/test_rq2_v2_unified_scientific_release_writer_offline.py`, **9 test sintetici da far eseguire in PyCharm**. Simulazioni con `TemporaryDirectory`, source/SDK fake, patch della flag solo durante il test; nessuna API o provider. Casi: hard-disable, ref sintetico, ref differente, versione SDK, SHA diverso, OOD unlocked, una scrittura fake canonica, duplicato no-overwrite, namespace occupato.
+- Nuovo file `src/tests/test_rq2_v2_unified_scientific_release_writer_offline.py`, **9 test sintetici PASS su PyCharm**. Simulazioni con `TemporaryDirectory`, source/SDK fake, patch della flag solo durante il test; nessuna API o provider. Casi: hard-disable, ref sintetico, ref differente, versione SDK, SHA diverso, OOD unlocked, una scrittura fake canonica, duplicato no-overwrite, namespace occupato.
 
 ## Attenzione sugli hash
 
@@ -24,7 +24,7 @@ git pull --ff-only origin feature/rq2-v2-scientific-release-writer-prep-2026-11-
 $env:PYTHONPATH = "src"
 python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_release_writer_offline.py" -v
 ```
-Attesi 9 metodi; **NON attribuire PASS prima dell'output reale**. Non ripetere 87 test prerelease, 145 test G4 storici o Colab precedente senza una dipendenza effettivamente cambiata. Se i nuovi 9 PASS, valutare la suite G4F strettamente dipendente dal ledger modificato e poi l'audit Colab finale, senza chiamate API.
+I 9 metodi sono PASS (10.624s), già acquisiti e NON da ripetere. Per il cambiamento al modulo ledger G4F, rimane da eseguire **soltanto la regressione strettamente dipendente** `test_rq2_v2_unified_scientific_ledger_offline.py` (22 metodi), poi l'audit Colab del nuovo sorgente, sempre senza API. Non ripetere 87 test prerelease, 145 test G4 storici o il vecchio preflight Colab.
 
 ## Gate di sicurezza aperti
 
