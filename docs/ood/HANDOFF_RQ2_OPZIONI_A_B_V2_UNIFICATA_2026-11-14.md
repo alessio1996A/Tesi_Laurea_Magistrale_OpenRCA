@@ -881,3 +881,54 @@ effettivamente live per singolo stage iniettando factory fake
 negli UNITTEST, source inventory completo (G4F/G4H/G4I/G4J e
 adapter/factory) + freeze SHA/commit, lock Drive e
 consenso esplicito al singolo pilot reale. 11 OOD locked.
+
+## 27. G4J 25 PASS; G4K provider live-capable HARD-DISABLED, inventory 29 sorgenti (15 novembre)
+
+**Esito test utente:** `Ran 25 tests in 1.037s; OK`
+per `test_rq2_v2_unified_provider_result_adapter_offline.py`.
+Il modulo G4J normalizza D/C/K verso G4F senza SDK e mantiene token
+osservati separati dal prezzo `UNKNOWN`. Ultimi gate G4F 22,
+G4G 17, G4H 20, G4I 24, G4J 25 **tutti PASS =108 test**.
+
+**Nuovo G4K scritto sul branch, NON ancora eseguito:**
+`src/evaluation/rq2_v2_unified_live_dispatcher.py`
+`src/tests/test_rq2_v2_unified_live_dispatcher_mock_offline.py`
+(18 metodi offline da lanciare).
+Il dispatcher `run_one_claimed_unified_stage` e' **hard-disabled**
+con `LIVE_API_ENABLED=False`, e rifiuta invocazioni persino con
+`confirm_paid_api=True`. Un futuro stage reale richiedera'
+codice sbloccato in un nuovo commit, release SHA external, checkout
+clean, ref approvazione non fake, approved_stage_id = stage_id,
+preflight G4H, claim G4F **prima** del client, D via
+`crea_modello_rq2` + RQ1 `run_experiment(..., salva=False)`,
+C/K via `rq2_ck_provider_transport._one_call` tool-free, normalize
+G4J → record G4F; errori/invalidi, figli blocked, no auto-retry.
+I test G4K patchano solo nel processo Python `LIVE_API_ENABLED=True`,
+sostituendo il runner D e la chiamata C/K con MOCK in
+TemporaryDirectory e con release sintetica. **Non esiste consenso a
+spendere o API autorizzata**.
+
+**Source inventory G4A aggiornato da 15 a 29 file** in
+`src/evaluation/rq2_v2_unified_release_preflight.py`: include
+ora ledger, release, G4H/I/J/K, factory RQ2-only, trasporto CK,
+policy di retry e costi. Aggiunto un test a
+`src/tests/test_rq2_v2_unified_release_preflight_offline.py`
+(19 test attesi). L'esito G4C pregresso con 15 source rimane storico,
+non valida questo nuovo commit. Nessun source RQ1 congelato, prompt
+C/K o split/manifest modificato.
+
+Documento:
+`docs/ood/RQ2_V2_UNIFIED_G4J_PASS_G4K_BLOCKED_LIVE_TRANSPORT_2026-11-15.md`.
+
+**Prossimo PyCharm dopo git status pulito:**
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_dispatcher_mock_offline.py" -v
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_release_preflight_offline.py" -v
+```
+Attesi rispettivamente **18** e **19**, entrambi PENDING.
+Non chiamare API o creare release vera prima del nuovo audit GT-free
+Colab 29 source/commit, prova lock Drive e approvazione singolo pilot.
+Lo stimatore USD e il 492 graph invoke candidati non sono hard cap HTTP.
+11 OOD / Opzione B sempre LOCKED.
