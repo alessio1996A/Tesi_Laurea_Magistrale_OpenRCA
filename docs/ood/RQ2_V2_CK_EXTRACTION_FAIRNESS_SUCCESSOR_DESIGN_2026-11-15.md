@@ -35,6 +35,16 @@ Nuovo test mirato: `src/tests/test_rq2_v2_ck_candidate_ledger_compatibility_offl
 
 Per il successore scientifico occorre un contratto/ledger **versionato e separato** che conservi queste diagnostiche in una struttura validata, senza salvare thinking, firme o altri dati sensibili; tutti i record del successore devono avere una policy dichiarata e identica per modello. La compatibilità con lo schema V2 non equivale a disponibilità di provenienza sufficiente.
 
+## Contratto di provenienza scientifica C/K successore — candidato, non attivo
+
+Dopo l'esito PyCharm **3/3 PASS** per `test_rq2_v2_ck_candidate_ledger_compatibility_offline.py`, è stato preparato `src/evaluation/rq2_v3_ck_provenance_receipt_candidate.py` (nessuna API, nessun writer) con un envelope versionato `text_extraction` per C/K.
+
+Il contratto candidato conserva esattamente: `schema`, `policy`, `content_kind`, `text_blocks`, `nontext_blocks`. Verifica schema/policy esatti, conteggi interi non negativi e limitati, coerenza tra errori e presenza di testo, e classificazione C/K con gli stessi validatori rigorosi del percorso congelato. Nessun contenuto di thinking, firma o tool-use nei nuovi metadati. La ricevuta mantiene `raw_response` e `stage_meter`.
+
+La separazione è deliberata: l'artifact successore **non è compatibile** con la lista di campi ammissibili del ledger V2. In seguito servirà un **contratto ledger V3 dedicato**, con namespace distinto, versione e inventario source-bound, create-only, SHA e controlli pre/post-record. Non è consentito forzare l'accettazione dell'artifact successore modificando il vecchio ledger.
+
+Nuovi test preparati, **non ancora eseguiti in PyCharm**: `src/tests/test_rq2_v3_ck_provenance_receipt_candidate_offline.py` (7 test per C/K su 3 modelli, errore provider, JSON invalido, metadati tamper, readback serializzato, fail closed su metadata assente e isolamento V2). Nessuna release o autorizzazione live è stata emessa.
+
 ## Requisiti GO/NO-GO prima della futura campagna reale
 
 1. **GO tecnico:** nuovi test passati e controlli anti-regressione selettivi su trasporto, parser, output-contract, contatori, gestione errori e no-auto-retry.
