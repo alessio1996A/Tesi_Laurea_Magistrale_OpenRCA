@@ -1336,3 +1336,25 @@ Solo se passano: preparare preflight su Colab dei **30 sorgenti**, runtime/sourc
 **Prossimo e unico gate:** Google Colab, *read-only* su Drive `/content/drive/MyDrive/Tesi_OpenRCA`, checkout worktree temporaneo clean al nuovo HEAD esplicito, `PYTHONPATH` SDK pin isolato `/content/rq2_v2_pinned_sdk_py313` + checkout `src`, esecuzione effettiva `preview_unified_source_bound`, `build_unified_release_blueprint`, `preview_scientific_ledger_gate`. Richiedere 30 sorgenti fingerprint, D/C/K 60 ciascuno, 180 stage, 11 OOD locked, namespace futuro assente, nessuna ground truth, api calls 0, nessuna release. Non copiare il vecchio source inventory SHA su 29 sorgenti: e' un riferimento storico valido per un altro commit.
 
 Se esito PASS, registrare esatti SHA 30-source/plan/blueprint e *solo poi* procedere al release freeze. Restano `LIVE_API_ENABLED=False`, 0/180 stage reali, nessun consenso API, Opzione B bloccata. RQ1 e precedenti RQ2 separati. Paper e trascrizioni del relatore non richiesti adesso; refactoring/comenti italiani/post-audit repository solo a fine raccolta dati.
+
+## 42. Colab preflight reale 30 sorgenti PASS, rubric K inclusa (15 novembre)
+
+Output dell'utente su Colab effettivo, checkout pulito su commit `feb7b7c9684138f348d8a6e3e6e9d4eb61798ae7`, SDK pin isolato + split/manifest GT-free reali:
+`RQ2-V2 30 SOURCE: PASS — 0 API REALI`,
+`status=RQ2_V2_30_SOURCE_REAL_GT_FREE_PASS_NO_API`,
+`runtime_snapshot_verified=true`,
+`source_file_count=30`,
+`source_inventory_sha256=8c2d022efed45214fec27b31ab4d7215f2912cd494aa6e16d3afaa55d8e891a1`,
+`k_rubric_sha256=d8b969d33e2e042ab44121a9b6e089fa96a4aa2b8be03cb31b3edeede6f83f52`,
+`source_plan_sha256=e6f797c4ca01ed422b80e928854469b9f8c7f7cc4215835bf91f9f7305425a00`,
+`blueprint_sha256=22005361b35c9873822fec37163cd55f00d4a2a1c697a5939ac0a5a4ec3b9270`,
+`split_sha256=c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724`,
+`manifest_sha256=5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13`,
+`C_system_prompt_sha256=81a5800500b3fafc23af4b7643e79a3d206c3ca6c80f6924514001ec85dc2a42`,
+`K_system_prompt_sha256=0935e2b7232715b623bb174f0a059387659f8d9bc7939804c8a372d8aa27ba71`.
+Per modello `D=20,C=20,K=20`, 180 stage; 11 OOD LOCKED; `ledger_namespace_absent=true`, `ground_truth_read=false`, `model_requests_sent=0`, `can_execute_api=false`, `scientific_release_frozen=false`. Checkout temporaneo rimosso. Documento completo:
+`docs/ood/RQ2_V2_UNIFIED_COLAB_30_SOURCE_K_RUBRIC_REAL_GT_FREE_PASS_2026-11-15.md`.
+
+**Attenzione al commit:** la verifica reale riguarda ESATTAMENTE `feb7b7c...`; i successivi commit di SOLA documentazione non impongono nuovi test del codice ma la release operativa richiede una SHA finale clean verificata. Il preflight 29-source originale e' valido solo per il vecchio commit, non deve essere riciclato.
+
+**Prossimo step tecnico-scientifico:** review non autorizzativa della futura release G4E/G4F e del dispatcher con `LIVE_API_ENABLED=False`, identificando ogni prerequisito prima di un singolo D pilot. Non dichiarare congelata una release che non e' stata creata. La decisione del relatore di privilegiare precisione rispetto ai costi non elimina la necessita' di un consenso esplicito e di un budget tecnico positivo della release. Non toccare RQ1, precedenti RQ2, 11 OOD; 0/180 stage reali.
