@@ -639,10 +639,21 @@ class UnifiedScientificLedger:
             }
 
 
-# G4L — preparazione della futura release scientifica sul medesimo ledger.
-# Fino a un commit/autorizzazione successivi, NESSUN chiamante puo' scrivere.
-# La flag resta diversa dal gate del dispatcher LLM, che e' anch'esso False.
-SCIENTIFIC_RELEASE_WRITE_ENABLED = False
+# G4L — predisposizione create-only con opt-in ESATTO di processo.
+# Di default nessuna scrittura e' possibile. L'opt-in non equivale
+# alla firma/approvazione esterna della release e non abilita API LLM.
+# La gate rimane indipendente dal dispatcher pagato; non attivare
+# in nessun processo di preflight o test su dati reali GT-free.
+RELEASE_WRITE_OPT_IN_ENV = "OPENRCA_RQ2_V2_ENABLE_RELEASE_CREATE"
+RELEASE_WRITE_OPT_IN_EXACT = "EXPLICIT_CREATE_ONLY_V1"
+
+
+def runtime_release_write_optin() -> bool:
+    """Valuta esattamente l'opt-in di processo, non il consenso umano."""
+    return os.environ.get(RELEASE_WRITE_OPT_IN_ENV) == RELEASE_WRITE_OPT_IN_EXACT
+
+
+SCIENTIFIC_RELEASE_WRITE_ENABLED = runtime_release_write_optin()
 
 
 def create_authorized_scientific_release_once(
@@ -653,14 +664,14 @@ def create_authorized_scientific_release_once(
     """Crea UNA futura release G4E solo dopo approvazioni esterne.
 
     La funzione e' inattiva per default. Non costruisce modelli, non
-    esegue provider, non crea claim e non accede ai casi OOD. Con
-    SCIENTIFIC_RELEASE_WRITE_ENABLED=False, blocca PRIMA di leggere o
-    scrivere il filesystem. Non modificare tale flag nei test esterni
-    o nei notebook; solo fixture offline con filesystem temporaneo.
+    esegue provider, non crea claim e non accede ai casi OOD. Senza
+    opt-in esatto presente prima dell'import, blocca PRIMA di leggere
+    o scrivere il filesystem. Non attivare nei preflight o nei notebook
+    di verifica. I test usano esclusivamente fixture offline temporanee.
 
-    Quando verra' autorizzata la release, il nuovo commit deve essere
-    preflighted su Colab con le 30 SOURCE_PATHS e approvato col digest
-    della release separato dal commit. Dopo ogni errore di scrittura,
+    L'opt-in non e' approvazione: sono comunque necessari commit clean,
+    audit Colab 30 SOURCE_PATHS, digest esterno della release approvato,
+    budget esplicito e reference non sintetica. Dopo errore di scrittura,
     fermarsi e auditare manualmente il namespace (nessun retry).
     """
     if SCIENTIFIC_RELEASE_WRITE_ENABLED is not True:
