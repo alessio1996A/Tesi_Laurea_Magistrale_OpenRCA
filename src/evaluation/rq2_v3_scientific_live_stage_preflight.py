@@ -42,6 +42,9 @@ POLICY = {
 }
 REQUIRED_PACKAGE_KEYS = frozenset({"python", *EXPECTED_COLAB_VERSIONS})
 
+# Evidence is reused ONLY inside the same Python process and mounted roots.
+_RUNTIME_PROOF_CACHE = {}
+
 
 class V3LiveRuntimeBlocked(RuntimeError):
     """Fail-closed; NEVER use this as permission to call any provider."""
@@ -415,10 +418,31 @@ def verify_v3_live_runtime_gate(*, data_dir: Path, repo_dir: Path,
         expected_source_inventory_sha256=expected_source_inventory_sha256,
         expected_runtime_versions=expected_runtime_versions,
     )
-    # The probes themselves enforce fake credentials/transport and exact pin.
-    transport = _check_sync_sdk_proofs(repo=repo, commit=expected_source_commit)
-    drive = _check_same_runtime_drive_scratch(data=data)
-    usage = _check_usage_meter_semantics()
+    # The same stage calls the source gate repeatedly (audit/claim/record).
+    # Reuse ONLY within this process and the same mounted filesystem roots.
+    # On another VM, process, mount, source pin or runtime version: probe anew.
+    import os
+    try:
+        data_mount = data.parent.stat()
+        source_mount = repo.stat()
+    except OSError as exc:
+        raise V3LiveRuntimeBlocked("Runtime mount identity unavailable") from exc
+    cache_key = (
+        os.getpid(), str(data), str(repo),
+        (data_mount.st_dev, data_mount.st_ino),
+        (source_mount.st_dev, source_mount.st_ino),
+        expected_source_commit, expected_source_inventory_sha256,
+        tuple(sorted(expected_runtime_versions.items())),
+    )
+    evidence = _RUNTIME_PROOF_CACHE.get(cache_key)
+    if evidence is None:
+        # No caller booleans or externally supplied reports are accepted.
+        transport = _check_sync_sdk_proofs(repo=repo, commit=expected_source_commit)
+        drive = _check_same_runtime_drive_scratch(data=data)
+        usage = _check_usage_meter_semantics()
+        evidence = (transport, drive, usage)
+        _RUNTIME_PROOF_CACHE[cache_key] = evidence
+    transport, drive, usage = evidence
     # Usage is recorded as UNKNOWN when not measured; it is NEVER a hard cap,
     # and the V3 dispatcher requires a new one-stage approval for every call.
     core = {
