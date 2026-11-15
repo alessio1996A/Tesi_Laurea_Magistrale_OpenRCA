@@ -1,21 +1,23 @@
-"""G4K — dispatcher RQ2-V2 unificato, SORGENTE LIVE MA BLOCCATA.
+"""G4K — dispatcher RQ2-V2 unificato, LIVE disabilitato di default.
 
 Per UN stage discovery: source G4H -> claim G4F -> RQ1 D / C/K
 tool-free con RQ2-only factory -> normalizzazione G4J -> record G4F.
 Al termine D/C invalido, figli BLOCKED_DEPENDENCY nel medesimo ledger.
 
-Il codice reale NON e' abilitato: LIVE_API_ENABLED=False. I test
-possono esercitare il percorso tramite mock in TemporaryDirectory e
-patch in-process, MA questa non e' autorizzazione a chiamare un LLM.
+Il codice reale e' disabilitato di default. Una futura invocazione richiede
+l'opt-in esplicito del processo, release SHA e consenso allo stage, tutti
+verificati indipendentemente. I test usano solo mock in TemporaryDirectory.
+Un opt-in di ambiente NON e' un'autorizzazione dell'utente.
 
-Quando verra' autorizzato un pilot, richiede un nuovo commit,
-source freeze COMPLETO, release external SHA, consenso allo stage e
-controllo tariffa/lock su Google Drive. Non e' una protezione di spesa
+Il codice e' congelabile PRIMA della futura autorizzazione. Per un pilot
+servono SHA di source freeze, release external SHA approvato, consenso
+allo stage e controllo tariffa/lock su Google Drive. Non e' una protezione di spesa
 hard-cap: il budget autorizzato e' un limite operativo, non di fattura.
 Nessuna modifica a sorgenti o protocolli RQ1; nessun test OOD.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from unittest.mock import patch
@@ -40,10 +42,21 @@ from evaluation.rq2_v2_unified_single_stage_dispatcher import (
 
 VERSION = "rq2_v2_unified_live_single_stage_dispatcher_blocked_v0"
 
-# SCONNESSO IN PRODUZIONE. Necessario nuovo commit/freeze prima di
-# sostituire False con True. NON modificare per i test: fare patch
-# solo nel processo unittest con SDK e rete integralmente fake.
-LIVE_API_ENABLED = False
+# L'opt-in deve essere ESATTO e presente PRIMA dell'import in un processo
+# separato. Di default e' sempre False; stringhe vicine / True / 1 non bastano.
+# Questo selettore NON sostituisce release approvata o consenso pagato
+# per esatto stage: _eligibility + G4E/G4F/G4H restano obbligatori.
+# Non impostarlo in nessun notebook di preflight o nei test reali GT-free.
+LIVE_OPT_IN_ENV = "OPENRCA_RQ2_V2_ENABLE_PAID_SINGLE_STAGE"
+LIVE_OPT_IN_EXACT = "EXPLICIT_ONE_STAGE_ONLY_V1"
+
+
+def runtime_live_optin() -> bool:
+    """Controllo esatto di abilitazione, indipendente dal consenso umano."""
+    return os.environ.get(LIVE_OPT_IN_ENV) == LIVE_OPT_IN_EXACT
+
+
+LIVE_API_ENABLED = runtime_live_optin()
 FAKE_APPROVAL = "SYNTHETIC_APPROVAL_NOT_REAL"
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SHA1 = re.compile(r"[0-9a-f]{40}\Z")
