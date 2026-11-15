@@ -23,6 +23,7 @@ import re
 from evaluation.rq2_probe_adapter import CAUSE_SYSTEM, RULE_SYSTEM
 from evaluation.rq2_v2_unified_discovery_plan import (
     VERSION as V2_PROTOCOL, DISCOVERY, TEST, HARNESSES, MODELS,
+    EXPECTED_SPLIT_SHA256, EXPECTED_MANIFEST_SHA256,
 )
 from evaluation.rq2_v2_unified_release_preflight import (
     VERSION as V2_SOURCE_VERSION,
@@ -92,7 +93,7 @@ def _root(path: Path, label: str) -> Path:
 
 def _source_bytes(root: Path, relative: str) -> bytes:
     if (type(relative) is not str or relative.startswith("/")
-            or "\" in relative or not relative.endswith(".py")
+            or chr(92) in relative or not relative.endswith(".py")
             or any(p in ("", ".", "..") for p in relative.split("/"))):
         raise V3SourceInventoryBlocked("Unsafe inventory source path")
     path = root
@@ -121,8 +122,8 @@ def _check_v2_source_receipt(v2: object, *, plan: dict, src_root: Path) -> dict:
         "source_file_count": len(V2_SOURCE_PATHS),
         "gt_free_source_verified": True,
         "frozen_rq1_source_identity_verified": True,
-        "split_sha256": "c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724",
-        "manifest_sha256": "5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13",
+        "split_sha256": EXPECTED_SPLIT_SHA256,
+        "manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "C_system_prompt_sha256": hashlib.sha256(
             CAUSE_SYSTEM.encode("utf-8")
         ).hexdigest(),
