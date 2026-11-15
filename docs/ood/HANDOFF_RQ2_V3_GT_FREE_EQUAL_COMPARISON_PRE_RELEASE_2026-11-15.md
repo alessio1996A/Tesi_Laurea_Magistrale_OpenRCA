@@ -47,3 +47,13 @@ Implementazione candidata: `src/evaluation/rq2_v3_d_final_stream_candidate.py`. 
 Test da eseguire in PyCharm: `src/tests/test_rq2_v3_d_final_stream_candidate_offline.py`, **9 nuovi test PENDING**: frammenti D sui due motori, preservazione di stringhe, mancata riparazione, esclusione thinking, tool native ID, errori di finalizzazione, duplicati finali, limite blocchi, single-use. Nessuna API; non ripetere i 58 test conclusi.
 
 **Vincoli aperti per un futuro GO:** collegare D al runner sperimentale V3 in modo source-bound, includere la provenienza D nel contratto e ledger V3; separare stadi/namespace/release dalla V2. Il modello e l'SDK possono produrre forme diverse di content block; i mock dimostrano la correttezza del nostro adattatore su casi sintetici, non la causa della risposta Gemini V2. Nessun nuovo stage pagato è autorizzato.
+
+## Dopo test 9/9 PASS sul ponte D, integrazione candidata con il runner reale (offline)
+
+L'utente ha riportato `Ran 9 tests in 0.033s — OK` per `src/tests/test_rq2_v3_d_final_stream_candidate_offline.py`. Totale cumulato **67/67 test mirati PASS**, esclusivamente offline. Il bridge D mantiene il testo finale esatto, osserva conteggi del content block e non muta l'originale, i tool, i token e il budget nei casi testati.
+
+È stato aggiunto `src/evaluation/rq2_v3_d_runner_capture_candidate.py`: strumentazione *solo offline* con patch contestuale dei punti di esecuzione importati dinamicamente dal `run_experiment()` originale, senza modificare il file storico. Supporta sia ReAct sia Planning/PAVE, con cattura separata della provenienza D e protezione contro duplicati/mismatch. NON chiama provider né scrive dati.
+
+Il test `src/tests/test_rq2_v3_d_runner_capture_candidate_offline.py`, con **7 nuove prove PENDING**, chiama davvero `experiment_runner.run_experiment()`, usando preparazione/caso, costruttore del grafo e LLM interamente simulati, ma i validatori `output.v2_task_contract` autentici. Verifica i cinque harness, i tre modelli, contabilizzazione, PAVE e il mantenimento dell'invalidità di JSON sintatticamente malformati.
+
+Per il passaggio all'esperimento reale NON basta il risultato del runner: l'adattatore V3 deve usare stage-ID V3, una provenienza D verificata nel ledger V3 e una release/source inventory completamente nuova con commit clean e approvazione per singolo stage. Il ponte attuale è non produttivo e non abilita Colab.
