@@ -99,11 +99,45 @@ class V3LiveRuntimePreviewOfflineTests(unittest.TestCase):
         self.assertEqual(result["real_provider_requests"], 0)
         self.assertIsNone(result["attestation_sha256"])
 
-    def test_definitive_gate_cannot_mint_verified_attestation(self):
-        with self.assertRaisesRegex(
-            runtime.V3LiveRuntimeBlocked, "DRIVE_SINGLE_WRITER_NOT_PROVEN",
+    def test_runtime_probe_absence_fails_closed_without_sdk_or_drive(self):
+        with patch.object(
+            runtime, "_check_sync_sdk_proofs",
+            side_effect=runtime.V3LiveRuntimeBlocked("NO_SYNTHETIC_SDK_EVIDENCE"),
         ):
-            self.verify()
+            with patch.object(runtime, "_check_same_runtime_drive_scratch") as drive:
+                with self.assertRaisesRegex(
+                    runtime.V3LiveRuntimeBlocked, "NO_SYNTHETIC_SDK_EVIDENCE",
+                ):
+                    self.verify()
+                drive.assert_not_called()
+
+    def test_only_scoped_measured_proofs_can_mint_non_authorizing_receipt(self):
+        sync = {"sync_429_http_sends": 4, "sync_timeout_loopback_sends": 4}
+        drive = {
+            "same_runtime_lock_denied_second_writer": True,
+            "same_runtime_exclusive_creators": 1,
+            "same_runtime_writer_processes": 8,
+            "other_colab_sessions_or_vms_verified": False,
+        }
+        with (
+            patch.object(runtime, "_check_sync_sdk_proofs", return_value=sync),
+            patch.object(runtime, "_check_same_runtime_drive_scratch", return_value=drive),
+        ):
+            result = self.verify()
+        from evaluation.rq2_v2_unified_scientific_ledger import _sha
+        self.assertEqual(result["status"], "V3_SDK_DRIVE_RUNTIME_GATE_VERIFIED")
+        self.assertEqual(result["source_commit"], PIN)
+        self.assertEqual(result["attestation_sha256"], _sha({
+            k: v for k, v in result.items() if k != "attestation_sha256"
+        }))
+        self.assertEqual(result["sync_mock_scope"], "HTTP_429_ONLY_CK_D_ONE_SEND_EACH")
+        self.assertEqual(result["drive_scope"], "SAME_COLAB_RUNTIME_ONE_SERIAL_WRITER_ONLY")
+        self.assertIs(result["async_streaming_tested"], False)
+        self.assertIs(result["full_stage_timeout_guaranteed"], False)
+        self.assertIs(result["usd_hard_cap_guaranteed"], False)
+        self.assertIs(result["can_execute_api"], False)
+        self.assertIs(result["can_run_ood_test"], False)
+        self.assertEqual(result["model_requests_sent"], 0)
 
     def test_bad_commit_inventory_runtime_shape_block_before_provider_audit(self):
         for pin, inventory, versions in (
