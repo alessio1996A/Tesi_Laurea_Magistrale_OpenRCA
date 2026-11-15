@@ -64,7 +64,7 @@ def exact_text(content, *, solo_testo=False):
 
 
 def split_d(raw):
-    marker = "synthetic-node-1"
+    marker = "node-1"
     a, b = raw.split(marker, 1)
     return [
         {"type": "text", "text": a},
