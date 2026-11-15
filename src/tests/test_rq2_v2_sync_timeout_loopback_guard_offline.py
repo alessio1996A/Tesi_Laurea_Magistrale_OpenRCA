@@ -76,10 +76,9 @@ class RQ2SyncTimeoutLoopbackGuardTests(unittest.TestCase):
             self.assertTrue(subject._contains_timeout(outer))
         self.assertFalse(subject._contains_timeout(ValueError("not timeout")))
 
-    def test_report_does_not_claim_release_or_stage_hard_cap(self):
+    def test_timeout_probe_is_short_and_pin_is_strict(self):
         self.assertGreater(subject.STALL_SECONDS, subject.MAX_ELAPSED_SECONDS)
         self.assertLess(subject.TIMEOUT_SECONDS, subject.MAX_ELAPSED_SECONDS)
-        self.assertIn("NO_RELEASE", subject.run_probe.__doc__ or "NO_RELEASE" if False else "NO_RELEASE")
         self.assertFalse(subject.SHA1.fullmatch("x" * 40))
 
 
