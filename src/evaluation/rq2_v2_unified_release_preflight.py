@@ -43,6 +43,8 @@ SOURCE_PATHS = (
     "evaluation/rq2_evidence_bundle.py",
     "evaluation/rq2_probe_adapter.py",
     "evaluation/rq2_output_contracts.py",
+    # Rubrica K preregistrata: sola analisi offline post-run, inclusa nel freeze.
+    "evaluation/rq2_v2_k_quality_rubric.py",
     "evaluation/rq2_stage_binding.py",
     "harness/investigation_planner.py",
     "harness/structural_temporal_verifier.py",
