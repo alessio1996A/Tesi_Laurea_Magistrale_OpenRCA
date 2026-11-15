@@ -1,14 +1,12 @@
-"""Read-only RQ2-V3 runtime/SDK preview: NO SDK CLIENT, NO HTTP, NO CLAIM.
+"""RQ2-V3 runtime: pure preview plus scoped synthetic/Drive live gate.
 
-This is a NON-AUTHORIZING preflight on the exact intended Colab checkout.
-It verifies pinned package versions and known SDK source digests, the frozen
-RQ1 factory, the RQ2-only factory's declared policy, and repository identity.
-It cannot certify *effective* LangChain->SDK HTTP retries/timeouts or Google
-Drive single-writer semantics: those require separate network-disabled mock
-probes and Drive scratch tests. Until then the release gate FAILS CLOSED.
-
-No GT, Market.zip, telemetry, API key, scientific data artifact or historical
-prediction is read or written by this module.
+The preview is read-only and non-authorizing. The definitive verifier
+checks exact SDK/source/commit identity, executes network-disabled fake
+HTTP 429 and loopback timeout probes in the pinned process, and checks
+same-runtime Drive lock/O_EXCL only in a temporary sibling scratch.
+It NEVER calls a real provider or creates scientific data. Its attestation
+covers observed sync paths only, not full-stage timeout or USD hard caps.
+Missing evidence remains NO-GO; release and stage consent are separate.
 """
 from __future__ import annotations
 
