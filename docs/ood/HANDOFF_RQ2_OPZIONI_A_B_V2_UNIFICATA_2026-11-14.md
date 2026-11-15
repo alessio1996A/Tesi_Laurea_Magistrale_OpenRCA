@@ -932,3 +932,47 @@ Non chiamare API o creare release vera prima del nuovo audit GT-free
 Colab 29 source/commit, prova lock Drive e approvazione singolo pilot.
 Lo stimatore USD e il 492 graph invoke candidati non sono hard cap HTTP.
 11 OOD / Opzione B sempre LOCKED.
+
+## 28. G4A inventario 29 file PASS; G4K import SyntaxError, correzione fixture (15 novembre)
+
+**Output effettivo utente PyCharm:**
+- G4A `test_rq2_v2_unified_release_preflight_offline.py`:
+  `Ran 19 tests in 0.379s; OK`. Include test obbligatorio
+  delle **29 sorgenti** nel piano source-bound. G4A aggiornato PASS.
+- G4K `test_rq2_v2_unified_live_dispatcher_mock_offline.py`:
+  `Ran 1 test in 0.002s; FAILED (errors=1)`, ma nessun
+  test G4K effettivo e' stato eseguito; `unittest.loader._FailedTest`
+  segnala **SyntaxError alla riga 185** del file test,
+  `patch.object(subject, "crea_modello_rq2") as factory`.
+
+**Diagnosi e correzione GitHub, SOLO file test:**
+```python
+# prima, non sintatticamente valido
+with patch.object(subject, "LIVE_API_ENABLED", False), (
+    patch.object(subject, "crea_modello_rq2") as factory
+):
+    ...
+# dopo, Python 3.12 valido
+with (
+    patch.object(subject, "LIVE_API_ENABLED", False),
+    patch.object(subject, "crea_modello_rq2") as factory,
+):
+    ...
+```
+Commit fix `e4c3e29187f5aaa199da17e19b2a57beb7e3e042`.
+Nessuna modifica a `rq2_v2_unified_live_dispatcher.py`,
+`LIVE_API_ENABLED=False`, ledger G4F, G4H/G4I/G4J, RQ1,
+prompt, source inventory 29, casi OOD o protocollo 180 stage.
+
+**G4K ancora PENDING: 18 metodi non sono mai stati testati.**
+Prossimo comando PyCharm su checkout pulito:
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m py_compile src/tests/test_rq2_v2_unified_live_dispatcher_mock_offline.py
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_dispatcher_mock_offline.py" -v
+```
+Attesi 18 e OK, non attestati. Se compaiono failure runtime
+differenti, valutare primo traceback, NON dichiarare G4K PASS.
+G4A 19 test PASS senza bisogno di nuova esecuzione. Nessuna API
+reale, autorizzazione o test OOD.
