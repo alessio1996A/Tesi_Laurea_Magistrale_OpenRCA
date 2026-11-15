@@ -1278,3 +1278,15 @@ Il report e' `docs/ood/RQ2_V2_UNIFIED_COLAB_SYNC_429_MOCK_PASS_2026-11-15.md`.
 **Cosa risulta verificato:** configurazioni SDK source-pinned e percorsi LangChain sync per test in-memory 503, 429 e loopback timeout di 0.3s, con un invio per scenario osservato. NON ci sono prove di tutte le possibili HTTP failure, di 300s runtime effettivi, di limite stage D, di hard cap USD, di async/stream o di API reali. Non ripetere altre prove generiche. RQ1 e 29 sorgenti di produzione non modificati da questi aggiornamenti.
 
 **Gate successivi:** verifica prezzo/quote provider; budget *esplicitamente* approvato; source freeze HEAD clean su Colab con hash dei 29 sorgenti; G4E/G4F create-only e release SHA approvato esternamente, poi consenso esplicito sullo stage D singolo (non altri). Matrice V2 per modello D/C/K = 20/20/20, NON V1 30/30/8. `LIVE_API_ENABLED=False` e OOD 11 LOCKED, stage reali V2 `0/180`.
+
+## 37. Costi RQ2-V2: scenario ipotetico non autorizzativo (15 novembre)
+
+Ricontrollati listini Standard pubblici Google/Anthropic il 15/11: Gemini 3.5 Flash-Lite USD 0.30/2.50 input/output per 1M; Sonnet 5.5 USD 2/10; Haiku 5.5 USD 0.10/0.50 per richieste <=100k prompt, USD 0.50/2.50 sopra soglia per *request*.
+
+Documento con formule esatte e avvertenze:
+`docs/ood/RQ2_V2_UNIFIED_BUDGET_SCENARIO_GT_FREE_NO_APPROVAL_2026-11-15.md`.
+Unicamente **WHAT-IF**: D = 150k input + 5k output aggregati, C e K = 10k input + 2k output ciascuno; su V2 nuova matrice `20 D + 20 C + 20 K` per modello, costo illustrativo totale USD `10.50–11.90`, Gemini singolo D USD `0.0575`. NON forecast/hard cap; cambiare token altera radicalmente il totale. Mai usare il vecchio helper V1 `estimate_campaign_cost` 30/30/8 per la matrice V2.
+
+Confronto GitHub fra preflight 29-source `601dc7c2f971b919962ff190e6feb192c4dd237a` e SHA documentale `c09d6bfa3c45e518a208d5d9e9029ec6512216c0`: ZERO modifiche ai file `src/` di produzione; solo quattro file di probe/test nuovi `src/tests/` e note `docs/`. Non ripetere 29-source preflight né suite storiche senza nuovo cambio sorgenti/causa scientifica; il freeze definitivo va comunque pinning su nuovo commit clean.
+
+**Prossima decisione esterna mancante:** budget operativo esplicito USD per il singolo pilot D (non hard cap) e policy di stop; NON equivale ancora ad autorizzazione a chiamare API. Successivamente freeze/release SHA e consenso esplicito ulteriore per esatto stage. V2 0/180 reali, OOD 11 LOCKED, `LIVE_API_ENABLED=False`.
