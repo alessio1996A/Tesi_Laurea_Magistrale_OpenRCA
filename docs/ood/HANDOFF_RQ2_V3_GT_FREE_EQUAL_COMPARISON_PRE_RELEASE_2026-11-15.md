@@ -37,3 +37,13 @@ Dunque la politica finale deve diventare **uniforme su D e C/K** nel successore,
 5. Non mescolare i risultati delle due versioni nella stima primaria. Separare affidabilità provider, validità JSON, accuratezza diagnostica, astensione, K bloccata, costi e qualità delle regole.
 
 **Stato conclusivo: nessun nuovo freeze, nessun stage pagato, nessuna release V3 attiva.**
+
+## Audit V3 dei motori D dopo 58 test PASS — integrazione candidata non attiva
+
+Il 15 novembre sono stati riportati altri 13/13 test PASS su PyCharm: 8 piano V3 GT-free e 5 audit dei due motori D. Totale dell'indagine: **58/58 test mirati PASS**, tutti offline e senza API.
+
+Implementazione candidata: `src/evaluation/rq2_v3_d_final_stream_candidate.py`. Un delegatore monouso di `graph.stream()` opera esclusivamente sui messaggi finali AI, conserva l'originale e ne passa una copia con testo esatto a `esegui_grafo_rca_v2()` (ReAct) o `esegui_grafo_rca_verify()` (Planning/PAVE). Riusa lo stesso estrattore C/K e registra un envelope `d_final_text_extraction` (schema/policy/kind/text_blocks/nontext_blocks). Non modifica il codice dei grafi, le risposte tool, i budget o il metering. Non ripara JSON malformati. In caso di errori/ambiguità non inventa una diagnosi. Non è ancora collegato a experiment_runner o al ledger e non costituisce un nuovo protocollo attivo.
+
+Test da eseguire in PyCharm: `src/tests/test_rq2_v3_d_final_stream_candidate_offline.py`, **9 nuovi test PENDING**: frammenti D sui due motori, preservazione di stringhe, mancata riparazione, esclusione thinking, tool native ID, errori di finalizzazione, duplicati finali, limite blocchi, single-use. Nessuna API; non ripetere i 58 test conclusi.
+
+**Vincoli aperti per un futuro GO:** collegare D al runner sperimentale V3 in modo source-bound, includere la provenienza D nel contratto e ledger V3; separare stadi/namespace/release dalla V2. Il modello e l'SDK possono produrre forme diverse di content block; i mock dimostrano la correttezza del nostro adattatore su casi sintetici, non la causa della risposta Gemini V2. Nessun nuovo stage pagato è autorizzato.
