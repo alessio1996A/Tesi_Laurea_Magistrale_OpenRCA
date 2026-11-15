@@ -1011,3 +1011,36 @@ prova storica, NON valida il nuovo checkout. Dopo JSON reale:
 verifica lock Drive/FUSE su scratch, runtime/timeout e tariffe,
 freeze e autorizzazione del singolo pilot D. I test OOD/Opzione B
 restano LOCKED 11/11; niente scoring o GT.
+
+## 30. Colab G4 reale 29-source PINNED PASS, JSON integrale (15 novembre)
+
+**Output utente Colab realmente completo:** due CSV originali GT-free
+verificati, HEAD del checkout separato
+`601dc7c2f971b919962ff190e6feb192c4dd237a`, cella
+`check=True` uscita normalmente senza API. Seconda cella di recupero
+ha stampato JSON e `json.loads` lo ha accettato.
+
+`status = RQ2_V2_29_SOURCE_REAL_GT_FREE_PREFLIGHT_OK_NO_API`;
+`source_file_count=29`;
+`source_inventory_sha256=32457ec256e0fc430580f6d2205a50983811784f5ce87917ca3d2f79ea0fbe9e`;
+`source_plan_sha256=e6f797c4ca01ed422b80e928854469b9f8c7f7cc4215835bf91f9f7305425a00`;
+`blueprint_sha256=d5bfe9872b2497bea19b3aec7f4c93635f3444679e11856b9a5975c8a2a929da`;
+`split_sha256=c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724`;
+`manifest_sha256=5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13`.
+C prompt SHA `81a5800500b3fafc23af4b7643e79a3d206c3ca6c80f6924514001ec85dc2a42`;
+K prompt SHA `0935e2b7232715b623bb174f0a059387659f8d9bc7939804c8a372d8aa27ba71`.
+3 modelli Gemini/Sonnet/Haiku × 5 harness × 4 discovery × D/C/K:
+**180 stage logici** (60 ciascuno). `ood_locked=11`,
+`ledger_namespace_absent=true`, `ground_truth_read=false`,
+`scientific_release_frozen=false`, `can_execute_api=false`,
+`model_requests_sent=0`.
+
+**Report dettagliato**:
+`docs/ood/RQ2_V2_UNIFIED_COLAB_29_SOURCE_REAL_GT_FREE_PASS_2026-11-15.md`.
+Il report verifica il commit 601dc7..., NON il futuro HEAD dopo
+modifiche alla documentazione. RQ2 V2 unified: **0/180 stage reali**,
+nessuna release o spesa API. Passi successivi: test FUSE lock e
+create-only su **scratch MyDrive esterna a Tesi_OpenRCA**, valutare
+se la semantica consente ledger create-only su Drive, runtime e tariffe,
+nuova approvazione SHA esterno finale, quindi consenso specifico per
+UN pilot D. 11 OOD sempre locked. NON modificare code RQ1 frozen.
