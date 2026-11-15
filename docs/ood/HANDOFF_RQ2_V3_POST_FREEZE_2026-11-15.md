@@ -91,6 +91,20 @@ Harness `A0`, `A1`, `A1_8R`, `A1_8R_Planning`, `A1_PAVE`; provider `gemini`, `so
 - Prima di autorizzare un qualsiasi nuovo stage/caso/provider: analizzare motivi `INVALID_OUTPUT` tramite SHA e flag di `json_status`, `output_contract_v2.valid`, parsabilità JSON/task shape, provenance auditor e metadati `d_final_text_extraction`. Preservare esattamente l'artefatto originale; il freeze scientifico impedisce patch silenziose sul code pin.
 - L'ultima autorizzazione economica è già stata consumata con il pilot; **nessun consenso implicito** per un secondo stage.
 
+## 6quater. Diagnostica read-only sul primo D: incongruenza task-aware / ledger (15 novembre 2026)
+
+L'utente ha eseguito una cella **senza API e senza scritture**, `RETURN_CODE:0`, `V3_D_INVALID_READONLY_DIAGNOSTIC` sul record D immutable SHA `61f80fd91ee33a87a23498114e17f7aecbdf06490c47e238345a963ba132c815`. Dati osservati:
+- `json_status_category=valid_json`; `raw_response_present=true`, lunghezza 117, SHA testo `3c864bc1fa218602d43ecf78070e245eb6bff1f51ce6455865066638e4c4e2b4` (non pubblicare il testo).
+- `json_parse_ok=true`, `json_top_level_type=dict`, ma `json_shape_ok=false`;
+- `task_contract_valid=true`, `task_contract_present=true`;
+- `provenance_ok=true`, `provenance_error_class=null`; `run_error_present=false`;
+- `d_extraction_content_kind=list`, `d_extraction_text_blocks=1`, `d_extraction_nontext_blocks=0`.
+- `claims=1`, `records=3`, `orphans=0`.
+
+**Analisi del codice scientificamente congelato (verificata su GitHub commit 8f8...):** `src/output/v2_task_contract.py` definisce `TASK_REQUIRED_FIELDS` per sette task e considera validi soltanto i campi pertinenti alla specifica richiesta, con cardinalità e indici verificati. Invece `src/evaluation/rq2_v2_unified_scientific_ledger.py::_validate_artifact`, importato anche da `rq2_v3_scientific_receipt_adapter_candidate.py`, per D `RECORDED_COMPLETE` esige sempre contemporaneamente i tre campi standard (datetime, component, reason), anche per task che ne chiedono solo un sottoinsieme. È un'**incompatibilità strutturale dei contratti** che spiega `INVALID_OUTPUT` malgrado `output_contract_v2.valid=true` e provenienza valida. Non è evidenza di errore causale né necessariamente errore dell'estrattore V3. Si può confermare esattamente quale campo manca con una sola ispezione read-only dei **nomi** delle chiavi JSON e `output_contract_v2.required_fields` (non il contenuto).
+
+**Decisioni operative:** nessun nuovo stage reale autorizzato, né C/K del pilot bloccati; no retry; non cambiare il record o ricalcolare lo status del protocollo V3 congelato. Prima di continuare la campagna RQ2 occorre decidere il rimedio metodologicamente corretto: versione scientifica successiva append-only con validazione D coerente col task-aware e nuovo code/release freeze, oppure mantenere V3 e registrare esplicitamente il filtro rigoroso come limite (ma rischia impedire la produzione di K e distorcere il confronto). Non patchare silenziosamente il commit/release frozen o la baseline RQ1/V2.
+
 ## 7. Messaggio consigliato per eventuale nuova chat
 
 > Riprendi la mia tesi OpenRCA. Leggi integralmente su GitHub `docs/ood/HANDOFF_RQ2_V3_POST_FREEZE_2026-11-15.md` nel repository `alessio1996A/Tesi_Laurea_Magistrale_OpenRCA`. V3 ha completato il freeze scientifico *create-only* in Colab: code commit **8f8b39e480db1296de155068c001d17ae05ac6ad**, release SHA **dae141c0dd7231cc172ef891299367df85adf2618be0b0c7882336ee585b1c04**, inventory SHA **e13bc96871a39ccaae4f25fd3f4ba99b263a40ced08a48d29d4c52a0d9c1be06**, runtime attestation SHA **61909d3fea3010968e9bf2485008e3b8477af960ff18e5e88f216f2b579db204**. Gli 11 OOD rimangono locked, 180 stage logici, claims=records=orphans=0, 0 API V3. NON ripetere freeze o test già PASS; non modificare RQ1/RQ2-V2 o il code pin. Prepara soltanto il piano per **un singolo pilot V3 D** con stage/model/commit/release/budget da farmi approvare separatamente. Consegna tesi **5/12/2026**: prima terminare RQ2 e presentarla al professore, poi concordare i capitoli. Non forzare la scrittura adesso; chiedere paper/trascrizioni solo se davvero necessari.
