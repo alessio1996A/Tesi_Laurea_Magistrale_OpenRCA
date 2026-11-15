@@ -35,3 +35,9 @@ I 9 metodi sono PASS (10.624s), già acquisiti e NON da ripetere. Per il cambiam
 - Refactoring e documentazione italiana a fine progetto, dopo audit/freeze sperimentali; questa estensione circoscritta non e' refactoring.
 
 **Non modificare alcun protocollo scientifico, prompt C/K o test OOD.** Il nuovo branch e' una proposta ingegneristica da validare, non una release.
+
+## G4F regressione 22/22 PASS sul nuovo sorgente (15 novembre)
+
+L'utente ha eseguito nel checkout PyCharm del branch G4L `python -m unittest discover -s src/tests -p "test_rq2_v2_unified_scientific_ledger_offline.py" -v` con output `Ran 22 tests in 15.074s\nOK`: **22/22 PASS**. Insieme alla nuova suite G4L 9/9 risultano **31/31 PASS** per le due verifiche mirate. Si tratta di test offline/mock, non sono evidenza di funzionamento delle API reali. Non ripeterli senza cambiamenti pertinenti.
+
+**Prossimo passo unico:** audit Colab GT-free, read-only, su checkout temporaneo clean al nuovo HEAD pinned, G4A/G4B/G4D, runtime pinned e `build_prerelease_dossier` in memoria. Il nuovo SHA dei 30 sorgenti e del blueprint **deve essere ricalcolato**; il preflight precedente su commit `4733eb90...` rimane storico. Continuano `SCIENTIFIC_RELEASE_WRITE_ENABLED=False`, `LIVE_API_ENABLED=False`, 0/180 stage reali, 11 OOD locked, nessuna release o claim.
