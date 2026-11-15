@@ -171,27 +171,38 @@ class UnifiedStageSourcePreviewTests(unittest.TestCase):
         self.assertEqual(self.journal.audit_restart()["claims"], 2)
 
     def test_actual_prompt_drift_still_fails_closed_for_both_stages(self):
-        # Con la fixture allineata, una modifica REALE al system prompt
-        # deve continuare a fallire, senza scrivere nuovi claim.
+        # Un preflight rifiuta sempre uno stage gia' registrato.
+        # Per verificare DAVVERO gli SHA, C deve essere ancora libero
+        # (con D valido), e K libero (con D e C validi).
         self.save_d()
-        self.save_c()
-        prior_claims = self.journal.audit_restart()["claims"]
-        for stage, prompt_name in (
-            ("C", "CAUSE_SYSTEM"), ("K", "RULE_SYSTEM"),
-        ):
-            with self.subTest(stage=stage):
-                with patch(
-                    "evaluation.rq2_v2_unified_live_stage_preflight."
-                    + prompt_name,
-                    "ALTERED_SYSTEM_PROMPT_MUST_NOT_BE_ACCEPTED",
+        before_c = self.journal.audit_restart()["claims"]
+        with self.subTest(stage="C"):
+            with patch(
+                "evaluation.rq2_v2_unified_live_stage_preflight.CAUSE_SYSTEM",
+                "ALTERED_SYSTEM_PROMPT_MUST_NOT_BE_ACCEPTED",
+            ):
+                with self.assertRaisesRegex(
+                    UnifiedStagePreviewBlocked, "Frozen C/K prompt SHA drift",
                 ):
-                    with self.assertRaisesRegex(
-                        UnifiedStagePreviewBlocked, "prompt SHA drift",
-                    ):
-                        self.preview(stage=stage)
-        self.assertEqual(
-            self.journal.audit_restart()["claims"], prior_claims
-        )
+                    self.preview(stage="C")
+        self.assertEqual(self.journal.audit_restart()["claims"], before_c)
+        self.assertIsNone(self.journal.load_claim(stage_id=sid(stage="C")))
+
+        # La normale C viene archiviata SOLO dopo il controllo negativo C.
+        # In questo modo K ha entrambi i parent validi ma non e' claimed.
+        self.save_c()
+        before_k = self.journal.audit_restart()["claims"]
+        with self.subTest(stage="K"):
+            with patch(
+                "evaluation.rq2_v2_unified_live_stage_preflight.RULE_SYSTEM",
+                "ALTERED_SYSTEM_PROMPT_MUST_NOT_BE_ACCEPTED",
+            ):
+                with self.assertRaisesRegex(
+                    UnifiedStagePreviewBlocked, "Frozen C/K prompt SHA drift",
+                ):
+                    self.preview(stage="K")
+        self.assertEqual(self.journal.audit_restart()["claims"], before_k)
+        self.assertIsNone(self.journal.load_claim(stage_id=sid(stage="K")))
 
     def test_each_preview_is_read_only(self):
         before = sorted(
