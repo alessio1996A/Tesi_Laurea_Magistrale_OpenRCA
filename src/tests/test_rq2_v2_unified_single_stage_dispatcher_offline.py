@@ -367,9 +367,22 @@ class SourceBoundSingleStageFakeTests(unittest.TestCase):
                 1,
             )
         )
-        with self.assertRaises(Exception):
+        # La release manomessa DEVE bloccare sia il dispatcher sia
+        # ogni lettura audit del ledger. Non usare audit_restart() per
+        # contare i claim quando il gate di provenienza e' volutamente
+        # invalido: controllare soltanto l'assenza fisica di nuovi file.
+        with self.assertRaisesRegex(
+            UnifiedScientificLedgerBlocked,
+            "Missing/different scientific release",
+        ):
             self.run_stage()
-        self.assertEqual(self.ledger.audit_restart()["claims"], 0)
+        with self.assertRaisesRegex(
+            UnifiedScientificLedgerBlocked,
+            "Missing/different scientific release",
+        ):
+            self.ledger.audit_restart()
+        self.assertFalse((self.data / ledger_code.CLAIMS).exists())
+        self.assertFalse((self.data / ledger_code.RECORDS).exists())
 
     def test_no_ground_truth_or_api_write_outside_scientific_namespace(self):
         self.run_dck(model="sonnet", harness="A1")
