@@ -266,8 +266,10 @@ class ProviderReceiptAdapterOfflineTests(unittest.TestCase):
             self.ck(value)
 
     def test_ck_missing_response_and_error_is_rejected(self):
+        value = ck_call(cause(), attempts=0, error=None)
+        value["raw_response"] = None
         with self.assertRaises(UnifiedProviderReceiptBlocked):
-            self.ck(ck_call(raw=None, attempts=0, error=None))
+            self.ck(value)
 
     def test_ck_error_leaking_raw_secret_is_rejected(self):
         with self.assertRaises(UnifiedProviderReceiptBlocked):
