@@ -21,7 +21,7 @@ Lo stesso difetto potenziale di estrazione interessa **C/K e anche la risposta f
 
 Il trasporto V2 e ledger V2 sono congelati e non devono essere modificati. L'adattatore V2 normalizza solo stage ID V2, e il ledger V2 scarta i metadati aggiunti; quindi V3 richiede stage ID, ricevute, nuovo ledger, source inventory e release propri.
 
-## Test mirati già SUPERATI in PyCharm — 74/74 PASS
+## Test mirati già SUPERATI in PyCharm — 83/83 PASS
 
 Tutti i seguenti esiti sono stati forniti dall'utente, senza SDK reali:
 1. **4/4** rischio newline della funzione originale e parità fra modelli sintetici;
@@ -36,7 +36,7 @@ Tutti i seguenti esiti sono stati forniti dall'utente, senza SDK reali:
 10. **9/9** `rq2_v3_d_final_stream_candidate` su stream graph sintetici;
 11. **7/7** integrazione `run_experiment()` reale con modelli/grafi/caso simulati e controllo task-aware originale.
 
-**Non ripetere questi 74 test per inerzia.** Eseguire prima i nuovi test qui sotto. NON equiparare questi successi offline a validazione delle risposte degli SDK reali.
+**Non ripetere questi 83 test per inerzia.** Eseguire prima i nuovi test qui sotto. NON equiparare questi successi offline a validazione delle risposte degli SDK reali.
 
 ## Branch di lavoro corrente e componenti
 
@@ -51,15 +51,23 @@ Componenti già sul branch:
 - `src/evaluation/rq2_v3_d_final_stream_candidate.py`: cattura l'AIMessage finale D tramite delegatore monouso del grafo; conserva copia originale, tool e token.
 - `src/evaluation/rq2_v3_d_runner_capture_candidate.py`: integrazione tramite patch contestuale offline delle due funzioni chiamate da `run_experiment()`. È ancora **prototipo**; evitare globale patch in live/concorrenza senza adeguati gate e test.
 - `src/evaluation/rq2_v3_scientific_receipt_adapter_candidate.py`: **NUOVO**, normalizza D e C/K con ID V3, riusa validator puri già collaudati, controlla provenance e sanitized errors, conserva in D `d_final_text_extraction` e in C/K `text_extraction`; non scrive e non esegue provider.
-- `src/tests/test_rq2_v3_scientific_receipt_adapter_candidate_offline.py`: **9 NUOVI TEST ANCORA PENDING**; verifica 15 arms (5×3) D/C/K, rifiuto ID V2/altro modello/OOD, errori sicuri, JSON C malformato preservato, contatori/provenienza, trasporto SDK mock senza HTTP.
+- `src/tests/test_rq2_v3_scientific_receipt_adapter_candidate_offline.py`: **9/9 PASS confermati dall'utente il 15 novembre 2026 (`Ran 9 tests in 1.714s — OK`)**; verifica 15 arms (5×3) D/C/K, rifiuto ID V2/altro modello/OOD, errori sicuri, JSON C malformato preservato, contatori/provenienza, trasporto SDK mock senza HTTP.
 
 L'adattatore è una prova di contratto, **non è un ledger scientifico né una release V3**. Per K il controllo del genitore C completo va ancora gestito nel futuro ledger V3; non attribuire questo gate all'adattatore puro. Per D la validazione del record e della provenienza è distinta dai vincoli di commit/release/claim, ancora assenti.
 
 ## Prossima azione concordata
 
-1. Eseguire *soltanto* `test_rq2_v3_scientific_receipt_adapter_candidate_offline.py` in PyCharm con `PYTHONPATH="src;src/tests"`, branch e HEAD verificati. Atteso **9 tests**, NON ancora certificato. Se fallisce, analizzare test e codice specifici, non cambiare frozen V2, non fingere che siano passati.
-2. Se PASS: implementare **ledger V3 create-only indipendente** con propri stage-ID, namespace distinto, release/source-bound preflight, controllo D/C/K completo e readback metadati, dati GT-free, claim-first/no-auto-retry, audit integrità e crash, singolo writer; test esclusivamente temporanei fino a gate scientifico.
+1. **CONCLUSO**: `test_rq2_v3_scientific_receipt_adapter_candidate_offline.py` — 9/9 PASS riferiti dall'utente. Non ripetere questo test senza una modifica al codice che lo giustifichi.
+2. **PROSSIMA FASE**: implementare **ledger V3 create-only indipendente** con propri stage-ID, namespace distinto, release/source-bound preflight, controllo D/C/K completo e readback metadati, dati GT-free, claim-first/no-auto-retry, audit integrità e crash, singolo writer; test esclusivamente temporanei fino a gate scientifico.
 3. Dopo regressione selettiva: costruire nuovi source inventory e release V3 con commit clean, audit SDK/runtime, preflight read-only Google Colab/Drive, protezione OOD. Non fare stage pagati senza esplicita nuova approvazione per release, singolo stage e budget. Non mescolare output V2 con V3.
 4. Quando la campagna RQ2 è congelata: trasferimento conoscenza/valutazione, analisi scientifica, grafici accuratezza/token, stesura, pulizia codice/commenti italiani. Non consentire che la correzione ingegneristica si trasformi in un esperimento non pianificato.
 
 **Stato attuale: NO-GO per nuovi stage a pagamento. V2 e RQ1 completamente intatti. Paper/trascrizioni del professore non necessari adesso.**
+
+## ESITO NUOVA CHAT — 15 novembre 2026, 83/83 test PASS
+
+L'utente ha comunicato `Ran 9 tests in 1.714s — OK` per il test dell'adattatore V3. Totale cumulativo dei test MIRATI superati con esito PyCharm riferito dall'utente: **83/83** (= 74 precedenti + 9 nuovi); non sono test con chiamate API. I nuovi test comprendono 15 combinazioni harness/modello su D/C/K sintetici, isolamento dei V2 stage ID, errori redatti, errori JSON preservati, contatori e provenienza.
+
+**HANDOFF OPERATIVO:** passare ora a nuova conversazione e leggere integralmente questo file mediante connettore GitHub, mantenendo branch `feature/rq2-v3-gtfree-equal-comparison-design-2026-11-15`. Non riavviare i test già superati. Primo intervento: progettare un **ledger V3 scientifico, realmente separato e source-bound**, anziché usare il journal prototipo `rq2_v3_offline_provenance_journal_prototype.py` come se fosse produzione. Controllare che gli artifact D/C/K dell'adattatore V3 siano verificati anche al readback: digest canonico, status + campi, provenienza, parent record SHA, claim-before-call, blocked K senza claim, orphan/no retry, namespace create-only, per-stage approval, source/release SHA e nessun GT. Tenere distinto il contesto simulato da quello reale. Dopo il ledger e la release V3, test SDK e preflight Colab rigorosamente **senza API**, quindi richiedere esplicita autorizzazione a UN pilot. Nessun budget precedente comporta approvazione V3 automatica.
+
+Nessun altro codice o release scientifica è stato modificato dopo la registrazione di questi 9 PASS; la prossima chat deve verificare HEAD corrente prima delle modifiche. Questo handoff è la fonte di continuità più recente e prevale sulle indicazioni storiche di PENDING nei paragrafi precedenti.
