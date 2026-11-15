@@ -6,8 +6,9 @@ It re-runs the REAL GT-free inventory, freezes the V2 and V3 source
 hashes, independently hashes the future runtime/dispatcher modules, and
 requires an independent runtime/Drive SDK verifier.
 
-Until that runtime gate and dispatcher exist, the verifier FAILS CLOSED.
-Synthetic tests can mock the missing dependency, never real campaign data.
+Until a create-only release and independently measured runtime evidence
+are present, the verifier FAILS CLOSED. Synthetic tests can mock the
+gate boundary, never real campaign data.
 An integrity proof never conveys authorization to spend money, execute
 models, inspect GT, or create claims; a separate user-approved per-stage
 gate is required.
