@@ -45,6 +45,14 @@ La separazione è deliberata: l'artifact successore **non è compatibile** con l
 
 Nuovi test preparati, **non ancora eseguiti in PyCharm**: `src/tests/test_rq2_v3_ck_provenance_receipt_candidate_offline.py` (7 test per C/K su 3 modelli, errore provider, JSON invalido, metadati tamper, readback serializzato, fail closed su metadata assente e isolamento V2). Nessuna release o autorizzazione live è stata emessa.
 
+## Prototipo di persistenza V3 SOLO OFFLINE, successivo ai 38 test PASS
+
+Il test del contratto di provenienza successore `test_rq2_v3_ck_provenance_receipt_candidate_offline.py` ha avuto **7/7 PASS** nell'ambiente PyCharm dell'utente. Totale test mirati di questa indagine: **38/38 PASS** (4 + 9 + 6 + 9 + 3 + 7). Non sono esecuzioni LLM reali.
+
+È ora disponibile `src/evaluation/rq2_v3_offline_provenance_journal_prototype.py`: prova di persistenza create-only **non produttiva**, che genera da sola una `TemporaryDirectory` e non accetta un percorso dati utente, non apre Google Drive, non legge GT, non costruisce SDK, non crea release e non può eseguire API. Verifica rilettura e hash canonici, dipendenze D→C→K, propagazione `BLOCKED_DEPENDENCY`, nessun retry, blocco di claim orfani e conservazione/validazione di `text_extraction` nei record C/K. È presente il test `src/tests/test_rq2_v3_offline_provenance_journal_prototype.py` con 7 prove **in attesa di esecuzione PyCharm**.
+
+**Limite essenziale:** il prototipo usa gli stage ID del piano V2 unicamente come *fixture sintetiche*, non può scrivere dati scientifici permanenti e non è una release V3. Prima del futuro protocollo reale servono: nuovi identificatori protocollo/piano e namespace, release autorizzata, hash source-bound per **tutti** i componenti, commit clean, gestione di lock e crash su Drive, test e policy uniformi su D e C/K, budget e autorizzazioni di singolo stage. Vietato usare il prototipo per scrivere nella directory scientifica V2.
+
 ## Requisiti GO/NO-GO prima della futura campagna reale
 
 1. **GO tecnico:** nuovi test passati e controlli anti-regressione selettivi su trasporto, parser, output-contract, contatori, gestione errori e no-auto-retry.
