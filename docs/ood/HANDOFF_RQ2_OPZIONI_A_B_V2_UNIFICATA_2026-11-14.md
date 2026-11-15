@@ -1322,3 +1322,17 @@ Output: `Ran 18 tests in 0.206s\nOK`. Questi sono test sintetici: non equivalgon
 **Prossimo controllo mirato:** il file `src/evaluation/rq2_v2_unified_release_preflight.py` e' cambiato SOLO per includere `evaluation/rq2_v2_k_quality_rubric.py` nell'inventario source-bound (30 file). PyCharm deve ora eseguire le suite dipendenti dalla lista `SOURCE_PATHS`: `test_rq2_v2_unified_release_preflight_offline.py` (19 test), `test_rq2_v2_unified_release_blueprint_offline.py` (18), `test_rq2_v2_unified_scientific_release_contract_offline.py` (18). Sono **55 test mirati, NON ANCORA ESEGUITI**. Non rieseguire i 145 precedenti.
 
 Solo se passano: preparare preflight su Colab dei **30 sorgenti**, runtime/source hash GT-free aggiornati e commit clean. L'ultimo check Colab valido su 29 sorgenti resta prova storica e non certifica la nuova rubrica. Ancora 0/180 stage reali; nessuna nuova approvazione economica o API; `LIVE_API_ENABLED=False` e 11 OOD LOCKED.
+
+## 41. SOURCE GATE K: tutte e tre le suite PyCharm PASS (15 novembre)
+
+**Output integrale dell'utente in file incollato, attestato per il checkout locale**:
+- `test_rq2_v2_unified_release_preflight_offline.py`: `Ran 19 tests in 0.723s — OK`;
+- `test_rq2_v2_unified_release_blueprint_offline.py`: `Ran 18 tests in 0.490s — OK`;
+- `test_rq2_v2_unified_scientific_release_contract_offline.py`: `Ran 18 tests in 0.939s — OK`;
+- comando PowerShell finale: `RQ2-V2 K RUBRIC SOURCE GATE: PASS`.
+
+**55/55 PASS**, aggiunti ai precedenti **18/18 PASS** della rubrica K: **73 nuovi test mirati PASS** sul cambiamento, senza rifare le 145 verifiche già superate. Questi sono unit test offline, non certificazioni della sorgente reale su Drive e non sono esecuzioni provider.
+
+**Prossimo e unico gate:** Google Colab, *read-only* su Drive `/content/drive/MyDrive/Tesi_OpenRCA`, checkout worktree temporaneo clean al nuovo HEAD esplicito, `PYTHONPATH` SDK pin isolato `/content/rq2_v2_pinned_sdk_py313` + checkout `src`, esecuzione effettiva `preview_unified_source_bound`, `build_unified_release_blueprint`, `preview_scientific_ledger_gate`. Richiedere 30 sorgenti fingerprint, D/C/K 60 ciascuno, 180 stage, 11 OOD locked, namespace futuro assente, nessuna ground truth, api calls 0, nessuna release. Non copiare il vecchio source inventory SHA su 29 sorgenti: e' un riferimento storico valido per un altro commit.
+
+Se esito PASS, registrare esatti SHA 30-source/plan/blueprint e *solo poi* procedere al release freeze. Restano `LIVE_API_ENABLED=False`, 0/180 stage reali, nessun consenso API, Opzione B bloccata. RQ1 e precedenti RQ2 separati. Paper e trascrizioni del relatore non richiesti adesso; refactoring/comenti italiani/post-audit repository solo a fine raccolta dati.
