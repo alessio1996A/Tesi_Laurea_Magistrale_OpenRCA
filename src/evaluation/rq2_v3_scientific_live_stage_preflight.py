@@ -435,9 +435,18 @@ def verify_v3_live_runtime_gate(*, data_dir: Path, repo_dir: Path,
     evidence = _RUNTIME_PROOF_CACHE.get(cache_key)
     if evidence is None:
         # No caller booleans or externally supplied reports are accepted.
-        transport = _check_sync_sdk_proofs(repo=repo, commit=expected_source_commit)
-        drive = _check_same_runtime_drive_scratch(data=data)
-        usage = _check_usage_meter_semantics()
+        try:
+            transport = _check_sync_sdk_proofs(
+                repo=repo, commit=expected_source_commit,
+            )
+            drive = _check_same_runtime_drive_scratch(data=data)
+            usage = _check_usage_meter_semantics()
+        except V3LiveRuntimeBlocked:
+            raise
+        except Exception as exc:
+            raise V3LiveRuntimeBlocked(
+                "Pinned runtime proof could not be established"
+            ) from exc
         evidence = (transport, drive, usage)
         _RUNTIME_PROOF_CACHE[cache_key] = evidence
     transport, drive, usage = evidence
