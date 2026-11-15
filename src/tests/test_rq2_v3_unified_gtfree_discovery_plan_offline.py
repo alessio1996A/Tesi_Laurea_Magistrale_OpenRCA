@@ -68,6 +68,8 @@ class V3GTFreeSuccessorPlanTests(unittest.TestCase):
             "can_write_scientific_claims", "can_run_ood_test",
             "ground_truth_read", "telemetry_read", "historical_results_read",
             "files_written", "reuse_v2_d_outputs", "reuse_v2_c_or_k_outputs",
+            "d_final_output_extraction_integration_verified",
+            "d_final_output_provenance_schema_frozen",
         ):
             self.assertIs(plan[field], False, field)
         self.assertEqual(plan["model_api_calls"], 0)
@@ -85,6 +87,10 @@ class V3GTFreeSuccessorPlanTests(unittest.TestCase):
         self.assertEqual(
             plan["ck_text_extraction_policy"],
             "rq2_ck_exact_text_fragments_candidate_v1",
+        )
+        self.assertEqual(
+            plan["uniform_final_text_extraction_policy_candidate"],
+            plan["ck_text_extraction_policy"],
         )
         self.assertEqual(
             plan["ck_text_provenance_schema"],
