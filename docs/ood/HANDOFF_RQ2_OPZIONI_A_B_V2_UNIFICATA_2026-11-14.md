@@ -719,3 +719,40 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_pref
 ```
 Attesi 20 e OK, **non attestati**. G4F 22 PASS e G4G 17 PASS
 attestati sul codice corrente. Nessuna API/OOD autorizzata.
+
+## 23. G4H seconda prova 19 pass, 1 fail per test negativo staged male (15 novembre)
+
+Output PyCharm condiviso:
+`Ran 20 tests in 7.460s; FAILED (failures=1)`.
+Tutti i 19 precedenti test G4H sono PASS, comprese le preview
+positive C/K dopo correzione del pin SHA fixture. Il solo
+`test_actual_prompt_drift_still_fails_closed_for_both_stages`
+falliva nel sottotest C con
+`Stage already claimed or recorded` invece di
+`Frozen C/K prompt SHA drift`: la fixture aveva chiamato
+`save_d(); save_c()` prima di testare la preview di C. Il guard
+blocca correttamente riuso di un C gia' registrato; questo
+test NON poteva raggiungere il codice SHA. Nessun problema
+di ledger/produzione dimostrato.
+
+**Fix SOLO test** commit
+`ce0001abe1980664f97203e48bc607e233e7cbdf`:
+ora verifica C SHA drift **dopo D e prima di salvare C**;
+poi salva C valido e verifica K SHA drift **prima di salvare K**.
+In entrambe le prove asserisce nessun claim nuovo; lascia
+immutati il blocco di stage gia' registrati, G4F, G4G, RQ1,
+fonti GT-free, release e OOD.
+
+Doc aggiornato:
+`docs/ood/RQ2_V2_UNIFIED_G4H_WINDOWS_PROMPT_SHA_FIX_2026-11-15.md`.
+
+**Prossimo PyCharm** (checkout clean, 20 test da rieseguire):
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_live_stage_preflight_offline.py" -v
+```
+**Non** dichiarare G4H PASS prima dell'output aggiornato.
+Ultime regressioni G4F 22 PASS e G4G 17 PASS; non serve
+ripeterle perche' la sola variazione funzionale e' nel test G4H.
+API e 11 OOD ancora bloccati. Dopo G4H preparare G4I.
