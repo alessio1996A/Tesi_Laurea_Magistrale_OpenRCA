@@ -50,7 +50,7 @@ from evaluation.rq2_v2_unified_scientific_release_contract import (
 )
 from evaluation.rq2_v2_unified_scientific_ledger_preflight import (
     NAMESPACE, RELEASE_FILE, CLAIMS, RECORDS, _strict_absolute,
-    _repository_commit,
+    _repository_commit, preview_scientific_ledger_gate,
 )
 
 VERSION = "rq2_v2_unified_scientific_ledger_v0"
@@ -637,3 +637,136 @@ class UnifiedScientificLedger:
                 "record_sha256": obj["record_sha256"],
                 "can_execute_api": False,
             }
+
+
+# G4L — preparazione della futura release scientifica sul medesimo ledger.
+# Fino a un commit/autorizzazione successivi, NESSUN chiamante puo' scrivere.
+# La flag resta diversa dal gate del dispatcher LLM, che e' anch'esso False.
+SCIENTIFIC_RELEASE_WRITE_ENABLED = False
+
+
+def create_authorized_scientific_release_once(
+    *, data_dir: Path, repo_dir: Path, expected_commit: str,
+    approved_release_sha256: str, external_approval_reference: str,
+    release: dict,
+) -> dict:
+    """Crea UNA futura release G4E solo dopo approvazioni esterne.
+
+    La funzione e' inattiva per default. Non costruisce modelli, non
+    esegue provider, non crea claim e non accede ai casi OOD. Con
+    SCIENTIFIC_RELEASE_WRITE_ENABLED=False, blocca PRIMA di leggere o
+    scrivere il filesystem. Non modificare tale flag nei test esterni
+    o nei notebook; solo fixture offline con filesystem temporaneo.
+
+    Quando verra' autorizzata la release, il nuovo commit deve essere
+    preflighted su Colab con le 30 SOURCE_PATHS e approvato col digest
+    della release separato dal commit. Dopo ogni errore di scrittura,
+    fermarsi e auditare manualmente il namespace (nessun retry).
+    """
+    if SCIENTIFIC_RELEASE_WRITE_ENABLED is not True:
+        raise UnifiedScientificLedgerBlocked(
+            "Scientific release creation HARD-DISABLED"
+        )
+    if (
+        type(release) is not dict
+        or type(external_approval_reference) is not str
+        or not external_approval_reference.strip()
+        or external_approval_reference.startswith("SYNTHETIC_")
+        or release.get("approval_reference") != external_approval_reference
+    ):
+        raise UnifiedScientificLedgerBlocked(
+            "Explicit external non-synthetic release approval required"
+        )
+
+    # G4D verifica HEAD clean e namespace assente; nessuna scrittura.
+    data = _strict_absolute(data_dir, "data root")
+    repo = _strict_absolute(repo_dir, "repository root")
+    gate = preview_scientific_ledger_gate(
+        data_dir=data, repo_dir=repo, expected_commit=expected_commit,
+    )
+    if (
+        gate.get("status") != "LEDGER_NAMESPACE_PREFLIGHT_PASS_BUT_NO_RELEASE"
+        or gate.get("source_commit") != expected_commit
+        or gate.get("new_namespace_absent") is not True
+        or gate.get("can_execute_api") is not False
+        or gate.get("can_create_scientific_claim") is not False
+        or gate.get("can_run_ood_test") is not False
+    ):
+        raise UnifiedScientificLedgerBlocked("Release preflight failed")
+
+    # Snapshot SDK verificato senza invocazioni di modelli.
+    import importlib.metadata as metadata
+    from evaluation.rq2_provider_policy_source_audit import (
+        EXPECTED_COLAB_VERSIONS,
+    )
+    from evaluation.rq2_model_factory import assert_exact_runtime_snapshot
+
+    try:
+        installed_versions = {
+            name: metadata.version(name) for name in EXPECTED_COLAB_VERSIONS
+        }
+        if (
+            installed_versions != EXPECTED_COLAB_VERSIONS
+            or release.get("runtime_versions") != installed_versions
+        ):
+            raise UnifiedScientificLedgerBlocked(
+                "Unpinned release SDK versions"
+            )
+        assert_exact_runtime_snapshot()
+    except (metadata.PackageNotFoundError, ImportError, OSError) as exc:
+        raise UnifiedScientificLedgerBlocked(
+            "Cannot verify pinned SDK runtime"
+        ) from exc
+
+    source = preview_unified_source_bound(
+        data_dir=data, src_root=repo / "src",
+    )
+    blueprint = build_unified_release_blueprint(source_preview=source)
+    receipt = validate_future_release(
+        release=release,
+        source_preview=source,
+        blueprint=blueprint,
+        externally_approved_sha256=approved_release_sha256,
+        expected_source_commit=expected_commit,
+    )
+    if (
+        receipt.get("status") != "RELEASE_CONTENT_VALIDATED_NO_EXECUTION_AUTHORITY"
+        or receipt.get("release_sha256") != approved_release_sha256
+        or receipt.get("can_execute_api") is not False
+        or receipt.get("can_create_scientific_claim") is not False
+        or receipt.get("can_run_ood_test") is not False
+    ):
+        raise UnifiedScientificLedgerBlocked("Release contract not verified")
+
+    # Create-only: il mkdir della root nuova e' il gate atomico contro
+    # sessioni concorrenti. Non rimuovere eventuali file parziali a
+    # seguito di errori: il successivo preflight deve fermarsi.
+    root = data / NAMESPACE
+    if root.is_symlink() or root.exists():
+        raise UnifiedScientificLedgerBlocked("Scientific release already exists")
+    try:
+        root.mkdir(mode=0o700)
+        with _writer_lock(root / LOCK_FILE):
+            (root / "claims").mkdir(mode=0o700)
+            (root / "records").mkdir(mode=0o700)
+            release_path = data / RELEASE_FILE
+            _write_once(release_path, release)
+            written = _read(release_path)
+            if written != release or release_digest(written) != approved_release_sha256:
+                raise UnifiedScientificLedgerBlocked("Release readback SHA mismatch")
+    except OSError as exc:
+        raise UnifiedScientificLedgerBlocked(
+            "Incomplete scientific release; MANUAL AUDIT ONLY"
+        ) from exc
+
+    return {
+        "status": "SCIENTIFIC_RELEASE_CREATED_NO_API_NO_CLAIM",
+        "release_sha256": approved_release_sha256,
+        "source_commit": expected_commit,
+        "release_relative_path": RELEASE_FILE.as_posix(),
+        "provider_requests_sent": 0,
+        "scientific_claims_written": 0,
+        "can_execute_api": False,
+        "can_run_ood_test": False,
+        "requires_separate_stage_authorization": True,
+    }
