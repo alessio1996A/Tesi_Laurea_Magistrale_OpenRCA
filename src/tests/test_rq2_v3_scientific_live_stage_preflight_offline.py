@@ -21,6 +21,8 @@ INVENTORY = "b" * 64
 
 class V3LiveRuntimePreviewOfflineTests(unittest.TestCase):
     def setUp(self):
+        runtime._RUNTIME_PROOF_CACHE.clear()
+        self.addCleanup(runtime._RUNTIME_PROOF_CACHE.clear)
         tmp = tempfile.TemporaryDirectory(prefix="V3_RUNTIME_PREVIEW_ONLY_")
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
@@ -120,10 +122,14 @@ class V3LiveRuntimePreviewOfflineTests(unittest.TestCase):
             "other_colab_sessions_or_vms_verified": False,
         }
         with (
-            patch.object(runtime, "_check_sync_sdk_proofs", return_value=sync),
-            patch.object(runtime, "_check_same_runtime_drive_scratch", return_value=drive),
+            patch.object(runtime, "_check_sync_sdk_proofs", return_value=sync) as sdk,
+            patch.object(runtime, "_check_same_runtime_drive_scratch", return_value=drive) as scratch,
         ):
             result = self.verify()
+            second = self.verify()
+            self.assertEqual(result, second)
+            sdk.assert_called_once()
+            scratch.assert_called_once()
         from evaluation.rq2_v2_unified_scientific_ledger import _sha
         self.assertEqual(result["status"], "V3_SDK_DRIVE_RUNTIME_GATE_VERIFIED")
         self.assertEqual(result["source_commit"], PIN)
