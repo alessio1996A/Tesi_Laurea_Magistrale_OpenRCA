@@ -1,73 +1,69 @@
-# HANDOFF — TESI OPENRCA / RQ2-V3, 15 novembre 2026
+# HANDOFF AGGIORNATO — Tesi OpenRCA, RQ2-V3, 15 novembre 2026 (post Colab)
 
-## Come proseguire e regole di lavoro
+> **Questo documento sostituisce operativamente il precedente handoff V3 dell'11/15**, precedentemente fermo a 83 test. Fonte di continuità per aprire una nuova chat: leggere integralmente, recuperare da GitHub i file rilevanti e verificare HEAD prima di ogni modifica. **Nessuna API LLM V3 eseguita; release V3 NON congelata; test/OOD BLOCCATI.**
 
-Questo documento è il punto di continuità per la prossima chat. Tesi magistrale in Ingegneria Informatica (Università di Catania), **Harness Engineering per LLM applicati a Root Cause Analysis su Microsoft OpenRCA**. Consegna prevista: **1 dicembre 2026**. Procedere con attenzione scientifica; preferire verifiche necessarie a rapidità e ripetizioni inutili.
+## Contesto e vincoli operativi
 
-Collaborazione concordata: modificare il codice su branch GitHub nuovo/non congelato; chiedere all'utente un comando PowerShell unico per test locali PyCharm; esaminare gli output; passare a Colab solo con preflight e autorizzazione separata. Non fare chiamate a pagamento prima dell'opt-in esatto. In fase finale: scrittura tesi, grafici accuratezza/token, confronto con paper OpenRCA 1.0, analisi della conoscenza K, refactoring e commenti italiani, rimozione file superflui senza toccare gli artifact. Avvisare spontaneamente quando conviene aprire nuova chat e preparare handoff, e quando servono paper/trascrizioni del professore; **non servono in questa fase ingegneristica**. Il professore NON vuole implementazione human-in-the-loop (solo discussione finale).
+- Università di Catania, tesi magistrale Ingegneria Informatica: **Harness Engineering per LLM in Root Cause Analysis (Microsoft OpenRCA)**. **Consegna 1 dicembre 2026**: non dilatare inutilmente l'ingegnerizzazione, iniziare scrittura dei capitoli RQ1/metodologia in parallelo alla chiusura di RQ2.
+- Metodologia concordata: GitHub branch non congelato → modifica isolata spiegata → PyCharm con **soli test pertinenti** → Colab read-only pin → singolo pilot reale SOLO dopo approvazione esplicita del nuovo commit, SHA release, specifico stage e budget. Mai autorizzare API dalla sola conferma dei test; non inventare esiti; GT-free sempre.
+- RQ1 e RQ2-V2 congelati, **non modificarli né ripetere campagne**. Human-in-the-loop NON richiesto dal professore (solo discussione conclusiva). In chiusura: refactoring e commenti italiani, rimozione prudentissima dei file superflui su branch separato, grafici token/accuratezza, stesura tesi.
+- Avvertire spontaneamente quando la chat diventa lunga; aggiornare handoff GitHub e fornire messaggio pronto da incollare nella chat successiva. Chiedere paper o trascrizioni del relatore **solo se realmente necessari**, indicando perché. **Non servono per il prossimo step tecnico**.
 
-## Risultati e vincoli congelati
+## RQ1 — risultati scientifici già congelati
 
-- RQ1 Evaluation20: 20 incidenti, 5 harness × 3 modelli = 300 tentativi, 295 complete e 5 errori provider. Scoring ufficiale Microsoft e analisi appaiate già congelati: **non ripetere, rescore o sovrascrivere**. Risultato Sonnet A1_PAVE medio 0.5040 vs A0 0.1165, strict 8 vs 1 sui 20 casi. In tesi distinguere effetti harness, variazioni tra modelli, token e limiti statistici.
-- RQ2-V2 **sorgente pin** `f0b64a36b08c2ae5db424b544965db5362190377`; **release SHA256** `af1867e2539edbb42cf27ae92c602dfacca1c12968475235955fb1cf0ed2dac4`. Architettura D (diagnosi), C (ipotesi causale), K (regola candidata).
-- Pilot reale V2 `cloudbed-1_q032:gemini:A0`: D `RECORDED_COMPLETE` (D SHA `8628b902aaa4a5955d8527ba6151eb1dc4d004aa9722cc11302a0c20fca98fb1`); C `INVALID_OUTPUT` (record SHA `51946d926aa2a5a0f9dd2ba997d8565116ef8158a2af44df5d0051d73ee3f4b1`); K `BLOCKED_DEPENDENCY`, zero API. D 7 model call, 30,332 input e 409 output token; C 1 call, 3,151 input e 257 output token.
-- In C il testo estratto contiene una newline NON escapata dentro il campo JSON `schema_version`. Il codice originale `agent.graph_engine.testo_messaggio()` usa `"\\n".join(parti)` su liste di content block; un test offline riproduce l'introduzione artificiale di newline. **NON sappiamo se sia stato questo a causare l'errore reale Gemini**, perché il record originale non salva i content block SDK non elaborati. Non riparare, rigiocare o riclassificare il record V2.
-- Discovery RQ2: **4 incidenti, 5 harness (A0, A1, A1_8R, A1_8R_Planning, A1_PAVE), 3 modelli (Gemini, Sonnet, Haiku)**; totale 180 stage D/C/K. **11 casi OOD/test BLOCCATI**; nessun GT/Market.zip/scorer disponibile al percorso discovery. Il budget approvato V2 era USD 100 operativo **non hard cap**; **non trasferire approvazione o pin V2 a una release V3**. Nessun retry automatico dopo claim e chiamata API ambigua.
-- La fase GT-free non prova la correttezza causale; analisi scientifica separa validità JSON, abstention, errori provider, qualità diagnosi, consumo token, qualità K, blocco dipendenze, e non fonde versioni sperimentali distinte.
+- Evaluation20: 20 incidenti, 5 harness × 3 modelli = 300 tentativi, 295 completati e 5 errori Gemini; scoring ufficiale Microsoft già eseguito; non rescore, non sovrascrivere, non rifare.
+- Sonnet A0: mean score 0.1165, strict 1/20; Sonnet A1_PAVE: mean score 0.5040, strict 8/20. Pairwise e trade-off token già presenti nel progetto. Limitare conclusioni alla coorte e ai provider osservati, non confondere l'incremento accuratezza con un trasferimento della conoscenza già dimostrato.
 
-## Perché serve V3
+## RQ2-V2 congelata e origine di V3
 
-Lo stesso difetto potenziale di estrazione interessa **C/K e anche la risposta finale D** nei motori `agent/rq2_v2_graph_engine.py` (A0/A1/A1_8R) e `agent/verify_graph.py` (Planning/PAVE). La soluzione candidata usa una politica **uniforme per le risposte finali D/C/K**: concatenare esattamente i frammenti testuali visibili senza inserire spazi/newline; non includere thinking/signatures/tool use; NON riparare JSON realmente malformati. Non alterare log dei tool, promps, metering, budget o grafi originali. Metadata: tipo contenuto, politica, numero di blocchi testuali e non testuali; non memorizzare thinking.
+- RQ2-V2 source commit `f0b64a36b08c2ae5db424b544965db5362190377`, release SHA-256 `af1867e2539edbb42cf27ae92c602dfacca1c12968475235955fb1cf0ed2dac4`. Il pilot reale `cloudbed-1_q032:gemini:A0` ha D `RECORDED_COMPLETE`, C `INVALID_OUTPUT`, K `BLOCKED_DEPENDENCY`; **NON** rifarlo o reinterpretarlo.
+- In C osservata una newline non escapata nel JSON salvato. Un test riproduce il potenziale effetto di `"\n".join(parti)` su content-block, ma **non dimostra** che abbia causato l'errore originale: content-block SDK non grezzi nel record congelato.
+- V3 affronta SOLO il rischio di disomogeneità nell'estrazione del testo finale su D/C/K: concatenare frammenti visibili senza separatori, non riparare JSON, escludere thinking/tool uses, mantenere provenienza. Stessi prompt C/K, cinque harness, modelli, budget e coorte. Nessun riuso di output D/C/K V2.
 
-Il trasporto V2 e ledger V2 sono congelati e non devono essere modificati. L'adattatore V2 normalizza solo stage ID V2, e il ledger V2 scarta i metadati aggiunti; quindi V3 richiede stage ID, ricevute, nuovo ledger, source inventory e release propri.
+## V3 — identità e stato sorgenti
 
-## Test mirati già SUPERATI in PyCharm — 83/83 PASS
+- GitHub: `alessio1996A/Tesi_Laurea_Magistrale_OpenRCA`, branch `feature/rq2-v3-gtfree-equal-comparison-design-2026-11-15`.
+- **Commit CODICE effettivamente testato in PyCharm e Colab**: `e564d49eeba392d4001b29a62c32a5693fc2c028`. L'aggiornamento di QUESTO handoff fa avanzare HEAD con **docs-only**: per le successive prove di source-bound release rileggere HEAD e rifare il solo inventory/commit-bound gate sul definitivo nuovo pin. Non presentare l'HEAD docs-only come commit già provato in Colab.
+- Protocollo `rq2_v3_unified_equal_ck_extraction_discovery_v0`, namespace futuro `data/rq2_v3_unified_scientific_v1`. 4 discovery × 5 harness `A0, A1, A1_8R, A1_8R_Planning, A1_PAVE` × 3 modelli `gemini, sonnet, haiku` × D/C/K = **180 stage logici**. **11 OOD/test sigillati**. Nessuna API V3, 0/180 stage tentati.
+- Componenti V3 ora implementati come codice **candidate/pre-release**:
+  - `src/evaluation/rq2_v3_unified_gtfree_discovery_plan.py` — piano.
+  - `src/evaluation/rq2_v3_d_final_stream_candidate.py`, `rq2_v3_d_runner_capture_candidate.py` — D final text + provenance per motori ReAct e Planning/PAVE.
+  - `src/evaluation/rq2_v2_ck_text_extraction_candidate.py`, `rq2_v2_ck_provider_transport_candidate.py` — estrazione/trasporto C/K, versione successore senza impatto V2.
+  - `src/evaluation/rq2_v3_scientific_receipt_adapter_candidate.py` — riceve D/C/K e controlla provenienza/status.
+  - `src/evaluation/rq2_v3_scientific_ledger.py` — ledger V3 separato con claim-before-request, create-only, parent hash, readback, orphan senza retry.
+  - `src/evaluation/rq2_v3_scientific_source_inventory.py` e `rq2_v3_scientific_source_release_gate.py` — verifica source inventory/release; **non creano una release**.
+  - `src/evaluation/rq2_v3_scientific_live_stage_preflight.py` — preview runtime; **`verify_v3_live_runtime_gate` al 15/11 termina SEMPRE in NO-GO**; NON contrassegnare sdk_retries_disabled_verified/per_request_timeout_verified/single_writer_drive_verified come veri per semplice input esterno.
+  - `src/evaluation/rq2_v3_scientific_single_stage_dispatcher.py` — collega D/C/K a ledger, commit/release/approvazione stage, opt-in esatto off per default. Senza release+runtime gate funzionante **non può eseguire API**. Il dispatcher NON equivale a campagna reale già validata.
+- **PyCharm: 147 test mirati distinti PASS forniti dall'utente**, non 147 test in un unico run: 83 precedenti + 10 ledger + 12 source inventory + 12 source release gate + 12 live runtime preview + 18 dispatcher. Dopo un fix mirato V3, ledger 10/10 e gate 12/12 confermati; successivamente runtime 12/12 e gate 12/12, dispatcher 18/18. **Non ripeterli per inerzia**. La suite globale `Ran 1434 tests` aveva failure 1 + errors 2 + skipped 2; i due errori V3 furono corretti e riconsolidati con test mirati, la failure AST del vecchio `test_rq2_v2_sync_429_retry_guard_offline.py` è preesistente: cerca assegnazione letterale `LIVE_API_ENABLED=False` benché la produzione V2 usi opt-in ambientale esatto. V2 rimane intatto. Non dichiarare l'intera suite globale verde.
 
-Tutti i seguenti esiti sono stati forniti dall'utente, senza SDK reali:
-1. **4/4** rischio newline della funzione originale e parità fra modelli sintetici;
-2. **9/9** estrattore esatto candidato;
-3. **6/6** trasporto C/K originale con estrattore candidato in test;
-4. **9/9** trasporto C/K candidato isolato;
-5. **3/3** compatibilità con adattatore/ledger V2 sintetici, evidenziando perdita metadati;
-6. **7/7** ricevuta C/K con provenienza e isolamento V2;
-7. **7/7** journal create-only sperimentale in TemporaryDirectory;
-8. **8/8** piano V3 GT-free distinto su 180 stage e 11 OOD bloccati;
-9. **5/5** rischio newline nella diagnosi D dei due motori;
-10. **9/9** `rq2_v3_d_final_stream_candidate` su stream graph sintetici;
-11. **7/7** integrazione `run_experiment()` reale con modelli/grafi/caso simulati e controllo task-aware originale.
+## Colab V3 — risultati REALMENTE comunicati dall'utente il 15/11
 
-**Non ripetere questi 83 test per inerzia.** Eseguire prima i nuovi test qui sotto. NON equiparare questi successi offline a validazione delle risposte degli SDK reali.
+**Repository su Colab**: `/content/Tesi_OpenRCA`, commit clean `e564d49eeba392d4001b29a62c32a5693fc2c028`; **dati** `/content/drive/MyDrive/Tesi_OpenRCA`. Condurre le prossime prove solo sul pin finale verificato; non cambiare branch automaticamente.
 
-## Branch di lavoro corrente e componenti
+1. **GT-free reale source inventory PASS**:
+   `gt_free_verified=true`, `rq1_source_verified=true`, `discovery_stages=180`, `ood_cases_locked=11`, `missing_future_sources=[]`.
+   Inventory candidate SHA256 (solo per il commit testato): `e13bc96871a39ccaae4f25fd3f4ba99b263a40ced08a48d29d4c52a0d9c1be06`.
+   `release_frozen=false`, `real_llm_calls=0`, `can_execute_api=false`.
+2. **Runtime SDK inizialmente globale Colab fallito correttamente** (Python 3.13.18; 1.7.4 core / 1.2.19 langgraph, 3 SDK assenti, google-genai 2.12.1). Ripristinato senza cambiare Colab globale, con **`pip --target /content/rq2_v2_pinned_sdk_py313`**: `langchain=1.4.7`, `langchain-core=1.7.1`, `langgraph=1.2.18`, `langchain-google-genai=4.4.2`, `langchain-anthropic=1.7.7`, `google-genai=2.34.0`, `anthropic=2.6.0`, `google-auth=2.56.0` + dipendenze. Nuovo subprocess `PYTHONPATH=DEPS:REPO/src` verifica **6/6 versioni esatte, 4/4 hash source SDK esatti, factory RQ1 invariata, factory RQ2 `assert_exact_runtime_snapshot(): PASS`**. Non reinstallare per inerzia.
+3. **Google Drive V3 scratch PASS**, stesso runtime Colab: lock concorrente respinto, lock rilasciato/riacquisito, **8 writer concorrenti → 1 O_EXCL successo, 7 collisioni**, readback corretto, scratch eliminato, `scientific_data_root_modified=false`, zero API. Stato `V3_DRIVE_SAME_RUNTIME_SCRATCH_PASS`. **NON provato fra sessioni/VM diverse**; ammettere SOLO una sessione Colab writer e uno stage seriale.
+4. **Trasporto SDK nel medesimo snapshot/pin V3: test HTTP 429 MOCK PASS e read timeout LOOPBACK PASS** (risultato utente):
+   - `SDK_SOURCE_AND_VERSION: PASS`
+   - `HTTP_429_MOCK: PASS`, stato `SYNC_HTTP_429_MOCK_ONE_SEND_EACH_NO_API_NOT_RELEASED`, 4 fake HTTP sends totali, **1 per provider (Google, Anthropic) × tipo (`CK_tool_free`, `D_bound_tools`)**.
+   - `SYNC_LOOPBACK_TIMEOUT: PASS`, stato `SYNC_LOCAL_STALL_TIMEOUT_CHECKED_NO_API_NO_RELEASE`, 4 invii loopback e 4 timeout observed, in secondi: Google CK **0.305**, Google D **0.3044**, Anthropic CK **0.3033**, Anthropic D **0.3036**; un invio ciascuno. Credenziali fittizie, loopback `127.0.0.1` o HTTP finto, zero chiamate LLM.
+   - Le sonde esistenti sono `src/tests/rq2_v2_sync_429_retry_probe.py` e `src/tests/rq2_v2_sync_timeout_loopback_probe.py` usate con `PYTHONPATH=DEPS:REPO/src:REPO/src/tests` e commit V3. Storica prova 503 finto sui medesimi SDK con SHA della fonte (12/11), senza bisogno di ripeterla, documentata `docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`.
+   - Il `graph.stream()` in RQ1 cicla gli eventi del grafo, ma i nodi LLM usano `llm.invoke()` / `llm.bind_tools(...).invoke()` sincroni. I test 429/503/stallo coprono quei **percorsi di trasporto**, non tutte le traiettorie reali del grafo, né async/streaming HTTP, massimo globale numero richieste, timeout dell'intero D, né hard cap USD. `async_streaming_tested=false`, `full_stage_timeout_guaranteed=false`, `usd_hard_cap_guaranteed=false`.
+5. Tutte le evidenze Colab V3 riportano **`real_llm_calls=0`, `can_execute_api=false`, `release_frozen=false`**. I test con chiavi fake non autorizzano alcun pilot.
 
-Branch: `feature/rq2-v3-gtfree-equal-comparison-design-2026-11-15`. Creato dal branch audit `audit/rq2-v2-ck-multiblock-fairness-2026-11-15`, che include la prima documentazione del rischio JSON. Il commit HEAD **va riletto da GitHub**, non inferito da questo documento dopo nuovi commit.
+## BLOCCANTI REALI E NEXT STEP — NO-GO FINCHÉ NON RISOLTI
 
-Componenti già sul branch:
-- `src/evaluation/rq2_v2_ck_text_extraction_candidate.py`: politica esatta, nessuna API.
-- `src/evaluation/rq2_v2_ck_provider_transport_candidate.py`: trasporto C/K candidato, no retry, metadata, non collegato al dispatcher.
-- `src/evaluation/rq2_v3_ck_provenance_receipt_candidate.py`: prima ricevuta C/K; **usa stage ID V2**, solo studio di fattibilità, non usare nel dispatcher V3.
-- `src/evaluation/rq2_v3_offline_provenance_journal_prototype.py`: journal sperimentale temporaneo, NON ledger scientifico produttivo.
-- `src/evaluation/rq2_v3_unified_gtfree_discovery_plan.py`: piano deterministico V3 `rq2_v3_unified_equal_ck_extraction_discovery_v0`; 180 stage nuovi; **namespace proposto** `data/rq2_v3_unified_scientific_v1`; OOD 11 bloccati. No riuso di D/C/K storici V2; no release.
-- `src/evaluation/rq2_v3_d_final_stream_candidate.py`: cattura l'AIMessage finale D tramite delegatore monouso del grafo; conserva copia originale, tool e token.
-- `src/evaluation/rq2_v3_d_runner_capture_candidate.py`: integrazione tramite patch contestuale offline delle due funzioni chiamate da `run_experiment()`. È ancora **prototipo**; evitare globale patch in live/concorrenza senza adeguati gate e test.
-- `src/evaluation/rq2_v3_scientific_receipt_adapter_candidate.py`: **NUOVO**, normalizza D e C/K con ID V3, riusa validator puri già collaudati, controlla provenance e sanitized errors, conserva in D `d_final_text_extraction` e in C/K `text_extraction`; non scrive e non esegue provider.
-- `src/tests/test_rq2_v3_scientific_receipt_adapter_candidate_offline.py`: **9/9 PASS confermati dall'utente il 15 novembre 2026 (`Ran 9 tests in 1.714s — OK`)**; verifica 15 arms (5×3) D/C/K, rifiuto ID V2/altro modello/OOD, errori sicuri, JSON C malformato preservato, contatori/provenienza, trasporto SDK mock senza HTTP.
+**Non ripetere test già PASS. Proseguire dalla progettazione di una attestazione V3 effettiva, verificabile, source-bound e conservativa**:
 
-L'adattatore è una prova di contratto, **non è un ledger scientifico né una release V3**. Per K il controllo del genitore C completo va ancora gestito nel futuro ledger V3; non attribuire questo gate all'adattatore puro. Per D la validazione del record e della provenienza è distinta dai vincoli di commit/release/claim, ancora assenti.
+1. Il runtime gate V3 `verify_v3_live_runtime_gate` **fa sempre raise**. Esiste soltanto preview di versioni/source. Per accettare una release occorre una logica esplicita che controlli prove credibili e loro ambito: SDK sincrono retry e timeout, limiti non provati, single writer stesso runtime (non multi-VM), gestione usage fail-closed. Evitare di impostare flag `true` basandosi soltanto su mock o report autoasseriti; valutare se il contratto richiede prove irrealistiche come HTTP hard-cap globale e progettare correzione **soltanto V3** con audit circoscritto. La revisione codice cambierà commit/source hash: nuovo preflight mirato finale.
+2. Il contratto della **release V3** attualmente richiede file `data/rq2_v3_unified_scientific_v1/release_v1.json` create-only con schema rigoroso, SHA canonico, `runtime_attestation_sha256`, source inventory, futuro dispatcher/runtime hashes e commit clean, non crea automaticamente il file. Studiare verifica release + ledger per evitare circolarità/auto-approvazione e **non creare release senza revisione esplicita**; un hash non è una firma utente. Fare un dossier di prerelease GT-free e budget realistico.
+3. Eseguire soltanto verifica differenziale/targeted dei nuovi componenti, poi checkout definitivo clean Colab, inventory GT-free source/runtimes finali e freeze scientifico V3. Non cambiare protocolli/fonte RQ1/V2.
+4. Dopo il freeze: prezzi/quote aggiornati, costi token, rischio D multichiamata, **budget operativo non hard cap** e separata approvazione utente del **singolo stage** (identità stage, modello, commit, SHA release, USD), con opt-in esatto. Solo dopo autorizzare **una** chiamata di pilot D; claim-first prima della chiamata, nessun retry automatico, audit claim/record post-call. Se provider restituisce error o claim resta orphan: STOP e review, mai retry opportunistico.
+5. Poi eventuale campagna 180 stage (non 180 chiamate HTTP: D multichiamata e K può restare bloccato), analisi K con outcome e limiti su 4 incidenti; 11 OOD non sbloccare prima di freeze/decisione metodologia di generalizzazione. Scrivere tesi parallelamente: RQ1 copre risultati quantitativi già solidi, RQ2 non è ancora evidenza di knowledge transfer.
 
-## Prossima azione concordata
+## Messaggio da passare alla prossima chat
 
-1. **CONCLUSO**: `test_rq2_v3_scientific_receipt_adapter_candidate_offline.py` — 9/9 PASS riferiti dall'utente. Non ripetere questo test senza una modifica al codice che lo giustifichi.
-2. **PROSSIMA FASE**: implementare **ledger V3 create-only indipendente** con propri stage-ID, namespace distinto, release/source-bound preflight, controllo D/C/K completo e readback metadati, dati GT-free, claim-first/no-auto-retry, audit integrità e crash, singolo writer; test esclusivamente temporanei fino a gate scientifico.
-3. Dopo regressione selettiva: costruire nuovi source inventory e release V3 con commit clean, audit SDK/runtime, preflight read-only Google Colab/Drive, protezione OOD. Non fare stage pagati senza esplicita nuova approvazione per release, singolo stage e budget. Non mescolare output V2 con V3.
-4. Quando la campagna RQ2 è congelata: trasferimento conoscenza/valutazione, analisi scientifica, grafici accuratezza/token, stesura, pulizia codice/commenti italiani. Non consentire che la correzione ingegneristica si trasformi in un esperimento non pianificato.
-
-**Stato attuale: NO-GO per nuovi stage a pagamento. V2 e RQ1 completamente intatti. Paper/trascrizioni del professore non necessari adesso.**
-
-## ESITO NUOVA CHAT — 15 novembre 2026, 83/83 test PASS
-
-L'utente ha comunicato `Ran 9 tests in 1.714s — OK` per il test dell'adattatore V3. Totale cumulativo dei test MIRATI superati con esito PyCharm riferito dall'utente: **83/83** (= 74 precedenti + 9 nuovi); non sono test con chiamate API. I nuovi test comprendono 15 combinazioni harness/modello su D/C/K sintetici, isolamento dei V2 stage ID, errori redatti, errori JSON preservati, contatori e provenienza.
-
-**HANDOFF OPERATIVO:** passare ora a nuova conversazione e leggere integralmente questo file mediante connettore GitHub, mantenendo branch `feature/rq2-v3-gtfree-equal-comparison-design-2026-11-15`. Non riavviare i test già superati. Primo intervento: progettare un **ledger V3 scientifico, realmente separato e source-bound**, anziché usare il journal prototipo `rq2_v3_offline_provenance_journal_prototype.py` come se fosse produzione. Controllare che gli artifact D/C/K dell'adattatore V3 siano verificati anche al readback: digest canonico, status + campi, provenienza, parent record SHA, claim-before-call, blocked K senza claim, orphan/no retry, namespace create-only, per-stage approval, source/release SHA e nessun GT. Tenere distinto il contesto simulato da quello reale. Dopo il ledger e la release V3, test SDK e preflight Colab rigorosamente **senza API**, quindi richiedere esplicita autorizzazione a UN pilot. Nessun budget precedente comporta approvazione V3 automatica.
-
-Nessun altro codice o release scientifica è stato modificato dopo la registrazione di questi 9 PASS; la prossima chat deve verificare HEAD corrente prima delle modifiche. Questo handoff è la fonte di continuità più recente e prevale sulle indicazioni storiche di PENDING nei paragrafi precedenti.
+> Continua la mia tesi magistrale OpenRCA/RQ2-V3. Usa il connettore GitHub e leggi integralmente `docs/ood/HANDOFF_RQ2_V3_GT_FREE_EQUAL_COMPARISON_PRE_RELEASE_2026-11-15.md` sul branch `feature/rq2-v3-gtfree-equal-comparison-design-2026-11-15` del repo `alessio1996A/Tesi_Laurea_Magistrale_OpenRCA`. Il commit di **codice realmente testato su Colab** è `e564d49eeba392d4001b29a62c32a5693fc2c028`, mentre HEAD potrebbe essere avanzato per aggiornare la documentazione; verifica quello corrente. Abbiamo **147 test mirati PyCharm PASS**, inventory GT-free V3, SDK 6/6 versioni + 4/4 source hashes, factory RQ2 PASS, Drive same-runtime lock/O_EXCL scratch PASS, test SDK sincroni 429 MOCK e timeout loopback PASS sul pin V3; 0 API reali V3, 11 OOD locked. **Release V3 ancora NO-GO** perché il runtime gate è deliberatamente fail-closed e release/attestazione non sono implementate fino al punto di avvio. Non ripetere test e non modificare RQ1/RQ2-V2. Prossimo compito: completare in modo minimale e corretto l'attestazione runtime source-bound e il freeze GT-free della release V3, poi richiedere separatamente consenso per un singolo stage/budget. Consegna tesi 1 dicembre 2026: evitare nuovi audit non necessari, scrivere RQ1/metodologia in parallelo. Avvisami sempre quando cambiare chat; chiedi paper/trascrizioni solo se servono davvero.
