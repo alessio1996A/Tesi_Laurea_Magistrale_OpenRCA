@@ -15,7 +15,7 @@ from typing import NamedTuple
 
 MAX_BLOCKS = 256
 POLICY = "rq2_ck_exact_text_fragments_candidate_v1"
-TEXT_KINDS = frozenset((None, "text", "text_delta"))
+TEXT_KINDS = (None, "text", "text_delta")
 
 
 class VisibleText(NamedTuple):
