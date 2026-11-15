@@ -1177,3 +1177,72 @@ G4K live remains `LIVE_API_ENABLED=False`. Dopo audit SDK:
 freeze di nuovo commit finale, review prezzo/budget,
 approval SHA release e user consent per UN pilot D,
 no 11 OOD; zero run RQ2-V2 API.
+
+## 34. SDK-only mock Colab PASS e tariffe ufficiali ricontrollate (15 novembre)
+
+**Output esatto utente Colab:** `RQ2_FACTORY_RUNTIME: PASS`;
+`SDK MOCK: PASS — 0 API REALI`.
+Il report `SDK_LOCAL_MOCK_CHECKED_LANGCHAIN_NETWORK_POLICY_NOT_FROZEN`
+è uscito con
+`source_snapshot_sha256=79d209cd7678b9ca036699cfa572579a20c2a62c4fd021042adf9d5b90f5ee98`.
+Google `retry_args` local counts = default 1, attempts=1→1,
+attempts=2→2. Anthropic SDK synthetic 503 con
+`sdk_mock_503_attempts=1`, timeout CONFIGURATO nella
+sola prova mock = 15 secondi. Factory RQ2 exact snapshot PASS
+sul target isolato; socket network deny-all; 0 credenziali reali,
+0 modello, 0 GT e 0 OOD. `scientific_release_signed=false`
+e tutti i gate API ancora false.
+
+**Limiti dichiarati dallo stesso report:** LangChain forwarding
+non verificato DA QUESTO test; stall timeout, streaming/async,
+aiohttp implicit retry NON provati. Un precedente test del 12/11
+`docs/ood/RQ2_COLAB_FAKE_HTTP_INVOKE_2026-11-12.md`
+aveva verificato LangChain→SDK sincrono con HTTP 503 finto,
+un send per invoke CK e D-bound in Gemini e Anthropic, sullo
+stesso snapshot di versioni/sha, ma non autorizza da solo
+assumptions di hard cap per tutti i trasporti/condizioni.
+Non impostare arbitrariamente `transport_retries_proven_no_implicit_http_retry`
+o `per_request_timeout_verified` nella release basandosi SOLO
+sull'SDK-only test; il contratto G4E richiede tali flag TRUE
+con evidenza sufficiente per il percorso davvero usato.
+
+**Prezzi ufficiali base paid standard ricontrollati sul web
+il 15/11/2026** rispetto ai valori sorgente
+`rq2_budget_preflight.py` del 12/11:
+- Gemini 3.5 Flash-Lite $0.30 input / $2.50 output
+  per milione token; output incluso thinking.
+  `https://ai.google.dev/gemini-api/docs/pricing`
+- Claude Sonnet 5.5 $2.00 input / $10.00 output;
+  `https://platform.claude.com/docs/en/about-claude/pricing`
+- Claude Haiku 5.5 $0.10 input / $0.50 output con
+  prompt per chiamata <=100K, $0.50/$2.50 per prompt >100K.
+  Stessa fonte Anthropic. Nessuna cache/Batch, tassa, conversione
+  né tier gratuito presunti. Sono **tariffe, non un budget
+  autorizzato né un limite massimo a consumo**. Non assumere
+  che le API remote/quote dei tre modelli siano confermate senza
+  una vera chiamata; la campagna unificata è ancora a 0/180 stage.
+
+**Next decisione, senza ricominciare il progetto**:
+- valutare se le prove esistenti sul PERCORSO sync effettivamente
+  utilizzato dal dispatcher G4K (non streaming) + policy
+  `TIMEOUT_SECONDS=300`, retry Google=1, Anthropic=0,
+  sono sufficienti e quali garanzie restano false; non mentire
+  nel release contract;
+- ricostruire release/preregistration finale sul commit **NUOVO**
+  (il report Colab 29 sorgenti è vincolato a HEAD `601dc7...`);
+- stabilire budget operativo iniziale e 1 stage D discovery
+  con consenso esplicito user, e solo allora creare release
+  create-only + pin SHA esterno, audit manuale, sbloccare con nuovo
+  commit G4K `LIVE_API_ENABLED=False` mantenendo safe gate;
+- D puo' richiedere più invoke, stimare ma niente hard cap USD
+  o HTTP certificato; no retry su orphan e writer seriale;
+- non avviare 11 OOD, non scrivere RQ1, non rimuovere documenti
+  prima del refactoring finale successivo alla raccolta dati.
+
+Report:
+`docs/ood/RQ2_V2_UNIFIED_COLAB_SDK_LOCAL_MOCK_PASS_2026-11-15.md`.
+La chat è lunga: prima del cambio successivo usare questo handoff
+e fornire all'utente un messaggio di trasferimento con branch,
+ultimo HEAD, output Colab/SDK, source SHA, gates aperti e singola
+azione successiva. Non confondere SHA del commit preflight 601dc7
+con HEAD successivo dei soli commit documentali.
