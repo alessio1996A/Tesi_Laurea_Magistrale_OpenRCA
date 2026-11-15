@@ -840,3 +840,44 @@ python -m unittest discover -s src/tests -p "test_rq2_v2_unified_single_stage_di
 **24 test PENDING** dopo fix: non dichiarare G4I PASS fino
 all'output. G4F 22 PASS, G4G 17 PASS, G4H 20 PASS
 gia' attestati. Nessuna API eseguita, test OOD 11 locked.
+
+## 26. G4I 24 PASS e G4J provider receipt adapter (15 novembre 2026)
+
+**Esito utente PyCharm:** `Ran 24 tests in 11.480s; OK` per
+`test_rq2_v2_unified_single_stage_dispatcher_offline.py`.
+**G4I PASS 24/24** dopo correzione chirurgica del solo test
+di manomissione release, senza cambiare codice G4I/G4F/GT-free.
+I gate recenti G4F=22 PASS, G4G=17 PASS, G4H=20 PASS, G4I=24 PASS.
+
+**Nuovo G4J aggiunto (PENDING test PyCharm):**
+`src/evaluation/rq2_v2_unified_provider_result_adapter.py` +
+`src/tests/test_rq2_v2_unified_provider_result_adapter_offline.py`
+(**25 metodi da lanciare**). Non importa/crea SDK, non invoca
+API, non crea claim, non legge GT o Market. Normalizza ricevute
+gia' ottenute da D `run_experiment` e C/K
+`rq2_ck_provider_transport._one_call` in
+`status+artifact` compatibili col nuovo ledger G4F.
+RIUSA il medesimo validatore G4F per status complete/invalid;
+identita' stage/LLM/harness source-bound, preserva errori
+provider e JSON non valido senza repair. Distinzione:
+logical invocations osservate NON hard cap HTTP;
+token osservati NON costo accertato: USD sempre UNKNOWN,
+usage_complete indipendente. Testano 3 modelli, errori/usage,
+forged E### e write/readback D/C/K su ledger create-only FAKE.
+No provider pagati. I vecchi trasporti V1 NON sono autorizzati
+ad usare il namespace G4F senza adattamento.
+
+**Documento completo:**
+`docs/ood/RQ2_V2_UNIFIED_G4I_PASS_G4J_PROVIDER_RECEIPTS_2026-11-15.md`.
+
+**Prossimo PyCharm** su checkout clean:
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_provider_result_adapter_offline.py" -v
+```
+Attesi 25 e OK, non attestati. Poi il nuovo transport/dispatcher
+effettivamente live per singolo stage iniettando factory fake
+negli UNITTEST, source inventory completo (G4F/G4H/G4I/G4J e
+adapter/factory) + freeze SHA/commit, lock Drive e
+consenso esplicito al singolo pilot reale. 11 OOD locked.
