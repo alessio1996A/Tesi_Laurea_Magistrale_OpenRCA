@@ -10,6 +10,7 @@ dependencies, claim-first, restart and the provenance envelopes.
 from __future__ import annotations
 
 import hashlib
+import re
 
 from evaluation.rq2_v2_ck_text_extraction_candidate import (
     POLICY, MAX_BLOCKS,
@@ -36,6 +37,7 @@ VERSION = "rq2_v3_scientific_receipt_adapter_candidate_v0"
 D_FIELDS = frozenset(("schema", "policy", "content_kind",
                       "text_blocks", "nontext_blocks"))
 STATUSES = frozenset(("RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR"))
+D_ERROR_CODE = re.compile(r"RUNNER_EXECUTION_ERROR_SHA256_[0-9a-f]{16}\\Z")
 
 
 class V3ScientificReceiptBlocked(ValueError):
@@ -130,6 +132,13 @@ def validate_v3_scientific_artifact(
         if status == "PROVIDER_ERROR":
             if diagnostic_run is not None:
                 raise V3ScientificReceiptBlocked("D error has untrusted source")
+            d_error = artifact["provider_error"]
+            if (
+                type(d_error) is not str
+                or not (D_ERROR_CODE.fullmatch(d_error)
+                        or d_error == "SDK_CONSTRUCTION_ERROR")
+            ):
+                raise V3ScientificReceiptBlocked("Unredacted/untrusted D error")
             # A D runner error must have discarded raw output; the meta
             # remains source-bound only under a future V3 ledger.
             _validate_d_meta(
@@ -165,6 +174,10 @@ def validate_v3_scientific_artifact(
     )
     if set(artifact) != required | {"text_extraction"}:
         raise V3ScientificReceiptBlocked("C/K V3 artifact schema mismatch")
+    if status == "PROVIDER_ERROR":
+        error_code = artifact["provider_error"]
+        if type(error_code) is not str or not ERROR_CODE.fullmatch(error_code):
+            raise V3ScientificReceiptBlocked("Unredacted/untrusted C/K error")
     meta = artifact["text_extraction"]
     try:
         _strict_metadata(
