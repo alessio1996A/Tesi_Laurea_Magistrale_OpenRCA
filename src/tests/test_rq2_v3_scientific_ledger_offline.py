@@ -28,6 +28,7 @@ from test_rq2_v3_scientific_receipt_adapter_candidate_offline import (
     sid, source_d, capture, ck_call, cause, rule,
 )
 
+GEMINI_MODEL_ID = build_offline_v3_discovery_plan()["model_ids"]["gemini"]
 PIN = "a" * 40
 INVENTORY_SHA = "b" * 64
 
@@ -83,7 +84,7 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
             expected_commit=PIN, approved_release_sha256=self.sha,
         )
 
-    def auth(self, stage_id, model_id="gemini", budget="0.10"):
+    def auth(self, stage_id, model_id=GEMINI_MODEL_ID, budget="0.10"):
         return {
             "scope": "ONE_V3_STAGE_CLAIM_ONLY",
             "stage_id": stage_id,
@@ -94,7 +95,7 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
             "stage_budget_usd": budget,
         }
 
-    def claim_and_record(self, stage_id, receipt, *, model_id="gemini"):
+    def claim_and_record(self, stage_id, receipt, *, model_id=GEMINI_MODEL_ID):
         claim = self.ledger.claim_stage(
             stage_id=stage_id, model_id=model_id,
             stage_authorization=self.auth(stage_id, model_id),
@@ -160,7 +161,7 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
         for stage in ("C", "K"):
             blocked_id = sid(stage=stage)
             result = self.ledger.record_stage(
-                stage_id=blocked_id, model_id="gemini", blocked=True,
+                stage_id=blocked_id, model_id=GEMINI_MODEL_ID, blocked=True,
             )
             self.assertEqual(result["status"], "BLOCKED_DEPENDENCY")
             record = self.ledger.load_record(stage_id=blocked_id)
@@ -174,34 +175,34 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
     def test_orphan_blocks_other_claims_and_no_automatic_retry(self):
         first = sid()
         existing = self.ledger.claim_stage(
-            stage_id=first, model_id="gemini",
+            stage_id=first, model_id=GEMINI_MODEL_ID,
             stage_authorization=self.auth(first),
         )
         self.assertEqual(self.new_ledger().audit_restart()["orphan_claims"], 1)
         another = sid(harness="A1")
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.claim_stage(
-                stage_id=another, model_id="gemini",
+                stage_id=another, model_id=GEMINI_MODEL_ID,
                 stage_authorization=self.auth(another),
             )
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.claim_stage(
-                stage_id=first, model_id="gemini",
+                stage_id=first, model_id=GEMINI_MODEL_ID,
                 stage_authorization=self.auth(first),
             )
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.record_stage(
-                stage_id=first, model_id="gemini", receipt=self.d_receipt(),
+                stage_id=first, model_id=GEMINI_MODEL_ID, receipt=self.d_receipt(),
                 expected_claim_sha256="0" * 64,
             )
         self.ledger.record_stage(
-            stage_id=first, model_id="gemini", receipt=self.d_receipt(),
+            stage_id=first, model_id=GEMINI_MODEL_ID, receipt=self.d_receipt(),
             expected_claim_sha256=existing["claim_sha256"],
         )
         self.assertEqual(self.ledger.audit_restart()["orphan_claims"], 0)
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.record_stage(
-                stage_id=first, model_id="gemini", receipt=self.d_receipt(),
+                stage_id=first, model_id=GEMINI_MODEL_ID, receipt=self.d_receipt(),
                 expected_claim_sha256=existing["claim_sha256"],
             )
 
@@ -211,21 +212,27 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
         for stage_id in (ood, v2):
             with self.assertRaises(V3ScientificLedgerBlocked):
                 self.ledger.claim_stage(
-                    stage_id=stage_id, model_id="gemini",
+                    stage_id=stage_id, model_id=GEMINI_MODEL_ID,
                     stage_authorization=self.auth(stage_id),
                 )
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.claim_stage(
                 stage_id=sid(), model_id="wrong", stage_authorization=self.auth(sid()),
             )
+        # Logical name is not the provider model_id: prevent silent aliasing.
+        with self.assertRaises(V3ScientificLedgerBlocked):
+            self.ledger.claim_stage(
+                stage_id=sid(), model_id="gemini",
+                stage_authorization=self.auth(sid()),
+            )
         wrong = self.auth(sid())
         wrong["release_sha256"] = "c" * 64
         with self.assertRaises(V3ScientificLedgerBlocked):
             self.ledger.claim_stage(
-                stage_id=sid(), model_id="gemini", stage_authorization=wrong,
+                stage_id=sid(), model_id=GEMINI_MODEL_ID, stage_authorization=wrong,
             )
         with self.assertRaises(V3ScientificLedgerBlocked):
-            self.ledger.record_stage(stage_id=sid(), model_id="gemini", blocked=True)
+            self.ledger.record_stage(stage_id=sid(), model_id=GEMINI_MODEL_ID, blocked=True)
 
     def test_invalid_json_c_not_repaired_and_k_blocked(self):
         diag = source_d()
@@ -239,7 +246,7 @@ class V3ScientificLedgerOfflineTests(unittest.TestCase):
         self.assertEqual(c["status"], "INVALID_OUTPUT")
         self.assertEqual(c["artifact"]["raw_response"], corrupted)
         self.ledger.record_stage(
-            stage_id=sid(stage="K"), model_id="gemini", blocked=True,
+            stage_id=sid(stage="K"), model_id=GEMINI_MODEL_ID, blocked=True,
         )
         self.assertEqual(
             self.ledger.load_record(stage_id=sid(stage="K"))["status"],
