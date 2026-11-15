@@ -1262,3 +1262,19 @@ con HEAD successivo dei soli commit documentali.
 La documentazione dettagliata e' `docs/ood/RQ2_V2_UNIFIED_SYNC_LOOPBACK_TIMEOUT_PASS_NEXT_RELEASE_2026-11-15.md`. Nessun modulo di produzione o RQ1 e' stato modificato: soltanto i due test nuovi e questo aggiornamento documentale dopo il preflight 29-source su `601dc7...`.
 
 **Prossima decisione tecnica/scientifica:** circoscrivere il gate retry/timeout al sync effettivamente usato e decidere se l'evidenza e' sufficiente o se un SOLO caso negativo mirato ancora mancante (p.es. 429) serve prima del freeze. Poi pianificare budget stage D, verifica sorgenti finali, release SHA esterno e consenso esplicito del singolo pilot. Non creare release o abilitare G4K senza questi passaggi; `LIVE_API_ENABLED=False`; RQ2-V2 rimane 0/180 stage API, 11 OOD LOCKED.
+
+## 36. HTTP 429 sync PASS e chiusura verifiche mirate 503/429/stallo (15 novembre)
+
+**Utente PyCharm:** `Ran 6 tests in 0.521s — OK` per `test_rq2_v2_sync_429_retry_guard_offline.py`.
+
+**Utente Colab pinned SHA `442bf7d61762cf5b11b58050d53aa8258ab74e0b`:**
+`status=SYNC_HTTP_429_MOCK_ONE_SEND_EACH_NO_API_NOT_RELEASED`;
+`synthetic_429_http_sends_total=4`; un HTTP sintetico per (Google, Anthropic) × (CK tool-free, D bound-tools), tutti con `http_error_observed=true`; `external_provider_requests=0`; `real_credentials_used=false`;
+`async_streaming_tested=false`; `max_http_attempts_guaranteed=null`;
+`usd_hard_cap_guaranteed=false`; `scientific_release_frozen=false`;
+`can_execute_api=false`; `can_run_ood_test=false`.
+Il report e' `docs/ood/RQ2_V2_UNIFIED_COLAB_SYNC_429_MOCK_PASS_2026-11-15.md`.
+
+**Cosa risulta verificato:** configurazioni SDK source-pinned e percorsi LangChain sync per test in-memory 503, 429 e loopback timeout di 0.3s, con un invio per scenario osservato. NON ci sono prove di tutte le possibili HTTP failure, di 300s runtime effettivi, di limite stage D, di hard cap USD, di async/stream o di API reali. Non ripetere altre prove generiche. RQ1 e 29 sorgenti di produzione non modificati da questi aggiornamenti.
+
+**Gate successivi:** verifica prezzo/quote provider; budget *esplicitamente* approvato; source freeze HEAD clean su Colab con hash dei 29 sorgenti; G4E/G4F create-only e release SHA approvato esternamente, poi consenso esplicito sullo stage D singolo (non altri). Matrice V2 per modello D/C/K = 20/20/20, NON V1 30/30/8. `LIVE_API_ENABLED=False` e OOD 11 LOCKED, stage reali V2 `0/180`.
