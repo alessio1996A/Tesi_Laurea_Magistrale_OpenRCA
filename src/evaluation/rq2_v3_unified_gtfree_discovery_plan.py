@@ -74,10 +74,38 @@ def build_offline_v3_discovery_plan() -> dict:
     ):
         raise RQ2V3PlanBlocked("Baseline cohort/model/harness drift")
 
+    if (
+        v2.get("entries_sha256") != _sha(entries)
+        or v2.get("preview_sha256") != _sha({
+            key: value for key, value in v2.items() if key != "preview_sha256"
+        })
+    ):
+        raise RQ2V3PlanBlocked("V2 preview or entries SHA drift")
+
     rows = []
     for old in entries:
         if type(old) is not dict or old.get("stage") not in STAGES:
             raise RQ2V3PlanBlocked("Malformed baseline entry")
+        if (
+            old.get("case_id") not in DISCOVERY
+            or old.get("logical_model") not in MODELS
+            or old.get("harness") not in HARNESSES
+            or old.get("model_id") != v2["model_ids"].get(old["logical_model"])
+            or old.get("d_engine") != ENGINES.get(old["harness"])
+        ):
+            raise RQ2V3PlanBlocked("Baseline arm identity drift")
+        prefix = (
+            f"{V2_PROTOCOL}:{old['case_id']}:"
+            f"{old['logical_model']}:{old['harness']}"
+        )
+        expected_deps = (
+            [] if old["stage"] == "D" else
+            [prefix + ":D"] if old["stage"] == "C" else [prefix + ":C"]
+        )
+        if old["stage_id"] != prefix + ":" + old["stage"] or (
+            old.get("depends_on") != expected_deps
+        ):
+            raise RQ2V3PlanBlocked("Baseline D/C/K dependency drift")
         row = {
             "stage_id": _v3_stage_id(old["stage_id"]),
             "case_id": old["case_id"],
