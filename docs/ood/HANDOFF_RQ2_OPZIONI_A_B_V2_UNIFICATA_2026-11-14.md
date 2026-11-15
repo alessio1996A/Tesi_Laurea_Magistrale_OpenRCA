@@ -1290,3 +1290,13 @@ Unicamente **WHAT-IF**: D = 150k input + 5k output aggregati, C e K = 10k input 
 Confronto GitHub fra preflight 29-source `601dc7c2f971b919962ff190e6feb192c4dd237a` e SHA documentale `c09d6bfa3c45e518a208d5d9e9029ec6512216c0`: ZERO modifiche ai file `src/` di produzione; solo quattro file di probe/test nuovi `src/tests/` e note `docs/`. Non ripetere 29-source preflight né suite storiche senza nuovo cambio sorgenti/causa scientifica; il freeze definitivo va comunque pinning su nuovo commit clean.
 
 **Prossima decisione esterna mancante:** budget operativo esplicito USD per il singolo pilot D (non hard cap) e policy di stop; NON equivale ancora ad autorizzazione a chiamare API. Successivamente freeze/release SHA e consenso esplicito ulteriore per esatto stage. V2 0/180 reali, OOD 11 LOCKED, `LIVE_API_ENABLED=False`.
+
+## 38. Indicazione del relatore, priorita' scientifiche e refactoring alla fine
+
+L'utente riferisce che il relatore ha detto di **non lasciarsi frenare dai costi**: la priorita' e' realizzare RQ2 accuratamente e in modo riproducibile. Questa e' un'indicazione di priorita' progettuale e NON costituisce un'approvazione esplicita a eseguire API o spendere senza limite. Il contratto G4E esige ancora un `approved_total_usd_limit` positivo e una reale `approval_reference`, mentre ogni singolo stage D/C/K richiede una conferma distinta. Non richiedere di nuovo micro-budget mentre si procede ai gate scientifici.
+
+L'utente conferma per la fase finale, **dopo raccolta/audit/freeze dati**: refactoring del codice, commenti/docstring in italiano, pulizia dei file e riordino dei repository. Lavoro su branch dedicata, previa analisi dipendenze e salvaguardia degli archivi scientifici. Non iniziare ora la pulizia, non cancellare dati o evidenze originali.
+
+Prossimo gate prioritario: preregistrazione indipendente della valutazione conservativa K (grounding E###, non-contraddizione segnali/condizioni, formalizzabilita' che non equivale a JSON valido), con test offline source-bound/GT-free; poi freeze 29-source + release G4E/G4F. Confermato dal confronto GitHub: i 29 sorgenti `src/` di produzione non sono cambiati dal preflight precedente, i nuovi test 503/429/stallo sono offline e passati; non ripetere tutti i test.
+
+Nota dettagliata: `docs/ood/RQ2_V2_RESEARCH_NEXT_STEPS_POST_RESULTS_REFACTOR_2026-11-15.md`. `LIVE_API_ENABLED=False`, 0/180 stage reali, 11 OOD LOCKED.
