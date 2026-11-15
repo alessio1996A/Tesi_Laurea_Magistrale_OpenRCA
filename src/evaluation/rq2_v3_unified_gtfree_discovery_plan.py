@@ -1,9 +1,10 @@
 """Successor RQ2 V3 GT-free discovery plan; PRE-RELEASE, NO API/CLAIM.
 
-The only experimental change planned relative to RQ2 V2 is the C/K
-transport's provider-neutral exact text extraction plus auditable text
-provenance. D configuration, C/K prompts, model IDs, cohort and harnesses
-remain identical. No V2 D/C/K result may be silently imported or replayed
+The intended infrastructure-only changes relative to RQ2 V2 are
+provider-neutral exact final-text extraction for BOTH D executors and C/K,
+plus auditable text provenance. D graph budgets, C/K prompts, model IDs,
+cohort and harnesses remain identical. The D extraction integration and
+provenance schema are still NOT IMPLEMENTED; no release is authorized. No V2 D/C/K result may be silently imported or replayed
 under a V3 stage ID.
 
 This module builds identities and a deterministic plan only. It does NOT
@@ -164,6 +165,9 @@ def build_offline_v3_discovery_plan() -> dict:
         "max_recursion_depth_D": RECURSION_LIMIT,
         "d_output_contract": "v2_enforce",
         "c_and_k_prompts": "rq2_probe_adapter_v0_unchanged",
+        "uniform_final_text_extraction_policy_candidate": CK_POLICY,
+        "d_final_output_extraction_integration_verified": False,
+        "d_final_output_provenance_schema_frozen": False,
         "ck_text_extraction_policy": CK_POLICY,
         "ck_text_provenance_schema": CK_PROVENANCE_SCHEMA,
         "reuse_v2_d_outputs": False,
