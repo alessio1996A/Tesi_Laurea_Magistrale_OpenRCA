@@ -37,7 +37,7 @@ VERSION = "rq2_v3_scientific_receipt_adapter_candidate_v0"
 D_FIELDS = frozenset(("schema", "policy", "content_kind",
                       "text_blocks", "nontext_blocks"))
 STATUSES = frozenset(("RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR"))
-D_ERROR_CODE = re.compile(r"RUNNER_EXECUTION_ERROR_SHA256_[0-9a-f]{16}\\Z")
+D_ERROR_CODE = re.compile(r"RUNNER_EXECUTION_ERROR_SHA256_[0-9a-f]{16}\Z")
 
 
 class V3ScientificReceiptBlocked(ValueError):
