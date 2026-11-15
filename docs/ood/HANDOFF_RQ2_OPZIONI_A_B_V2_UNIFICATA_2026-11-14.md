@@ -805,3 +805,38 @@ Se fallisce, riportare il traceback prima di modificare codice.
 Poi adapter provider reale, lock Drive, metering/timeout, nuovo
 source inventory completo + SHA e approvazione esplicita del
 singolo pilot, non 180 stage API. 11 OOD ancora locked.
+
+## 25. G4I primo test 23 PASS/1 ERROR release fake; test-only fix (15 novembre 2026)
+
+**Output utente effettivo**: `Ran 24 tests in 13.179s; FAILED (errors=1)`.
+23 test G4I positivi; unico errore nel
+`test_fake_release_required_even_if_marker_exists`, dove
+la fixture altera volontariamente il file release e poi invoca
+`self.ledger.audit_restart()` per contarne i claim. Questo
+audit giustamente ferma l'esecuzione con
+`UnifiedScientificLedgerBlocked: Missing/different scientific release`
+perche' la release SHA NON corrisponde. Non e' corretto
+aggirare questo guard per ottenere un conteggio.
+
+**Fix chirurgico SOLO test**:
+`src/tests/test_rq2_v2_unified_single_stage_dispatcher_offline.py`,
+commit `e57f4955ea1f343339deb4ed02285116df118335`.
+Ora asserisce che sia `run_stage()` sia `audit_restart()`
+rifiutino esplicitamente una release manomessa; verifica
+direttamente che sul filesystem temporaneo siano assenti
+directory claim/record senza invocare audit in stato invalido.
+Nessun modulo di produzione, protocollo, prompt, RQ1 o fonte GT-free
+modificato.
+
+Report:
+`docs/ood/RQ2_V2_UNIFIED_G4I_FIRST_WINDOWS_23_PASS_1_ERROR_FIX_2026-11-15.md`.
+
+**Prossimo PyCharm** su checkout clean:
+```powershell
+git pull --ff-only
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v2_unified_single_stage_dispatcher_offline.py" -v
+```
+**24 test PENDING** dopo fix: non dichiarare G4I PASS fino
+all'output. G4F 22 PASS, G4G 17 PASS, G4H 20 PASS
+gia' attestati. Nessuna API eseguita, test OOD 11 locked.
