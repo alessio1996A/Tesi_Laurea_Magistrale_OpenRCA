@@ -1312,3 +1312,13 @@ Il codice che la applica e' `src/evaluation/rq2_v2_k_quality_rubric.py`, SOLO po
 **Semantica della rubrica:** `CANDIDATE` non significa corretta; validazione dei riferimenti E### dalla traiettoria originale, osservazioni non vuote/troncate, metriche/unità letteralmente visibili (sempre senza garanzia fisica), contraddizioni aritmetiche `all`, `REQUIRES_VERIFICATION` vs `NOT_FORMALIZABLE_CONTRADICTION`; `INSUFFICIENT_EVIDENCE` distinto da `INVALID_OUTPUT`. L'analizzatore restituisce sempre `diagnostic_correctness_verified=false`, `physical_units_verified=false`, `causal_transfer_verified=false`, `ood_test_performed=false`. Gli stati upstream `BLOCKED_DEPENDENCY`/`PROVIDER_ERROR` provengono dal ledger, non si inventano raw K. Nessuna esecuzione di pseudocodice, provider, GT, Market o file scientifici. Le 180 run rimangono non autorizzate, `LIVE_API_ENABLED=False`.
 
 **Prossima azione singola:** verificare la nuova suite su PyCharm e poi source preflight/blueprint offline mirati sul cambiamento 29→30, senza rieseguire l'intera batteria storica. Se PASS, nuovo preflight Colab GT-free con SHA e 30 sorgenti; solo dopo congelare release/policy e chiedere approvazione pilota D. Prima di Colab e' ancora necessario approvare la versione di HEAD corretta.
+
+## 40. Rubrica K: 18 test PyCharm PASS (15 novembre)
+
+Dopo l'introduzione della rubrica preregistrata (sezione 39), l'utente ha eseguito:
+`python -m unittest discover -s src/tests -p "test_rq2_v2_k_quality_rubric_offline.py" -v`.
+Output: `Ran 18 tests in 0.206s\nOK`. Questi sono test sintetici: non equivalgono a valutazione di regole K reali, causalita' o OOD.
+
+**Prossimo controllo mirato:** il file `src/evaluation/rq2_v2_unified_release_preflight.py` e' cambiato SOLO per includere `evaluation/rq2_v2_k_quality_rubric.py` nell'inventario source-bound (30 file). PyCharm deve ora eseguire le suite dipendenti dalla lista `SOURCE_PATHS`: `test_rq2_v2_unified_release_preflight_offline.py` (19 test), `test_rq2_v2_unified_release_blueprint_offline.py` (18), `test_rq2_v2_unified_scientific_release_contract_offline.py` (18). Sono **55 test mirati, NON ANCORA ESEGUITI**. Non rieseguire i 145 precedenti.
+
+Solo se passano: preparare preflight su Colab dei **30 sorgenti**, runtime/source hash GT-free aggiornati e commit clean. L'ultimo check Colab valido su 29 sorgenti resta prova storica e non certifica la nuova rubrica. Ancora 0/180 stage reali; nessuna nuova approvazione economica o API; `LIVE_API_ENABLED=False` e 11 OOD LOCKED.
