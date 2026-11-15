@@ -1246,3 +1246,19 @@ e fornire all'utente un messaggio di trasferimento con branch,
 ultimo HEAD, output Colab/SDK, source SHA, gates aperti e singola
 azione successiva. Non confondere SHA del commit preflight 601dc7
 con HEAD successivo dei soli commit documentali.
+
+## 35. Timeout sync loopback RQ2-V2 PASS; freeze e budget ancora aperti (15 novembre)
+
+**Nuova evidenza reale dell'utente:**
+- PyCharm `test_rq2_v2_sync_timeout_loopback_guard_offline.py`: `Ran 8 tests in 0.009s — OK`.
+- Colab checkout clean pinned `d67141ad0ef1e0b4f258c2667372e9aca8ff6292`, SDK pinned isolato, test HTTP **solo server fittizio 127.0.0.1**.
+- `status=SYNC_LOCAL_STALL_TIMEOUT_CHECKED_NO_API_NO_RELEASE`; `loopback_sends_total=4`, `external_api_requests=0`, `actual_model_calls=0`.
+- Google: C/K una richiesta locale e timeout dopo `0.3071s`; D-bound una e timeout dopo `0.3057s`.
+- Anthropic: C/K una richiesta e timeout dopo `0.3041s`; D-bound una e timeout dopo `0.3037s`.
+- `async_streaming_tested=false`, `full_stage_timeout_guaranteed=false`, `usd_hard_cap_guaranteed=false`, `scientific_release_frozen=false`, `can_execute_api=false`, `can_run_ood_test=false`. Nessun claim scientifico.
+
+**Limite fondamentale:** prova con timeout test 0.3s, NON con i 300s configurati nella factory RQ2-only e NON per durata complessiva D. La precedente prova 503 fake del 12/11 e quella SDK-only del 15/11 completano l'evidenza sync per gli scenari osservati, ma non certificano ogni altro errore/status (es. 429), ogni trasporto, async/stream, hard HTTP count o fatturazione. Non impostare flag G4E a True in senso universale senza perimetro verificabile.
+
+La documentazione dettagliata e' `docs/ood/RQ2_V2_UNIFIED_SYNC_LOOPBACK_TIMEOUT_PASS_NEXT_RELEASE_2026-11-15.md`. Nessun modulo di produzione o RQ1 e' stato modificato: soltanto i due test nuovi e questo aggiornamento documentale dopo il preflight 29-source su `601dc7...`.
+
+**Prossima decisione tecnica/scientifica:** circoscrivere il gate retry/timeout al sync effettivamente usato e decidere se l'evidenza e' sufficiente o se un SOLO caso negativo mirato ancora mancante (p.es. 429) serve prima del freeze. Poi pianificare budget stage D, verifica sorgenti finali, release SHA esterno e consenso esplicito del singolo pilot. Non creare release o abilitare G4K senza questi passaggi; `LIVE_API_ENABLED=False`; RQ2-V2 rimane 0/180 stage API, 11 OOD LOCKED.
