@@ -1092,3 +1092,43 @@ installare automaticamente. Seguiranno pin SDK + policy retry/timeout
 su mock transport, stima spesa, release G4F e consenso esplicito
 stage D prima di UNA API pagata. RQ2 V2 = 0/180 stage API reali;
 Opzione B = 11 OOD LOCKED.
+
+## 32. SDK runtime Colab nuovo NON conforme — STOP corretto (15 novembre)
+
+**Audit reale dell'utente, SDK source-only** nella nuova sessione Colab
+Python 3.13.18: `runtime_snapshot_ready=false`, mentre
+`frozen_rq1_factory_unchanged=true`, `model_requests_sent=0`
+e `can_execute_api=false`.
+
+Versioni attese → osservate: langchain-core 1.7.1→1.7.4;
+langgraph 1.2.18→1.2.19; langchain-anthropic 1.7.7→missing;
+langchain-google-genai 4.4.2→missing; anthropic 2.6.0→missing;
+google-genai 2.34.0→2.12.1. Hash Google GenAI source
+osservato `d0209bc9b335c6e8c440ed0a6f3b46af367785a4e5743aedc51b46e395e5e205`,
+expected `b179b80a126a35c98b98aeefa701950304c38c8a1e117136a2270a0901fd93e4`.
+Il resto dei quattro SHA provider è null. 6/6 versioni NON
+coincidenti e 4/4 SHA NON coincidenti.
+
+**Interpretazione:** la cella usa il Python GLOBALE di Colab e
+non il target dipendenze isolato dei precedenti audit; NON è
+evidenza di mutazione dei CSV, RQ1 frozen, release o split.
+La factory RQ2-only fa esattamente ciò che deve: rifiuta lo
+snapshot sbagliato. **STOP per qualunque API**, no modifica
+automatica di dipendenze globali/SDK pin.
+
+**Prossima azione proposta**: ripristino riproducibile su cartella
+temporanea NUOVA `/content/rq2_v2_pinned_sdk_py313` con
+`pip --target`, stesse versioni storiche (compresi
+langchain==1.4.7 e google-auth==2.56.0) e audit subprocess con
+`PYTHONPATH` composto da DEPS+REPO/src. Verificare 6 versioni e
+4 SHA sorgenti, NO API, prima di dichiarare SDK PASS.
+**Ripristino non ancora attestato** e nessun commit sorgete modificato.
+
+Dettagli:
+`docs/ood/RQ2_V2_UNIFIED_COLAB_SDK_RUNTIME_DRIFT_AND_PIN_RESTORE_2026-11-15.md`.
+
+Restano PASS il Colab source preflight 29 file sul commit
+`601dc7...` e l'esclusivita' lock/O_EXCL scratch nella
+stessa sessione. `LIVE_API_ENABLED=False`; 0/180 stage reali,
+11 OOD locked. Dopo ripristino eventuale: audit runtime,
+policy retry/timeout, release pin finale, consenso singolo pilot.
