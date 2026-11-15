@@ -1358,3 +1358,17 @@ Per modello `D=20,C=20,K=20`, 180 stage; 11 OOD LOCKED; `ledger_namespace_absent
 **Attenzione al commit:** la verifica reale riguarda ESATTAMENTE `feb7b7c...`; i successivi commit di SOLA documentazione non impongono nuovi test del codice ma la release operativa richiede una SHA finale clean verificata. Il preflight 29-source originale e' valido solo per il vecchio commit, non deve essere riciclato.
 
 **Prossimo step tecnico-scientifico:** review non autorizzativa della futura release G4E/G4F e del dispatcher con `LIVE_API_ENABLED=False`, identificando ogni prerequisito prima di un singolo D pilot. Non dichiarare congelata una release che non e' stata creata. La decisione del relatore di privilegiare precisione rispetto ai costi non elimina la necessita' di un consenso esplicito e di un budget tecnico positivo della release. Non toccare RQ1, precedenti RQ2, 11 OOD; 0/180 stage reali.
+
+## 43. Preparazione prerelease senza API (15 novembre, codice offline nuovo)
+
+Dopo `RQ2-V2 30 SOURCE: PASS — 0 API REALI` sul commit di codice `feb7b7c9684138f348d8a6e3e6e9d4eb61798ae7` e dopo la documentazione dei digest, l'utente ha autorizzato a **proseguire nell'ingegnerizzazione**, NON a inviare chiamate API.
+
+Per evitare di cambiare o rieseguire inutilmente i 30 sorgenti di produzione gia' verificati e' stato aggiunto **SOLO sotto src/tests/**:
+- `rq2_v2_unified_release_dossier_offline.py`: dossier prerelease read-only, pure in-memory, controllo fail-closed identita' 30 source SHA, rubrica K, piano 180, blueprint SHA e runtime pinned; primo stage pianificato `cloudbed-1_q032:gemini:A0:D`. NON genera release G4E, non crea approvazione, nessun claim, nessun API; nessun `release_sha256` valido.
+- `test_rq2_v2_unified_release_dossier_offline.py`: **14** test sintetici con fixture G4E gia' esistenti, inclusi gate di mancata autorizzazione, commit SHA, 30 SHA, SDK e OOD. **DA ESEGUIRE**; non dichiarare PASS prima dell'output PyCharm.
+
+Commit prima della nota `03b8b15ba2b31168267e92d70fd9891580af58df`. Confronto GitHub rispetto al `da4b63c1561e7f656ef4aa89454ed91ae6da793a`: SOLO i due file nuovi in src/tests; zero mutazioni di SOURCE_PATHS o degli agenti, `LIVE_API_ENABLED=False`, 0/180 reali, 11 OOD locked.
+
+**Prossima singola azione per utente**: `git pull --ff-only` del nuovo commit esatto e PyCharm `python -m unittest discover -s src/tests -p "test_rq2_v2_unified_release_dossier_offline.py" -v`; attesi 14 test, non attestati. Se PASS, un'UNICA cella Colab GT-free puo' ricostruire G4A+G4B su checkout pinned e invocare `build_prerelease_dossier` in memoria, senza file scientifici o provider. Questa review non sostituisce il futuro freeze definitivo e il consenso stage D.
+
+**Passaggio di chat:** l'handoff resta fonte primaria. Prima di cambio, comunicare utente branch, ultimo SHA documentale, codice verificato `feb7...`, hash 30-source `8c2d022efed45214fec27b31ab4d7215f2912cd494aa6e16d3afaa55d8e891a1`, obiettivo di raccolta e gate ancora chiusi. Non ripetere le suite 73 PASS né 29/30-source Colab in assenza di nuovi sorgenti.
