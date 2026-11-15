@@ -181,8 +181,9 @@ class UnifiedLiveMockDispatcherTests(unittest.TestCase):
         return receipt
 
     def test_live_gate_is_disabled_by_default_without_sdk(self):
-        with patch.object(subject, "LIVE_API_ENABLED", False), (
-            patch.object(subject, "crea_modello_rq2") as factory
+        with (
+            patch.object(subject, "LIVE_API_ENABLED", False),
+            patch.object(subject, "crea_modello_rq2") as factory,
         ):
             with self.assertRaisesRegex(
                 RQ2V2LiveDispatchBlocked, "disabled",
