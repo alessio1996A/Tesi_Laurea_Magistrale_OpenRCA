@@ -41,6 +41,25 @@ python -m unittest discover -s src/tests -p "test_rq2_v4_adapter_ledger_offline.
 ```
 Non ripetere ora i 20 test già PASS. L'utente riporterà `Ran 12 tests...` o traceback; se errore, correggere *solo* il nuovo codice V4 con commit tracciabile. Nessun Colab o API.
 
+## Aggiornamento 16 novembre 2026 — 32/32 offline PASS, nuovo gate source/release
+
+L'utente ha riportato `Ran 12 tests in 1.068s — OK` per `test_rq2_v4_adapter_ledger_offline.py`; sommati ai 20 precedenti **32 test V4 mirati PASS**. Non chiedere di ripeterli senza necessità. Tutti sintetici/offline, non certificano i limiti della rete reale.
+
+Nuovi file V4 e codice aggiornato da testare:
+- `src/evaluation/rq2_v4_scientific_source_inventory.py`: nuovo inventario immutabile che ricontrolla solo sorgenti/manifest GT-free attraverso V3/V2 (NON record o release V3), poi SHA dei sei file V4 esistenti. `FUTURE_REQUIRED_PATHS` include il dispatcher V4 ancora assente; `missing_future_paths` è esplicito.
+- `src/evaluation/rq2_v4_scientific_source_release_gate.py`: gate implementato (sostituisce placeholder) richiede release V4 GIÀ creata create-only, commit Git pulito esterno, SHA release esterno, 180 stage/11 OOD, hash di sorgenti V2/V3/V4 e futuro dispatcher, identità di prompt/modelli/policy, attestazione SDK/Drive del medesimo runtime. **Riutilizza il verificatore di trasporto/runtime V3 congelato come codice**, con nuovo commit/inventory V4; NON riutilizza file dati/risultati V3. `can_execute_api=false` sempre. Finché il dispatcher e release non esistono, il gate reale è **NO-GO**.
+- `src/tests/test_rq2_v4_scientific_source_release_gate_offline.py`: **10 nuovi test da eseguire** con fixture sintetiche e mock espliciti; per errori di SHA, commit, history, OOD, dispatcher mancante, runtime attestation. Il PASS di questi test NON equivale a freeze reale o proof live.
+
+**Prossimo comando PyCharm**, se working tree pulito, sul branch V4:
+```powershell
+git pull --ff-only origin feature/rq2-v4-task-aware-ledger-2026-11-15
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v4_scientific_source_release_gate_offline.py" -v
+```
+Non ripetere i 32 precedenti; attendere output 10 test. Non eseguire Colab o API.
+
+**Pulizia finale richiesta esplicitamente dall'utente:** dopo il completamento sperimentale, creare un layout finale pulito e refactoring/commenti italiani, ridurre prototipi e file inutili nel codice attivo **senza distruggere evidenze, release, risultati congelati e sorgenti/commit necessari a riprodurre RQ1/RQ2**. Valutare archiviazione tag/branch/manifest prima di ogni eliminazione. Non anticipare il cleanup ora perché cambia gli SHA scientifici.
+
 ## Stato e NO-GO
 
 - La V4 è ancora **offline e non rilasciata**. Adapter V4 e ledger V4 sono stati implementati; il source/release gate è un NO-GO intenzionale; manca un dispatcher V4 e la release create-only. Nessuna nuova API o campagna autorizzata.
