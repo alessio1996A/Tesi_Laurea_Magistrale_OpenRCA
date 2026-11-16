@@ -12,6 +12,11 @@ documenti che testimoniano le iterazioni precedenti.
    inventario, cosa mantenere e cosa non eliminare.
 4. **Notebook su Google Drive**: `Tesi_OpenRCA/demo_relatore/Demo_Relatore_OpenRCA_V3.ipynb`.
    È una demo di **replay**, senza chiamate Gemini.
+5. **RQ2 (16 novembre 2026)**:
+   [consolidamento scientifico e operativo](CONSOLIDAMENTO_SCIENTIFICO_E_OPERATIVO_2026-11-16.md) (punto di ingresso),
+   [esito L2](RQ2_ESITO_L2_2026-11-16.md),
+   [congelamento L1/L2](RQ2_CONGELAMENTO_L1_L2_2026-11-16.md),
+   [registro delle decisioni](REGISTRO_DECISIONI_RQ2.md).
 
 ## Documenti storici — conservati per tracciabilità
 
