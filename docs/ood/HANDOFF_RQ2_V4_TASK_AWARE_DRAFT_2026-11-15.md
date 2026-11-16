@@ -2,6 +2,18 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Primo esperimento REALE V4 Gemini A0 D: RECORDED_COMPLETE
+
+**ESITO USER-REPORTED (Colab, 16/11/2026):** `SOURCE_COMMIT_PIN_CLEAN: OK`, `GEMINI_CREDENTIAL: PRESENT`, `PILOT_RETURN_CODE: 0` e `AUDIT_RETURN_CODE: 0`. Primo stage scientifico V4 **eseguito UNA sola volta**: `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D` / `gemini-3.5-flash-lite` / harness `A0`, source pin `78734fa130369d7c236ec53c0cc25d88c8860b27`, release V4 `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+
+- Dispatcher: `status=V4_ONE_STAGE_RECORDED`, `record_status=RECORDED_COMPLETE`, `record_sha256=345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f`, `descendants_blocked=[]`, `claims_created=1`, `automatic_retry_allowed=false`.
+- Audit indipendente READ-ONLY: `claims=1, records=1, orphans=0`, stage claim presente, stage record `RECORDED_COMPLETE` e SHA identico; `task_index=task_2`, `task_contract_valid=true`, `json_status=valid_json`.
+- Consumo osservato D: `llm_calls=7`, `input_tokens=40570`, `output_tokens=394`, `token_usage_complete=true`. Non inferire fattura o cap USD: budget precedente USD 0.10 era operativo, NON hard cap.
+- **Conclusione limitata ma importante:** V4 task-aware ha accettato correttamente l'output formale del task_2 nel primo esperimento live. Non dimostra ancora correttezza causale, efficacia K, trasferimento OOD o generalizzazione a 15 combinazioni. RQ1 e V3 restano congelati.
+- **MAI RITENTARE D**: il claim e il record esistono già e sono intoccabili. Non pulire/rimuovere/riclassificare il record. Il protocollo source commit e release SHA restano congelati.
+
+**PROSSIMO STEP:** preflight **solo lettura** dell'adiacente stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:C` via `preview_one_v4_stage` con ledger/source/release verificati. Controllare che D parent sia `RECORDED_COMPLETE` con hash esatto, che C e K non abbiano claim/record, che audit iniziale e finale rimanga `claims=1, records=1, orphans=0`, pacchetto C con SHA/prompt verificati, zero API e zero scritture scientifiche. Non utilizzare OOD. Successivamente, se PASS, preparare singolo stage C real con autorizzazione limitata, senza rieffettuare D. Evitare ulteriori PyCharm test già passati. `OPENRCA_RQ2_V4_ENABLE_PAID_SINGLE_STAGE` deve restare unset nel preflight. Mai aggiornare checkout frozen.
+
 ## 16 novembre 2026 — Consenso utente al primo pilot V4, non ancora eseguito
 
 L'utente ha risposto: «sì autorizzo sempre non c'è bisogno che me lo chiedi», in risposta alla proposta puntuale di **un solo** stage V4 `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D` su `gemini-3.5-flash-lite`, con budget operativo di riferimento **USD 0.10 non hard cap**, massimo 6 tool rounds, no automatic retry. Questa autorizzazione concreta è acquisita per il primo stage. Non chiedere nuovamente il consenso per esso; non trasformare la frase di disponibilità generale in un'autorizzazione di spesa illimitata o di pilot su altre combinazioni senza vincoli e identificativi espliciti.
