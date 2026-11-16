@@ -1,5 +1,9 @@
 # RQ2 — Protocollo di verifica delle regole K: BOZZA V1 da congelare
 
+> **Sostituita** da `RQ2_PROTOCOLLO_K_DEFINITIVO_PROPOSTA_2026-11-16.md` (dopo le
+> precisazioni di ChatGPT: tre valori, copertura sui negativi, orizzonte globale H,
+> perimetro RQ2-A). Si conserva come cronologia.
+
 **16 novembre 2026.** Stato: **bozza, non approvata.** Nessun dato sigillato è stato
 aperto: non ho letto né telemetria né ground truth dei 11 incidenti sigillati. Conosco
 solo gli ID e i conteggi per classe che stanno già nei documenti del repository.
