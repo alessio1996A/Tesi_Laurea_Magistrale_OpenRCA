@@ -2,6 +2,17 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Preflight K Gemini A0: PASS; prossimo K LIVE unico e limitato
+
+Utente riporta `RETURN_CODE=0`, `V4_GEMINI_A0_K_READONLY_PREFLIGHT_PASS`. Identità esatta: `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K`; source SHA `78734fa130369d7c236ec53c0cc25d88c8860b27`; release V4 SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+- D parent `RECORDED_COMPLETE`, SHA `345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f`. C parent `RECORDED_COMPLETE`, SHA `cdb90c39eb6f5a17c2db6abe572dce8dffa7744b098ced275fd476a2798cc1c7`.
+- Pacchetto K preparato SHA-256 `d233772258cacc9391075e5e47f42a9cd999020bd340b8d3d17d6a961d91e889`.
+- Ledger prima e dopo sola lettura `claims=2, records=2, orphans=0`; K claim/record inesistenti, `real_llm_calls_this_step=0`, `can_execute_api=false`.
+- Non eseguire nuovamente D o C. Non toccare codice o release congelati. Nessun OOD.
+
+**Azione seguente:** un solo K reale con `run_one_v4_stage`, Gemini `gemini-3.5-flash-lite`, A0, caso q032, preflight K con SHA vincolato, nuovo claim K create-only, budget di riferimento USD 0.10 (NON hard cap), no retry e nessun lancio di altri stage. La precedente disponibilità dell'utente ad approvare i pilot non comporta esecuzione illimitata: mantenere consenso tracciato per singolo stage, solo questo. Ambiente Colab: `GEMINI_API_KEY` come secret, mappato a `GOOGLE_API_KEY` nel sottoprocesso; SDK isolati `/content/rq2_v2_pinned_sdk_py313` e checkout `/content/Tesi_OpenRCA_V4` a pin. Audit in processo SEPARATO senza key/opt-in, senza creare record. Se il provider/ledger fallisce, conservare claim o record e NON rieseguire lo stage (orphan => manual review).
+- Un `RECORDED_COMPLETE` K prova conformità formale della conoscenza candidata, NON prova trasferimento su OOD o correttezza GT. Eventuali esiti `INVALID_OUTPUT`/`PROVIDER_ERROR` sono dati scientifici e NON da ritentare.
+
 ## 16 novembre 2026 — Primo stage C REALE Gemini A0: RECORDED_COMPLETE
 
 Output Colab comunicato dall'utente: `PILOT_RETURN_CODE=0`, `AUDIT_RETURN_CODE=0`, `V4_C_PILOT_FINISHED — NO_FURTHER_STAGE`.
