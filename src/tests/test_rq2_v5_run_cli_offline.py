@@ -55,6 +55,16 @@ def _fake_modules():
             "evaluation.rq2_model_factory": factory}
 
 
+# Variabili di sistema da conservare quando il test svuota l'ambiente: senza
+# PATH (e, su Windows, SYSTEMROOT/PATHEXT) subprocess non trova git.
+_SYSTEM_ENV = ("PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR",
+               "COMSPEC", "TEMP", "TMP", "HOME", "USERPROFILE")
+
+
+def _system_env() -> dict:
+    return {k: os.environ[k] for k in _SYSTEM_ENV if k in os.environ}
+
+
 def _git_repo(path: Path) -> Path:
     path.mkdir()
     for args in (["init", "-q"], ["config", "user.email", "t@example.org"],
@@ -81,7 +91,9 @@ class RunCliOfflineTests(unittest.TestCase):
                 "--namespace", NAMESPACE, *SELECTION, *extra]
         if command != "summary":
             argv += ["--repo-dir", str(self.repo)]
-        environment = {"GOOGLE_API_KEY": "fake-key-123456"} if env is None else env
+        # Le chiavi sono quelle del test (o nessuna se env={}); il resto e' di sistema.
+        keys = {"GOOGLE_API_KEY": "fake-key-123456"} if env is None else env
+        environment = {**_system_env(), **keys}
         out = io.StringIO()
         with (
             patch.dict(sys.modules, _fake_modules()),
