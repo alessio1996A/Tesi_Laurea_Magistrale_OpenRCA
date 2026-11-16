@@ -43,8 +43,10 @@ def _git(repo: Path, *args: str) -> str:
     return out.stdout.strip()
 
 
-def _store_root(drive_root: Path) -> Path:
-    return drive_root / mr.NAMESPACE
+def _store_root(drive_root: Path, namespace: str | None = None) -> Path:
+    """Archivio del run: di default quello scientifico; un pilota ne usa uno
+    separato, cosi' non consuma gli stage reali (che sono create-only)."""
+    return drive_root / (namespace or mr.NAMESPACE.as_posix())
 
 
 def _key_present(provider: str) -> bool:
@@ -156,7 +158,7 @@ def cmd_run(args) -> int:
             print(f"Chiave mancante per il provider {provider}: run rifiutato.")
             return 2
     assert_exact_runtime_snapshot()
-    root = _store_root(Path(args.drive_root))
+    root = _store_root(Path(args.drive_root), args.namespace)
     print("Manifest:", ensure_manifest(root, build_manifest(repo, plan)))
     store = mr.StageStore(root)
     executor = V5StageExecutor(data_dir=Path(args.drive_root), repo_dir=repo)
@@ -175,7 +177,7 @@ def cmd_run(args) -> int:
 
 def cmd_summary(args) -> int:
     _, rows = _plan_rows()
-    store = mr.StageStore(_store_root(Path(args.drive_root)))
+    store = mr.StageStore(_store_root(Path(args.drive_root), args.namespace))
     selected = _select(rows, args)
     print(mr.format_summary(mr.summarize(selected, store)))
     return 0
@@ -188,6 +190,8 @@ def _parser() -> argparse.ArgumentParser:
         p = sub.add_parser(name)
         p.add_argument("--drive-root", required=True)
         p.add_argument("--repo-dir")
+        p.add_argument("--namespace", help="cartella archivio sotto drive-root "
+                       "(default: data/rq2_v5_format_fair_v1)")
         p.add_argument("--models", nargs="+")
         p.add_argument("--harnesses", nargs="+")
         p.add_argument("--cases", nargs="+")
