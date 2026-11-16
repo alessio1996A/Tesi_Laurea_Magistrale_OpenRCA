@@ -22,7 +22,7 @@ noti.
 
 ## 2. Cosa è congelato
 
-* **Codice**: commit `2474886a551044565b062806a12a6ff9730b3299` (esecutore v2, valutatore v2,
+* **Codice**: commit `88e46580c38dd89cbfae8076ba0752776c1c12b5` (esecutore v2, valutatore v2,
   preflight, protocollo L1). Il comando `freeze` registra il commit effettivo, e `run`
   si rifiuta di partire se è diverso. I file del run V5 e dei contratti sono identici a `ddb2ca4`.
 * **Tabella semantica** `rq2_k_semantic_table_v1`, hash `642b9d2c5f3bfd1b6bb70fe93d4410e142b0addf99c301ce34055ee87289c981`
