@@ -78,6 +78,19 @@ python -m unittest discover -s src/tests -p "test_rq2_v4_single_stage_dispatcher
 ```
 Riportare `Ran 13 tests...` ed eventuali errori. Non chiedere di ripetere 42 test già PASS.
 
+## Aggiornamento 16 novembre 2026 — Dispatcher 13/13 PASS, totale V4 55/55
+
+L'utente ha eseguito su PyCharm i 13 test nuovi `test_rq2_v4_single_stage_dispatcher_offline.py`: `Ran 13 tests in 0.254s — OK`. **Risultati cumulativi V4: 20+12+10+13 = 55 test offline PASS**. Non rieseguire questi test senza motivazione specifica.
+
+Sorgenti V4 del branch `feature/rq2-v4-task-aware-ledger-2026-11-15` pronti per la **prima verifica read-only in Colab**. La release V4 non è stata creata, nessuna credenziale/provider API autorizzata; il precedente consenso V3 era per un singolo tentativo già consumato.
+
+Procedura:
+- NON modificare il checkout Colab V3 `/content/Tesi_OpenRCA` congelato. Usare un clone distinto `/content/Tesi_OpenRCA_V4` a commit V4 esatto e pulito, con dataset GT-free in `/content/drive/MyDrive/Tesi_OpenRCA`, SDK isolati già disponibili in `/content/rq2_v2_pinned_sdk_py313`.
+- Verificare sola lettura `build_offline_v4_discovery_plan` (180 stage, 11 OOD, nessun riuso output V2/V3) e `preview_v4_scientific_source_inventory` (sorgenti V2/V3/V4, prompt, manifest/split, dispatcher presente, digest canonico), ed eventualmente `preview_v3_live_runtime` sul **nuovo commit V4**, soltanto come codice di verifica SDK, non come prova della nuova release.
+- Solo dopo `PASS` fare proof runtime SDK/Drive (scratch) e creare release V4 **create-only** in namespace separato, con readback, hash esterno e zero API, preservando V3.
+- Prima di lanciare ogni pilot a pagamento V4 serve consenso nuovo per singolo stage, modello e budget operativo; nessuna approvazione implicita.
+- **Pulizia codice dopo la campagna**, previa archiviazione/version tagging di release e risultati; evitare refactoring del frozen source commit.
+
 ## Stato e NO-GO
 
 - La V4 è ancora **offline e non rilasciata**. Adapter V4 e ledger V4 sono stati implementati; il source/release gate è un NO-GO intenzionale; dispatcher V4 implementato ma in attesa dei suoi 13 test mirati; manca la release create-only e il freeze source/runtime. Nessuna nuova API o campagna autorizzata.
