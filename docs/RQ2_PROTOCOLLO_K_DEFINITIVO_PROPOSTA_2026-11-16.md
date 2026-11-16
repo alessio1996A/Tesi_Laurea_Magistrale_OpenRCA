@@ -1,5 +1,10 @@
 # RQ2 — Protocollo K definitivo (proposta breve, da approvare e congelare)
 
+> **Aggiornamento 16 novembre (sera):** il protocollo e' stato approvato con le precisazioni di GPT e
+> congelato; vale il documento `RQ2_CONGELAMENTO_L1_L2_2026-11-16.md`. In particolare il `negative`
+> conservativo sull'intero livello e' sostituito dalla popolazione dei componenti che espongono i KPI
+> necessari (registro, righe 20-22).
+
 **16 novembre 2026.** Sostituisce la bozza
 `RQ2_PROTOCOLLO_VERIFICA_REGOLE_K_BOZZA_V1_2026-11-16.md` dopo le cinque precisazioni
 di ChatGPT. Nessun dato sigillato aperto. **Non è approvato:** lo approvano Alessio e,
