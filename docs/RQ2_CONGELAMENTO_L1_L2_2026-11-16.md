@@ -80,7 +80,15 @@ componenti osservabili.
 
 ## 5. Procedura
 
-1. `freeze` (scrive `freeze.json`, create-only) → 2. `run` (verifica il freeze, esegue L1 sui
-4 incidenti di discovery, scrive `l1_report.json`, create-only) → 3. lettura del report da
-parte di Alessio e GPT → 4. solo con il loro ok, L2 sugli 11 sigillati in un processo separato
-con la GT. Se il codice cambia dopo il freeze serve un nuovo congelamento, dichiarato.
+1. `freeze` (scrive `freeze.json`, create-only). **Eseguito il 16 novembre.**
+2. `run` (verifica il freeze, esegue L1 sui 4 incidenti di discovery, scrive `l1_report.json`,
+   create-only). **Eseguito il 16 novembre**; lo legge GPT insieme ad Alessio.
+3. **Proposta, in attesa dell'approvazione di GPT e di Alessio** (registro, riga 24):
+   * `addendum` (create-only): elenco degli 11 sigillati e dei gruppi temporali, hash del
+     release pre-registrato, del manifest, del report L1 e dei due moduli L2. Non legge telemetria.
+   * L2a, `run --authorize-sealed-telemetry`: esegue la regola congelata sui gruppi e scrive le
+     decisioni con hash. Legge la telemetria dei sigillati, non la ground truth.
+   * L2b, `--authorize-ground-truth` (processo separato): verifica la catena di hash, legge la GT,
+     chiama il valutatore con i parametri del freeze e scrive il verdetto.
+4. Se il codice cambia dopo il freeze, oltre a nuovi moduli L2, test e documenti, serve un nuovo
+   congelamento, dichiarato. Dopo l'addendum non puo' cambiare nulla, nemmeno un commento nei moduli L2.
