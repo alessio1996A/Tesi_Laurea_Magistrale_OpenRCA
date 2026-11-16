@@ -27,13 +27,20 @@ Semantica (protocollo K, proposta in revisione)
            sconosciuta; altrimenti vero.
       any: vero se una e' vera; altrimenti sconosciuto se una e' sconosciuta;
            altrimenti falso.
-  * Sconosciuto = metrica assente per il componente, finestra senza campioni,
-    finestra che parte prima della storia caricata, delta con un solo campione.
-    Mai trasformato in "falso" in silenzio.
-  * Decisione di gruppo, in modo CONSERVATIVO:
+  * Sconosciuto = finestra senza campioni, finestra che parte prima della storia caricata,
+    delta con un solo campione. Mai trasformato in "falso" in silenzio.
+  * POPOLAZIONE (v2, decisione approvata il 16 nov): si valutano solo i componenti del
+    livello che ESPONGONO TUTTI i KPI richiesti dalla regola, cioe' con almeno un campione
+    finito per ogni KPI dentro la finestra di gruppo [start, end). La popolazione e'
+    fissata dai soli dati di telemetria, senza etichette. I componenti esclusi sono TUTTI
+    contati e nominati (con i KPI che mancano) e la copertura = popolazione / totale e'
+    riportata. Un componente escluso non e' mai un "falso" ne' uno "sconosciuto": e' fuori
+    dalla popolazione. Una decisione `negative` vale quindi SOLO per i componenti
+    osservabili, non per l'intero livello.
+  * Decisione di gruppo, in modo CONSERVATIVO sulla popolazione:
       positive  se almeno una cella e' vera (un sospetto basta);
       negative  solo se nessuna cella e' vera E nessuna e' sconosciuta;
-      abstain   altrimenti, con la causa. Una lacuna non e' prova di assenza.
+      abstain   altrimenti (popolazione vuota o celle sconosciute), con la causa.
     La quota di celle valutabili si riporta come misura, non decide `negative`.
 """
 from __future__ import annotations
@@ -46,7 +53,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-VERSION = "rq2_k_rule_executor_v1"
+VERSION = "rq2_k_rule_executor_v2"
 GRID_SECONDS_DEFAULT = 60
 
 TRUE, FALSE, UNKNOWN = "T", "F", "U"
@@ -54,8 +61,8 @@ AGGREGATIONS = frozenset({"mean", "max", "min", "sum", "count", "p95", "last", "
 OPERATORS = frozenset({">", ">=", "<", "<=", "=="})
 LEVELS = ("node", "container")
 
-# Cause di "sconosciuto" (restano nel risultato, mai nascoste).
-CAUSE_METRIC_MISSING = "metric_missing_for_component"
+# Cause di "sconosciuto" (restano nel risultato, mai nascoste). Un KPI assente per un
+# componente NON e' piu' una causa: il componente e' fuori dalla popolazione.
 CAUSE_NO_SAMPLES = "no_samples_in_window"
 CAUSE_HISTORY = "window_before_loaded_history"
 CAUSE_DELTA_ONE_SAMPLE = "delta_needs_two_samples"
@@ -200,7 +207,9 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
     level, reason = rule_level(conditions, kpi_levels)
     if level is None:
         return {**base, "decision": "abstain", "reason": {"code": reason},
-                "components_total": 0, "components_missing_metric": [],
+                "components_total": 0, "components_in_population": 0, "population": [],
+                "components_excluded": [], "excluded_missing_metrics": {},
+                "population_coverage": None,
                 "cells": {"total": 0, "true": 0, "false": 0, "unknown": 0},
                 "evaluable_fraction": None, "unknown_by_cause": {},
                 "first_fire_unix_by_component": {}}
@@ -208,11 +217,17 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
     frame = telemetry.get(level)
     if frame is None or frame.empty:
         frame = pd.DataFrame(columns=["timestamp", "cmdb_id", "kpi_name", "value"])
-    components = sorted(str(c) for c in frame["cmdb_id"].unique())
     metrics = {c["metric"] for c in conditions}
     series = _series_by_component(frame, metrics)
-    missing_metric = sorted(
-        c for c in components if any((c, m) not in series for m in metrics))
+    stamps_all = pd.to_numeric(frame["timestamp"], errors="coerce")
+    in_window = frame.loc[stamps_all.ge(start_unix) & stamps_all.lt(end_unix)]
+    components_total = sorted(str(c) for c in in_window["cmdb_id"].unique())
+    # Esposto = almeno un campione finito del KPI dentro la finestra di gruppo.
+    exposed = {key for key, (stamps, _) in series.items()
+               if bool(((stamps >= start_unix) & (stamps < end_unix)).any())}
+    components = [c for c in components_total if all((c, m) in exposed for m in metrics)]
+    excluded_missing = {c: sorted(m for m in metrics if (c, m) not in exposed)
+                        for c in components_total if c not in set(components)}
 
     combine = kleene_all if rule["combination"] == "all" else kleene_any
     instants = list(range(start_unix, end_unix, grid_seconds))
@@ -226,10 +241,6 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
             for cond in conditions:
                 key = (component, cond["metric"])
                 window = cond["window_seconds"]
-                if key not in series:
-                    truths.append(UNKNOWN)
-                    causes.append(CAUSE_METRIC_MISSING)
-                    continue
                 if t - window < history_start_unix:
                     truths.append(UNKNOWN)
                     causes.append(CAUSE_HISTORY)
@@ -250,19 +261,25 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
                 first_fire[component] = t
 
     total = sum(counts.values())
-    if counts[TRUE] > 0:
+    if not components:
+        decision = "abstain"
+    elif counts[TRUE] > 0:
         decision = "positive"
     elif total > 0 and counts[UNKNOWN] == 0:
         decision = "negative"
     else:
         decision = "abstain"
     reason_code = (None if decision != "abstain"
-                   else ("no_cells" if total == 0 else "unknown_cells"))
+                   else ("empty_population" if not components else "unknown_cells"))
     return {
         **base, "level": level, "decision": decision,
         "reason": {"code": reason_code} if reason_code else {},
-        "components_total": len(components),
-        "components_missing_metric": missing_metric,
+        "components_total": len(components_total),
+        "components_in_population": len(components),
+        "population": components,
+        "components_excluded": sorted(excluded_missing),
+        "excluded_missing_metrics": excluded_missing,
+        "population_coverage": (len(components) / len(components_total)) if components_total else None,
         "cells": {"total": total, "true": counts[TRUE], "false": counts[FALSE],
                   "unknown": counts[UNKNOWN]},
         "evaluable_fraction": ((counts[TRUE] + counts[FALSE]) / total) if total else None,

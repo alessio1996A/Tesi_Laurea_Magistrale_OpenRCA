@@ -25,6 +25,14 @@ Verdetti (protocollo K, proposta)
                             affermazione di generalizzazione.
 Un FP o un FN osservato prevale sulla copertura: e' una prova, non una lacuna.
 La soglia 2/3 sui negativi e' un criterio ESPLORATIVO dichiarato.
+
+Popolazione (esecutore v2, decisione approvata il 16 nov)
+---------------------------------------------------------
+L'esecutore valuta solo i componenti che espongono tutti i KPI della regola. Se il
+componente di RIFERIMENTO di un gruppo positivo e' fuori dalla popolazione, quel positivo e'
+NON_VALUTABILE: esce dai denominatori di TP/FN, viene contato e nominato a parte, e non
+vale come FN. Un negativo (TN) vale SOLO per i componenti osservabili: la copertura della
+popolazione e' riportata e non se ne trae nessuna conclusione sull'intero livello.
 """
 from __future__ import annotations
 
@@ -32,7 +40,7 @@ from math import comb
 
 from evaluation.rq2_rule_group_scorer import evaluate_group_decisions
 
-VERSION = "rq2_k_rule_evaluation_v1"
+VERSION = "rq2_k_rule_evaluation_v2"
 VERIFIED = "VERIFICATA_OPERATIVAMENTE"
 NOT_VERIFIED = "NON_VERIFICATA"
 NOT_EVALUABLE = "NON_VALUTABILE"
@@ -106,17 +114,41 @@ def evaluate_rule(*, target_fault_type: str, known_fault_types: tuple[str, ...],
 
     decisions = {gid: (group_results.get(gid) or {"decision": "error"}).get("decision", "error")
                  for gid in by_id}
+
+    # Positivi il cui componente di riferimento e' fuori dalla popolazione: NON_VALUTABILE.
+    not_observable: dict[str, list[str]] = {}
+    for gid, group in by_id.items():
+        if (group["reference_complete"] and target_fault_type in group["fault_types"]
+                and decisions[gid] != "error"):
+            result = group_results[gid]
+            if "population" not in result:
+                raise ValueError(f"Risultato senza popolazione (esecutore < v2): gruppo {gid}")
+            population = set(result["population"])
+            missing = sorted({f["component"] for f in group["faults"]
+                              if f["fault_type"] == target_fault_type
+                              and f["component"] not in population})
+            if missing:
+                not_observable[gid] = missing
+
+    def _reference(g: dict) -> dict:
+        record = {k: g[k] for k in _SCORER_KEYS}
+        if g["group_id"] in not_observable:
+            record["reference_complete"] = False          # fuori dai denominatori
+        return record
+
     scorer = evaluate_group_decisions(
         target_fault_type=target_fault_type, known_fault_types=known_fault_types,
-        group_references=[{k: g[k] for k in _SCORER_KEYS} for g in group_references],
+        group_references=[_reference(g) for g in group_references],
         group_decisions=decisions)
-    counts = scorer["counts"]
+    counts = dict(scorer["counts"])
+    counts["reference_unscorable_groups"] -= len(not_observable)     # solo GT davvero incompleta
+    counts["positive_groups_reference_not_observable"] = len(not_observable)
 
     # Localizzazione sui soli gruppi positivi per la classe, completi e rilevati.
     localization = {}
     for gid, group in by_id.items():
-        if (group["reference_complete"] and target_fault_type in group["fault_types"]
-                and decisions[gid] == "positive"):
+        if (group["reference_complete"] and gid not in not_observable
+                and target_fault_type in group["fault_types"] and decisions[gid] == "positive"):
             localization[gid] = _localization(
                 group, group_results[gid], target_fault_type, h_pre_seconds, h_seconds)
     tp_localized = sum(1 for v in localization.values() if v["all_located"])
@@ -141,11 +173,27 @@ def evaluate_rule(*, target_fault_type: str, known_fault_types: tuple[str, ...],
         gaps = []
         if positives == 0:
             gaps.append("no_complete_positive_group")
+            if not_observable:
+                gaps.append("reference_component_not_observable")
         if counts["abstain_positive"] or counts["error_positive"]:
             gaps.append("abstention_or_error_on_positives")
         if negatives == 0 or (coverage_neg is not None and coverage_neg < negative_coverage_min):
             gaps.append("negative_coverage_below_exploratory_threshold")
         verdict, reasons = (NOT_EVALUABLE, gaps) if gaps else (VERIFIED, [])
+
+    def _coverage_min(group_ids) -> float | None:
+        values = [group_results[g]["population_coverage"] for g in group_ids
+                  if g in group_results and group_results[g].get("population_coverage") is not None]
+        return min(values) if values else None
+
+    negative_ids = [gid for gid, g in by_id.items()
+                    if g["reference_complete"] and target_fault_type not in g["fault_types"]
+                    and decisions[gid] in ("negative", "positive")]
+    positive_ids = [gid for gid, g in by_id.items()
+                    if g["reference_complete"] and target_fault_type in g["fault_types"]
+                    and gid not in not_observable and decisions[gid] in ("negative", "positive")]
+    evaluable_positive_fraction = (positives / (positives + len(not_observable))
+                                   if (positives + len(not_observable)) else None)
 
     recall_k = tp_localized
     return {
@@ -164,9 +212,16 @@ def evaluate_rule(*, target_fault_type: str, known_fault_types: tuple[str, ...],
                      "error_positive": counts["error_positive"],
                      "error_negative": counts["error_negative"],
                      "unscorable_groups": counts["reference_unscorable_groups"]},
+        "positives_not_observable": {"groups": not_observable, "count": len(not_observable),
+                                     "evaluable_positive_fraction": evaluable_positive_fraction},
+        "population": {"negative_groups_coverage_min": _coverage_min(negative_ids),
+                       "positive_groups_coverage_min": _coverage_min(positive_ids)},
         "localization_by_group": localization,
         "parameters": {"h_pre_seconds": h_pre_seconds, "h_seconds": h_seconds},
         "rules_tested": rules_tested,
-        "caveat": ("Verdetto SUL CAMPIONE osservato; nessuna generalizzazione. Con molte "
-                   "regole in prova un esito perfetto puo' essere casuale: riportare rules_tested."),
+        "caveat": ("Verdetto SUL CAMPIONE osservato; nessuna generalizzazione. Un negativo "
+                   "vale per i soli componenti osservabili (popolazione), non per l'intero "
+                   "livello; i positivi con riferimento non osservabile sono NON_VALUTABILI e "
+                   "riportati a parte. Con molte regole in prova un esito perfetto puo' essere "
+                   "casuale: riportare rules_tested."),
     }

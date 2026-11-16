@@ -17,8 +17,10 @@ Cosa NON fa
     guasto; legge solo i 4 incidenti di scoperta (`rq2_k_catalog.DISCOVERY_CASES`).
   * Non estende l'esecutore per recuperare le regole non formalizzabili: le segnala.
   * Non esegue la regola: non produce nessuna decisione di gruppo.
-  * La tabella semantica e' una PROPOSTA (versione `_proposed`): va confermata e poi
-    congelata prima di L2. Qui e' solo applicata, in modo deterministico.
+  * La tabella semantica (v1, approvata da GPT e da Alessio il 16 nov) e' una mappatura di
+    COMPATIBILITA' tra famiglia di KPI e classe, NON di causalita': dice che un KPI e' una
+    firma osservabile di una classe, non che la regola ne provi la causa. Qui e' solo
+    applicata, in modo deterministico.
 
 Esiti L1 (interpretazione di Claude delle tre voci richieste, da confermare)
 ----------------------------------------------------------------------------
@@ -50,7 +52,7 @@ from evaluation import rq2_k_records as rk
 from evaluation import rq2_k_rule_executor as ex
 
 VERSION = "rq2_k_l1_preflight_v1"
-SEMANTIC_TABLE_VERSION = "rq2_k_semantic_table_v1_proposed"
+SEMANTIC_TABLE_VERSION = "rq2_k_semantic_table_v1"
 
 FORMALIZABLE = "FORMALIZZABILE"
 NOT_FORMALIZABLE = "NON_FORMALIZZABILE_NODE_CONTAINER"
@@ -64,7 +66,7 @@ C_PROCESS = "container process termination"
 C_PACKET_LOSS = "container packet loss"
 CLASSES = (C_NODE_CPU, C_WRITE_IO, C_PROCESS, C_PACKET_LOSS)
 
-# Tabella semantica PROPOSTA: la prima famiglia che corrisponde per livello e nome vince.
+# Tabella semantica v1 (compatibilita', non causalita'): la prima famiglia che corrisponde per livello e nome vince.
 # `classes` = classi per cui il KPI e' una firma DIRETTA; () = nessuna firma diretta.
 FAMILIES = (
     {"id": "node_cpu_usage", "level": "node",
@@ -73,11 +75,15 @@ FAMILIES = (
                   "carico di CPU (classe gia' coperta dalle regole fisse, assente dai sigillati)"},
     {"id": "node_cpu_iowait", "level": "node", "pattern": r"^system\.cpu\.iowait$", "classes": (),
      "rationale": "attesa di I/O: effetto indiretto del disco, nessuna firma diretta delle quattro classi"},
+    {"id": "node_ping_can_connect", "level": "node", "pattern": r"^ping\.can_connect$", "classes": (),
+     "rationale": "raggiungibilita' del nodo (ping): nessuna firma diretta delle quattro classi"},
     {"id": "node_other", "level": "node", "pattern": r"^system\.", "classes": (),
      "rationale": "altri KPI di nodo (memoria, disco, I/O, carico): nessuna firma diretta delle quattro classi"},
     {"id": "container_start_time", "level": "container",
      "pattern": r"^container_start_time_seconds$", "classes": (C_PROCESS,),
-     "rationale": "l'istante di avvio del container cambia quando il processo termina e riparte"},
+     "rationale": "l'istante di avvio del container cambia quando il processo termina e riparte",
+     "caveat": "Rileva un RIAVVIO OSSERVABILE del container; non dimostra di per se' la causa "
+               "della terminazione del processo."},
     {"id": "container_fs_write", "level": "container",
      "pattern": r"^container_fs_writes(_MB)?(\.|$)", "classes": (C_WRITE_IO,),
      "rationale": "scritture su disco del container: firma diretta del carico di scrittura"},
@@ -185,7 +191,7 @@ def classify_candidate(entry: dict, catalog: dict, kpi_levels: dict[str, str]) -
            "hypothesized_fault_type": rule.get("hypothesized_fault_type"),
            "rule_sha256": _sha(rule), "combination": rule.get("combination"),
            "executable": False, "classes": [], "required_history_seconds": None,
-           "conditions": [], "reason": None, "l1_outcome": NOT_FORMALIZABLE}
+           "conditions": [], "caveats": [], "reason": None, "l1_outcome": NOT_FORMALIZABLE}
     try:
         conditions = ex._check_rule(rule)
     except ex.RuleExecutionError as exc:
@@ -208,6 +214,10 @@ def classify_candidate(entry: dict, catalog: dict, kpi_levels: dict[str, str]) -
             "unit_check": unit_check(metric, cond.get("unit")) if level else None,
             "components_per_case": _components_per_case(catalog, metric, level) if level else {}})
 
+    row["caveats"] = sorted({kpi_family(c["metric"], c["level"]).get("caveat")
+                             for c in row["conditions"]
+                             if c["level"] and kpi_family(c["metric"], c["level"])
+                             and kpi_family(c["metric"], c["level"]).get("caveat")})
     outside = sorted({c["metric"] for c in row["conditions"] if not c["in_catalog"]})
     if outside:
         return {**row, "reason": "kpi_fuori_dal_catalogo_node_container: " + ", ".join(outside)}
@@ -258,6 +268,7 @@ def render_table(table: dict) -> str:
                   f"  ipotesi LLM  : {row['hypothesized_fault_type']}   (solo provenienza)",
                   f"  combinazione : {row['combination']}   storia richiesta: "
                   f"{row['required_history_seconds']} s   sha256 regola: {row['rule_sha256'][:12]}"]
+        lines += [f"  CAUTELA      : {c}" for c in row["caveats"]]
         for c in row["conditions"]:
             cases = ", ".join(f"{k.split('_')[-1]}:{v['with_kpi']}/{v['components_total']}"
                               for k, v in sorted(c["components_per_case"].items())) or "-"

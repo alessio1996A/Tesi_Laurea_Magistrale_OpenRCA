@@ -18,7 +18,7 @@ START = 1647748800                 # 12:00 a Shanghai: la storia di poche ore re
 WINDOW = 1800
 END = START + WINDOW
 
-NODE_KPIS = ("system.cpu.pct_usage", "system.cpu.iowait", "system.mem.used")
+NODE_KPIS = ("system.cpu.pct_usage", "system.cpu.iowait", "system.mem.used", "ping.can_connect")
 CONTAINER_KPIS = ("container_start_time_seconds", "container_fs_writes./dev/vda",
                   "container_fs_writes_MB./dev/vda", "container_cpu_cfs_throttled_periods",
                   "container_network_receive_packets_dropped.eth0",
@@ -96,6 +96,23 @@ class LevelMapAndFamilyTests(unittest.TestCase):
                  ("container_cpu_cfs_throttled_periods", "container"): "container_cpu_cfs"}
         for (kpi, level), expected in cases.items():
             self.assertEqual(pf.kpi_family(kpi, level)["id"], expected, kpi)
+
+    def test_ping_can_connect_is_explicitly_a_node_kpi_without_direct_signature(self):
+        family = pf.kpi_family("ping.can_connect", "node")
+        self.assertEqual(family["id"], "node_ping_can_connect")
+        self.assertEqual(family["classes"], ())
+        self.assertIsNone(pf.kpi_family("ping.can_connect", "container"))
+
+    def test_semantic_table_hash_is_the_frozen_one(self):
+        # Se questo test fallisce la tabella e' cambiata dopo il congelamento: serve un nuovo freeze.
+        self.assertEqual(pf.semantic_table_sha256(), "642b9d2c5f3bfd1b6bb70fe93d4410e142b0addf99c301ce34055ee87289c981")
+
+    def test_the_restart_rule_carries_the_caveat(self):
+        row = _classify([_cond("container_start_time_seconds")])
+        self.assertEqual(len(row["caveats"]), 1)
+        self.assertIn("RIAVVIO OSSERVABILE", row["caveats"][0])
+        self.assertIn("non dimostra", row["caveats"][0])
+        self.assertEqual(_classify([_cond("system.cpu.iowait")])["caveats"], [])
 
     def test_level_matters_and_unknown_names_have_no_family(self):
         self.assertIsNone(pf.kpi_family("system.cpu.pct_usage", "container"))
@@ -225,7 +242,7 @@ class TableTests(unittest.TestCase):
     def test_render_mentions_outcomes_and_semantic_table(self):
         text = pf.render_table(pf.build_table(self._entries(), _catalog()))
         for needle in (pf.FORMALIZABLE, pf.NOT_CLASSIFIABLE, pf.NOT_FORMALIZABLE,
-                       "mrt_max", pf.SEMANTIC_TABLE_VERSION, "container_start_time"):
+                       "mrt_max", pf.SEMANTIC_TABLE_VERSION, "container_start_time", "CAUTELA"):
             self.assertIn(needle, text)
 
 

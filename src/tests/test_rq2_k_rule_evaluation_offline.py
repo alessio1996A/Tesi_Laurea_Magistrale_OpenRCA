@@ -29,10 +29,91 @@ NEG = {"decision": "negative", "first_fire_unix_by_component": {}}
 ABS = {"decision": "abstain", "first_fire_unix_by_component": {}}
 
 
+def _with_population(groups, results):
+    """Di default tutti i componenti di riferimento sono osservabili (popolazione completa)."""
+    out = {}
+    for gid, result in results.items():
+        result = dict(result)
+        group = next(g for g in groups if g["group_id"] == gid)
+        result.setdefault("population", sorted({f["component"] for f in group["faults"]}))
+        result.setdefault("population_coverage", 1.0)
+        out[gid] = result
+    return out
+
+
 def _evaluate(groups, results, **kw):
     return ev.evaluate_rule(target_fault_type="cls_a", known_fault_types=CLASSES,
-                            group_references=groups, group_results=results,
+                            group_references=groups,
+                            group_results=_with_population(groups, results),
                             h_pre_seconds=H_PRE, h_seconds=H, **kw)
+
+
+class PopulationTests(unittest.TestCase):
+    def _groups(self):
+        return [_group("p1", ["cls_a"]), _group("p2", ["cls_a"]),
+                _group("n1", ["cls_b"]), _group("n2", ["cls_c"]), _group("n3", ["cls_b"])]
+
+    def _results(self):
+        return {"p1": _hit("comp-p1", 1100), "p2": _hit("comp-p2", 1000),
+                "n1": NEG, "n2": NEG, "n3": NEG}
+
+    def test_reference_component_outside_the_population_is_not_evaluable_not_a_fn(self):
+        groups = self._groups()
+        results = self._results()
+        results["p2"] = {**NEG, "population": ["altro-componente"], "population_coverage": 0.9}
+        report = _evaluate(groups, results)
+        self.assertEqual(report["counts"]["fn"], 0)
+        self.assertEqual(report["counts"]["positive_groups_reference_not_observable"], 1)
+        self.assertEqual(report["counts"]["complete_positive_groups"], 1)    # solo p1
+        self.assertEqual(report["positives_not_observable"]["groups"], {"p2": ["comp-p2"]})
+        self.assertEqual(report["positives_not_observable"]["evaluable_positive_fraction"], 0.5)
+        self.assertEqual(report["verdict"], ev.VERIFIED)     # sul solo positivo osservabile
+
+    def test_all_positives_not_observable_makes_the_rule_not_evaluable(self):
+        groups = self._groups()
+        results = self._results()
+        for gid in ("p1", "p2"):
+            results[gid] = {**NEG, "population": [], "population_coverage": 0.0}
+        report = _evaluate(groups, results)
+        self.assertEqual(report["verdict"], ev.NOT_EVALUABLE)
+        self.assertIn("no_complete_positive_group", report["reasons"])
+        self.assertIn("reference_component_not_observable", report["reasons"])
+        self.assertEqual(report["counts"]["fn"], 0)
+
+    def test_not_observable_is_not_counted_as_incomplete_ground_truth(self):
+        groups = self._groups() + [_group("x", ["cls_a"], complete=False)]
+        results = self._results() | {"x": NEG}
+        results["p2"] = {**NEG, "population": [], "population_coverage": 0.0}
+        report = _evaluate(groups, results)
+        self.assertEqual(report["counts"]["reference_unscorable_groups"], 1)   # solo "x"
+        self.assertEqual(report["counts"]["positive_groups_reference_not_observable"], 1)
+
+    def test_an_executor_error_on_a_positive_stays_an_error(self):
+        groups = self._groups()
+        results = self._results()
+        results["p2"] = {"decision": "error"}
+        report = _evaluate(groups, results)
+        self.assertEqual(report["counts"]["error_positive"], 1)
+        self.assertEqual(report["positives_not_observable"]["count"], 0)
+
+    def test_result_without_population_is_refused(self):
+        groups = self._groups()
+        results = _with_population(groups, self._results())
+        del results["p1"]["population"]
+        with self.assertRaises(ValueError):
+            ev.evaluate_rule(target_fault_type="cls_a", known_fault_types=CLASSES,
+                             group_references=groups, group_results=results,
+                             h_pre_seconds=H_PRE, h_seconds=H)
+
+    def test_population_coverage_of_negatives_is_reported_and_caveated(self):
+        groups = self._groups()
+        results = self._results()
+        results["n1"] = {**NEG, "population_coverage": 0.95}
+        results["n2"] = {**NEG, "population_coverage": 0.9}
+        report = _evaluate(groups, results)
+        self.assertEqual(report["population"]["negative_groups_coverage_min"], 0.9)
+        self.assertEqual(report["population"]["positive_groups_coverage_min"], 1.0)
+        self.assertIn("componenti osservabili", report["caveat"])
 
 
 class IntervalTests(unittest.TestCase):

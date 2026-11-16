@@ -109,7 +109,9 @@ class GroupDecisionTests(unittest.TestCase):
         self.assertEqual(result["level"], "node")
 
     def test_positive_even_if_other_cells_are_unknown(self):
-        rows = _series("node-1", "cpu", [95.0] * 30) + _series("node-2", "cpu", FLAT[:1])
+        # node-2 ha pochi campioni dentro la finestra: le celle successive sono sconosciute.
+        rows = (_series("node-1", "cpu", [95.0] * 30)
+                + _series("node-2", "cpu", [10.0] * 3, first_ts=START))
         result = _run(_rule([_cond()]), rows)
         self.assertEqual(result["decision"], "positive")      # un sospetto basta (any T)
         self.assertGreater(result["cells"]["unknown"], 0)
@@ -122,12 +124,42 @@ class GroupDecisionTests(unittest.TestCase):
         self.assertEqual(result["evaluable_fraction"], 1.0)
         self.assertEqual(result["first_fire_unix_by_component"], {})
 
-    def test_missing_metric_on_a_component_is_never_a_silent_negative(self):
+    def test_component_without_the_kpi_is_excluded_counted_and_named(self):
         rows = _series("node-1", "cpu", FLAT) + _series("node-2", "mem", FLAT)
         result = _run(_rule([_cond()]), rows)          # node-2 non ha "cpu"
-        self.assertEqual(result["decision"], "abstain")
-        self.assertEqual(result["components_missing_metric"], ["node-2"])
-        self.assertIn(ex.CAUSE_METRIC_MISSING, result["unknown_by_cause"])
+        self.assertEqual(result["decision"], "negative")   # vale per la POPOLAZIONE: solo node-1
+        self.assertEqual(result["population"], ["node-1"])
+        self.assertEqual(result["components_total"], 2)
+        self.assertEqual(result["components_in_population"], 1)
+        self.assertEqual(result["components_excluded"], ["node-2"])
+        self.assertEqual(result["excluded_missing_metrics"], {"node-2": ["cpu"]})
+        self.assertEqual(result["population_coverage"], 0.5)
+        self.assertEqual(result["cells"]["unknown"], 0)    # l'escluso non diventa "sconosciuto"
+
+    def test_an_excluded_component_never_makes_the_group_positive(self):
+        rows = _series("node-1", "cpu", FLAT) + _series("node-2", "mem", [99.0] * 30)
+        result = _run(_rule([_cond("cpu")]), rows)
+        self.assertEqual(result["decision"], "negative")
+        self.assertEqual(result["first_fire_unix_by_component"], {})
+
+    def test_kpi_only_in_the_history_does_not_count_as_exposed(self):
+        # node-2 espone "cpu" solo prima della finestra di gruppo: non e' nella popolazione.
+        rows = (_series("node-1", "cpu", FLAT)
+                + _series("node-2", "cpu", [10.0] * 5, first_ts=START - 600)
+                + _series("node-2", "mem", FLAT))
+        result = _run(_rule([_cond("cpu")]), rows)
+        self.assertEqual(result["population"], ["node-1"])
+        self.assertEqual(result["excluded_missing_metrics"], {"node-2": ["cpu"]})
+
+    def test_every_required_kpi_is_needed_even_for_combination_any(self):
+        rows = _series("node-1", "cpu", [95.0] * 30)       # nessun "mem"
+        conds = [_cond("cpu"), _cond("mem", threshold=1)]
+        levels = {"cpu": "node", "mem": "node"}
+        for combination in ("all", "any"):
+            result = _run(_rule(conds, combination), rows, kpi_levels=levels)
+            self.assertEqual(result["decision"], "abstain")
+            self.assertEqual(result["reason"]["code"], "empty_population")
+            self.assertEqual(result["components_excluded"], ["node-1"])
 
     def test_a_gap_larger_than_the_window_makes_the_group_abstain(self):
         # nessun campione nelle ultime finestre: tolgo il tratto centrale
@@ -144,11 +176,12 @@ class GroupDecisionTests(unittest.TestCase):
         self.assertIn(ex.CAUSE_HISTORY, result["unknown_by_cause"])
 
     def test_all_vs_any_with_one_unknown_condition(self):
-        rows = _series("node-1", "cpu", [95.0] * 30)    # nessun "mem"
+        # "mem" ha campioni solo all'inizio della finestra: poi la condizione e' sconosciuta.
+        rows = (_series("node-1", "cpu", [95.0] * 30)
+                + _series("node-1", "mem", [0.0] * 3, first_ts=START))
         conds = [_cond("cpu"), _cond("mem", threshold=1)]
-        # "mem" e' nel catalogo (livello node) ma il componente non ha campioni: sconosciuto.
         levels = {"cpu": "node", "mem": "node"}
-        # all: vero + sconosciuto = sconosciuto -> abstain; any: vero basta -> positive
+        # all: falso o sconosciuto, mai vero -> abstain; any: "cpu" vera basta -> positive
         self.assertEqual(_run(_rule(conds, "all"), rows, kpi_levels=levels)["decision"], "abstain")
         self.assertEqual(_run(_rule(conds, "any"), rows, kpi_levels=levels)["decision"], "positive")
 
@@ -186,7 +219,8 @@ class LevelAndSafetyTests(unittest.TestCase):
                                  kpi_levels={"n_cpu": "node", "c_cpu": "container"})
         self.assertEqual(result["level"], "container")
         self.assertEqual(result["decision"], "abstain")
-        self.assertEqual(result["reason"]["code"], "no_cells")
+        self.assertEqual(result["reason"]["code"], "empty_population")
+        self.assertEqual(result["components_total"], 0)
 
     def test_kpi_not_in_the_catalog_is_metric_absent_even_if_data_has_it(self):
         rows = _series("node-1", "cpu", FLAT)
