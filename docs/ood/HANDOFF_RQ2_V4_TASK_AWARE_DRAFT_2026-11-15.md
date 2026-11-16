@@ -60,9 +60,27 @@ Non ripetere i 32 precedenti; attendere output 10 test. Non eseguire Colab o API
 
 **Pulizia finale richiesta esplicitamente dall'utente:** dopo il completamento sperimentale, creare un layout finale pulito e refactoring/commenti italiani, ridurre prototipi e file inutili nel codice attivo **senza distruggere evidenze, release, risultati congelati e sorgenti/commit necessari a riprodurre RQ1/RQ2**. Valutare archiviazione tag/branch/manifest prima di ogni eliminazione. Non anticipare il cleanup ora perché cambia gli SHA scientifici.
 
+## Aggiornamento 16 novembre 2026 — Dispatcher V4 creato, 13 nuovi test non eseguiti
+
+Dopo il precedente batch PyCharm, l'utente ha riportato `Ran 10 tests in 0.343s — OK` per `test_rq2_v4_scientific_source_release_gate_offline.py`. Totale **42/42 test V4 mirati PASS**, sino a questo punto. Non rieseguirli se non richiesto da una modifica che li coinvolga.
+
+Aggiunte nuove, ancora da testare:
+- `src/evaluation/rq2_v4_scientific_single_stage_dispatcher.py`: dispatcher a **singolo stage V4** (D/C/K distinti), derivato solo come codice dal dispatcher V3 (non riusa suoi claim/record). `LIVE_OPT_IN_ENV=OPENRCA_RQ2_V4_ENABLE_PAID_SINGLE_STAGE` catturata all'import; valore esatto `EXPLICIT_V4_ONE_STAGE_ONLY_V1`. `run_one_v4_stage` richiede Stage ID, approval reference, model ID, commit/release SHA, budget operativo non hard cap, `confirm_paid_api=True`. Registra claim create-only prima di ogni singolo stage; D usa `normalize_v4_d_capture` task-aware, C/K mantengono la grammatica e provenance già prevista; nessun retry, nessun OOD. Su D/C non valido discendenti bloccati senza nuove API; se errore ambiguo dopo claim, lascia orphan per revisione manuale.
+- `src/tests/test_rq2_v4_single_stage_dispatcher_offline.py`: **13 nuovi test NON ANCORA ESEGUITI**; mock sintetici per opt-in, approvazione, budget, ID OOD/V3, provider fake, ordine claim→provider→record, blocco C/K, orphan, nessun retry.
+
+**Il gate reale non può ancora aprirsi**: non esiste una release scientifica V4 create-only e manca la source/runtime attestation in Colab V4. Scrivere il modulo dispatcher NON concede autorizzazione a pagamento. Il precedente consenso V3 è esaurito.
+
+Prossimo comando unico PyCharm (branch V4, working tree pulito):
+```powershell
+git pull --ff-only origin feature/rq2-v4-task-aware-ledger-2026-11-15
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v4_single_stage_dispatcher_offline.py" -v
+```
+Riportare `Ran 13 tests...` ed eventuali errori. Non chiedere di ripetere 42 test già PASS.
+
 ## Stato e NO-GO
 
-- La V4 è ancora **offline e non rilasciata**. Adapter V4 e ledger V4 sono stati implementati; il source/release gate è un NO-GO intenzionale; manca un dispatcher V4 e la release create-only. Nessuna nuova API o campagna autorizzata.
+- La V4 è ancora **offline e non rilasciata**. Adapter V4 e ledger V4 sono stati implementati; il source/release gate è un NO-GO intenzionale; dispatcher V4 implementato ma in attesa dei suoi 13 test mirati; manca la release create-only e il freeze source/runtime. Nessuna nuova API o campagna autorizzata.
 - Il controllo V4 di `expected_faults` usa l'audit già registrato nel runner. In fase di integration/readback source-bound, bisognerà confrontarlo anche con l'istruzione GT-free originale e il manifest/split congelato, senza leggere GT.
 - Il nuovo validatore NON deve essere sostituito con il validatore generale V2/V3 per D; invece i contratti C/K delle evidenze rimangono invariati.
 - Nessun `git pull` nel Colab congelato V3 per provare questa bozza. Nessuna API, nessuna nuova release, nessun retry, nessun OOD.
