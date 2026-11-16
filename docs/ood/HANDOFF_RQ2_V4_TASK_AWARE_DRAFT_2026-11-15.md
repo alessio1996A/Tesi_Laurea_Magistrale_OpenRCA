@@ -2,6 +2,20 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## STATO CORRENTE — 16 novembre 2026: Claude Sonnet A0 D REALE INVALID_OUTPUT, C/K BLOCCATI
+
+L'utente ha riportato da Colab `PILOT_RETURN_CODE=0`, `AUDIT_RETURN_CODE=0`, `V4_SONNET_D_PILOT_FINISHED — NO_FURTHER_STAGE`. **Lo status scientifico è D = INVALID_OUTPUT, non successo D.** La registrazione e i controlli scientifici sono riusciti.
+
+- Identità `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:sonnet:A0:D` / `claude-sonnet-5-5`; `status=V4_ONE_STAGE_RECORDED`, `record_status=INVALID_OUTPUT`, `record_sha256=ed8e99f4928d4e539a6355d666a5a6b36e76ccb586354dfa341d33ee6fb2404f`. `claims_created_this_stage=1`.
+- Errore di contratto: `task_index=task_2`, `task_contract_valid=false`, `json_status=invalid_v2_task_output: OutputContractError: JSON non analizzabile`. La classificazione deriva dal testo di risposta non analizzabile come JSON, non da `PROVIDER_ERROR`, non dal vecchio difetto di task_2 della V3.
+- 5 chiamate LLM logiche osservate; `input_tokens=95697`, `output_tokens=2242`, `token_usage_complete=true`. Costi reali NON attestati; non confondere token e fatturazione.
+- Discendenti creati automaticamente come `BLOCKED_DEPENDENCY`, **senza claim / senza nuove richieste LLM**: `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:sonnet:A0:C` e `...:sonnet:A0:K`.
+- Stato ledger post-run: `claims=4, records=6, orphans=0`; record Gemini K `PROVIDER_ERROR:GoogleAPIError` preservato. D Sonnet NO RETRY: non rieseguire questo stage e non tentare C o K bloccati. Source pin scientifico `78734fa130369d7c236ec53c0cc25d88c8860b27`, release SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be` immutati.
+
+**PROSSIMO PASSO MINIMO (solo lettura e nessuna API):** diagnosi strutturale del `raw_response` di D Sonnet da ledger senza stampare il testo: `d_final_text_extraction.content_kind/text_blocks/nontext_blocks`, lunghezza, SHA-256, classificazione primo carattere, presenza di fence Markdown, eventuale `json.JSONDecodeError.msg/pos`, `output_contract_v2.error`, senza persistere nulla e senza reinterpretare l'esito. NELLA STESSA CELLA verificare `preview_one_v4_stage` per **nuovo Haiku A0 D**, `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:haiku:A0:D`, `claude-haiku-5-5` e nessun claim/record. Conservare ledger 4/6/0 e tutti gli hash di Sonnet e Gemini. Solo se preflight Haiku PASS, eventuale successivo singolo Haiku D live con consenso circoscritto/budget appropriato, no replay, no modifica del protocollo.
+
+L'obiettivo è capire se Sonnet abbia prodotto naturale prosa/Markdown, testo vuoto o JSON tronco, **non ripararlo** né trasformare un tentativo inválido in valido. Sintassi JSON non valida potrebbe dipendere da modello, prompt e gestione finale del testo; non attribuire a una causa tecnica certa senza evidenza. Gli output reali RQ1 restano intatti.
+
 ## 16 novembre 2026 — Claude Sonnet A0 D READONLY PREFLIGHT PASS, PRONTO PER UN PILOT
 
 Utente ha eseguito una cella Colab indipendente `RETURN_CODE: 0` con `V4_SONNET_A0_D_READONLY_PREFLIGHT_PASS`, per lo stage esatto `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:sonnet:A0:D`, `model_id=claude-sonnet-5-5`. Confermati: source pin pulito `78734fa130369d7c236ec53c0cc25d88c8860b27`; release scientifica `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`; 6 tool rounds D; `claims=3, records=3, orphans=0`; `gemini_k_record_preserved=true`; nessun claim o record Sonnet D; 11 OOD sigillati; 0 API.
