@@ -2,6 +2,18 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Primo stage C REALE Gemini A0: RECORDED_COMPLETE
+
+Output Colab comunicato dall'utente: `PILOT_RETURN_CODE=0`, `AUDIT_RETURN_CODE=0`, `V4_C_PILOT_FINISHED — NO_FURTHER_STAGE`.
+
+- Stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:C` per modello `gemini-3.5-flash-lite`, harness A0, source commit congelato `78734fa130369d7c236ec53c0cc25d88c8860b27`, release scientifica `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+- `V4_ONE_STAGE_RECORDED`, `record_status=RECORDED_COMPLETE`, `record_sha256=cdb90c39eb6f5a17c2db6abe572dce8dffa7744b098ced275fd476a2798cc1c7`, `descendants_blocked=[]`, `claims_created_this_stage=1`, retry disabilitato.
+- Audit read-only: `claims=2, records=2, orphans=0`, D SHA precedente `345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f` invariato; claim C presente; C status/sha coincidono; K non eseguito (`k_record_status=null, k_claim_present=false`).
+- C ha generato 1 richiesta logica modello; `input_tokens_observed=7143`, `output_tokens_observed=186`, `usage_complete=true`, `text_extraction.content_kind=list` accettato e validato. Non interpretare questi dati come costo finale o correttezza causale; C è formalmente valido.
+- **NON rieseguire D o C**: entrambi claim + record sono immutabili e il singolo consenso per ciascuno è stato consumato.
+
+**PROSSIMA AZIONE:** preflight read-only SOLO K `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K` con `preview_one_v4_stage`, source pin e release SHA identici; controlli prima e dopo 2 claim, 2 record, 0 orphan; entrambi D e C `RECORDED_COMPLETE` e SHA esatti; nessun claim/record K; `prepared_package_sha256` di K calcolato e registrato; zero API/GT. Il contenuto K proviene dal D tool trajectory e dal C effettivo via `prepare_candidate_rule`, senza leggere risultati V3. Se PASS, si può realizzare un solo K live tracciabile, senza rifare D/C; annotare consenso e budget di riferimento di quel singolo stage. K valido non dimostra automaticamente trasferimento OOD: serviranno valutazione successiva e coorte sealed.
+
 ## 16 novembre 2026 — Preflight REALE in sola lettura del primo C: PASS
 
 Output utente Colab: `RETURN_CODE=0`, `V4_GEMINI_A0_C_READONLY_PREFLIGHT_PASS`, stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:C`; parent D SHA `345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f`; pacchetto C SHA `f6f3ee6c7c95e903c7cf21e56242551a4de62c088e708f810da53078106689e6`; `claims=1, records=1, orphans=0`; nessun claim C/K e nessuna API. Verificati `preview_one_v4_stage`, sorgente e release `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
