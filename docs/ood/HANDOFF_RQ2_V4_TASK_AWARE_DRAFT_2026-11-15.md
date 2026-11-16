@@ -2,6 +2,26 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## STATO ATTUALE CERTIFICATO — V4 SCIENTIFIC FREEZE PASS (16 novembre 2026)
+
+**Questa sezione aggiorna/supera le istruzioni storiche “V4 draft/no release” presenti più sotto. Non eseguire le vecchie celle di creazione release, né ripetere freeze o test senza motivo.**
+
+- Branch del codice: `feature/rq2-v4-task-aware-ledger-2026-11-15`. **Commit scientifico esatto, da NON cambiare:** `78734fa130369d7c236ec53c0cc25d88c8860b27`. Ulteriori commit docs-only non sostituiscono il pin.
+- Protocollo: `rq2_v4_task_aware_d_discovery_v0`. **Plan SHA-256** `ddba5cd92795e92e196d69cd5cc13df85eec91e9c18913561356f268127deec7`.
+- **Source inventory SHA-256** `a88ff23870c18836d375b3d6b222d00b91fa275a57eec3f19bae913ce0670633` (sei sorgenti V4 + futuro dispatcher separato, V2/V3 sorgenti e dati GT-free senza GT).
+- **Runtime attestation SHA-256** `192133f40fdf247fa5cfd6c6b2cfd59b23d53fea73d9e64f3d8151ad2c90ff9c`: 4 invii HTTP 429 sintetici, 4 timeout loopback, lock/O_EXCL Drive nel *medesimo* Colab; SDK versioni e sorgenti esatte. Non dimostra altri Colab, timeout di intero stage o hard cap USD.
+- **Release V4 SHA-256 confermata** `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+- Directory dati in Drive: `/content/drive/MyDrive/Tesi_OpenRCA/data/rq2_v4_task_aware_scientific_v1/`; release create-only `release_v1.json`. Directory V3 separata e intatta.
+- Checkout Colab V4 isolato: `/content/Tesi_OpenRCA_V4` a commit scientifico detached e clean; SDK isolati `/content/rq2_v2_pinned_sdk_py313` ripristinati nel runtime Python 3.13.18. **Non fare git pull in questo checkout e non modificare i sorgenti congelati.**
+- V4 55/55 test offline mirati PASS riportati da utente: 20 task/piano +12 adapter/ledger +10 release gate +13 dispatcher.
+- La prima prova Colab `V4_READONLY_SOURCE_RUNTIME_PREFLIGHT_PASS` ha confermato 180 stage (4 discovery × 5 harness × 3 modelli × D/C/K), 11 casi OOD locked, 0 release/claim/run.
+- La seconda prova Colab `V4_RUNTIME_PROOF_PASS_RELEASE_CANDIDATE_ONLY` ha calcolato candidate release SHA e runtime attestation senza creare release/claim/API.
+- **La release è stata poi effettivamente creata una sola volta**: processo 1 `V4_RELEASE_CREATE_ONLY_READBACK_PASS`, `RETURN_CODE=0`; processo 2 distinto `V4_SCIENTIFIC_FREEZE_INDEPENDENT_AUDIT_PASS`, `RETURN_CODE=0`, proof `V4_SOURCE_BOUND_RELEASE_VERIFIED`, ledger `V4_SCIENTIFIC_LEDGER_READBACK_AUDITED`, **claims=0, records=0, orphans=0**. `real_llm_calls=0`. Il flag `can_execute_api=false` in release/proof è intenzionale e non è un'autorizzazione.
+
+**Prossima e unica attività:** preflight **read-only** stage V4 `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D`, usando `preview_one_v4_stage` del dispatcher, dopo aver istanziato `V4ScientificLedger` e verificato claims/records/orphans=0. La preview può leggere istruzione GT-free ma non GT né telemetria; non deve creare claim/record o chiamare API. Eseguire in processo separato privo di credenziali e senza `OPENRCA_RQ2_V4_ENABLE_PAID_SINGLE_STAGE`. Se NO-GO fermarsi, non ripetere esecuzioni live. Il successivo vero pilot (a pagamento) necessita *nuovo consenso esplicito per stage, modello e budget operativo*, con `run_one_v4_stage` attualmente default disabled. Nessuna nuova API autorizzata ora.
+
+**Pulizia finale:** dopo la campagna, separare artefatti/prototipi dal codice di consegna tramite archivio/branch/tag con SHA, non cancellare storia e prove congelate. Migliorare commenti in italiano e struttura su branch successivo, non sul commit scientifico.
+
 ## Evidenza e motivazione
 
 Il primo e unico pilot reale V3 `rq2_v3_unified_equal_ck_extraction_discovery_v0:cloudbed-1_q032:gemini:A0:D` (release SHA256 `dae141c0dd7231cc172ef891299367df85adf2618be0b0c7882336ee585b1c04`; code commit `8f8b39e480db1296de155068c001d17ae05ac6ad`) ha prodotto:
