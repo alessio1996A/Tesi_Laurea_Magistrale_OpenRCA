@@ -34,6 +34,16 @@ repository va controllata nei file, non data per buona.
   della causa) → **K** (regola candidata nel contratto `rq2_candidate_rule_v0`).
   Human-in-the-loop e integrazione automatica nell'harness: **solo lavoro
   futuro**, non si implementano.
+- Nota di conteggio, da chiarire: le 8 regole (`src/harness/rule_batch.py`:
+  container CPU, memoria, read I/O; nodo CPU load, memoria, read I/O, write
+  I/O, spazio disco) più le 4 classi escluse fanno 12 su 15. **Restano 3
+  classi** né coperte dalle regole né oggetto di RQ2. Non le ho ricostruite;
+  `docs/ARCHITETTURA_E_RISULTATI_V3.md` cita casi di rete non coperti
+  (`cloudbed-1_q005`, `q027`). La tesi deve dichiarare questo perimetro.
+- Il file `2606.27154v2.pdf` del Project è OpenRCA 2.0 (PAVE, altri sistemi),
+  **non** il benchmark usato: i dati sono OpenRCA 1.0, sistema Market
+  (148 casi, 44 componenti, 15 cause). PAVE serve come fonte dei principi di
+  verifica (strutturale, statistico, temporale) dell'harness A1_PAVE.
 
 ## 3. Perimetro sperimentale RQ2
 
