@@ -178,6 +178,36 @@ def cmd_run(args) -> int:
     )
     print(json.dumps(outcome, indent=2))
     print(mr.format_summary(mr.summarize(rows, store)))
+    _print_orphans(store, rows)
+    return 0
+
+
+def _print_orphans(store, rows) -> None:
+    """Elenca gli stage con claim ma senza record (run interrotto)."""
+    orphans = store.orphans([r["stage_id"] for r in rows])
+    if not orphans:
+        return
+    print()
+    print(f"ATTENZIONE: {len(orphans)} stage orfani (claim senza record). "
+          "Non vengono mai rieseguiti da soli. Se il run e' stato interrotto "
+          "e vuoi sbloccarli: comando release-orphan, con motivazione.")
+    for stage_id in orphans:
+        print("  -", stage_id)
+
+
+def cmd_release_orphan(args) -> int:
+    """Sblocca UN claim orfano, con motivazione e traccia (mai in automatico)."""
+    _, rows = _plan_rows()
+    if args.stage_id not in {r["stage_id"] for r in rows}:
+        print("Stage non presente nel piano: rifiutato.")
+        return 2
+    store = mr.StageStore(_store_root(Path(args.drive_root), args.namespace))
+    try:
+        entry = store.release_orphan(args.stage_id, args.reason)
+    except mr.StoreError as exc:
+        print("Rifiutato:", exc)
+        return 2
+    print(json.dumps(entry, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -186,6 +216,7 @@ def cmd_summary(args) -> int:
     store = mr.StageStore(_store_root(Path(args.drive_root), args.namespace))
     selected = _select(rows, args)
     print(mr.format_summary(mr.summarize(selected, store)))
+    _print_orphans(store, selected)
     return 0
 
 
@@ -206,6 +237,12 @@ def _parser() -> argparse.ArgumentParser:
             p.add_argument("--max-stages", type=int)
             p.add_argument("--time-budget-minutes", type=float)
             p.add_argument("--allow-dirty", action="store_true")
+    rel = sub.add_parser("release-orphan")
+    rel.add_argument("--drive-root", required=True)
+    rel.add_argument("--namespace")
+    rel.add_argument("--stage-id", required=True)
+    rel.add_argument("--reason", required=True,
+                     help="motivazione esplicita (almeno 10 caratteri)")
     return parser
 
 
@@ -214,8 +251,8 @@ def main(argv=None) -> int:
     if args.command in ("check", "run") and not args.repo_dir:
         print("--repo-dir obbligatorio")
         return 2
-    return {"check": cmd_check, "run": cmd_run,
-            "summary": cmd_summary}[args.command](args)
+    return {"check": cmd_check, "run": cmd_run, "summary": cmd_summary,
+            "release-orphan": cmd_release_orphan}[args.command](args)
 
 
 if __name__ == "__main__":

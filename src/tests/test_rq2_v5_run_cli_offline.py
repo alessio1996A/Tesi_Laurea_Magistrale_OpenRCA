@@ -161,5 +161,54 @@ class RunCliOfflineTests(unittest.TestCase):
         self.assertIn("gemini|A0|K: RECORDED_COMPLETE=1", out)
 
 
+    # -- stage orfani (run interrotto, es. disconnessione di Colab)
+    STAGE_D = "rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D"
+
+    def _release(self, stage_id, reason):
+        argv = ["release-orphan", "--drive-root", str(self.drive),
+                "--namespace", NAMESPACE, "--stage-id", stage_id,
+                "--reason", reason]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = cli.main(argv)
+        return rc, out.getvalue()
+
+    def _make_orphan(self):
+        store = mr.StageStore(self.drive / NAMESPACE)
+        store.claim(self.STAGE_D, {})
+        return store
+
+    def test_orphans_are_listed_in_summary_and_never_rerun(self):
+        self._make_orphan()
+        rc, out = self._main("summary", env={})
+        self.assertEqual(rc, 0)
+        self.assertIn("1 stage orfani", out)
+        self.assertIn(self.STAGE_D, out)
+        _, out = self._main("run")
+        self.assertEqual(_FakeExecutor.calls, [])   # D orfano: nulla parte
+
+    def test_release_orphan_needs_reason_then_allows_rerun_and_leaves_a_log(self):
+        store = self._make_orphan()
+        rc, out = self._release(self.STAGE_D, "corto")
+        self.assertEqual(rc, 2)                      # motivazione troppo breve
+        self.assertIsNotNone(store.load_claim(self.STAGE_D))
+        rc, out = self._release(
+            self.STAGE_D, "Colab disconnesso durante lo stage, nessun record")
+        self.assertEqual(rc, 0, out)
+        self.assertIsNone(store.load_claim(self.STAGE_D))
+        log = (self.drive / NAMESPACE / "released_claims" / "log.jsonl"
+               ).read_text("utf-8")
+        self.assertIn("Colab disconnesso", log)
+        self._main("run")
+        self.assertEqual(_FakeExecutor.calls, ["D", "C", "K"])
+
+    def test_release_refuses_unknown_stage_and_stage_with_record(self):
+        rc, _ = self._release("stage_inventato", "motivazione abbastanza lunga")
+        self.assertEqual(rc, 2)
+        self._main("run")                            # D ha un record
+        rc, out = self._release(self.STAGE_D, "motivazione abbastanza lunga")
+        self.assertEqual(rc, 2)
+        self.assertIn("Rifiutato", out)
+
 if __name__ == "__main__":
     unittest.main()
