@@ -2,6 +2,12 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Claude Sonnet A0 D READONLY PREFLIGHT PASS, PRONTO PER UN PILOT
+
+Utente ha eseguito una cella Colab indipendente `RETURN_CODE: 0` con `V4_SONNET_A0_D_READONLY_PREFLIGHT_PASS`, per lo stage esatto `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:sonnet:A0:D`, `model_id=claude-sonnet-5-5`. Confermati: source pin pulito `78734fa130369d7c236ec53c0cc25d88c8860b27`; release scientifica `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`; 6 tool rounds D; `claims=3, records=3, orphans=0`; `gemini_k_record_preserved=true`; nessun claim o record Sonnet D; 11 OOD sigillati; 0 API.
+
+**Prossima singola operazione**: primo live Sonnet D su questo identico stage (senza riutilizzare il D Gemini); `ANTHROPIC_API_KEY` dai Secrets Colab, nessuna chiave esposta; esecuzione vincolata a release/source e a `ONE_V4_STAGE_CLAIM_ONLY`, `confirm_paid_api=True` e opt-in esclusivo nel sottoprocesso; un solo tentativo senza retry. Budget operativo di riferimento proposto per Sonnet D USD **1.00**, NON hard cap e non garanzia di spesa massima; Sonnet ha costi/token potenzialmente più elevati. Il valore è un riferimento di autorizzazione per la singola cella, non prezzo calcolato né richiesta di eseguire altri stage. Al termine audit indipendente senza credenziali; attesi 4 claim/4 record/0 orphans se il dispatcher registra correttamente. Se `PROVIDER_ERROR` o `INVALID_OUTPUT`, mantenere l'esito scientifico, non ritentare. Se orphan, stop e forensic. Nessuna modifica al codice, protocollo, risultato Gemini o release.
+
 ## AGGIORNAMENTO FORENSE (16 novembre 2026) — K Gemini A0: GoogleAPIError
 
 L'utente ha eseguito audit **read-only, senza API** `V4_K_ERROR_FORENSIC_READONLY_PASS` (RETURN_CODE 0) e confermato:
