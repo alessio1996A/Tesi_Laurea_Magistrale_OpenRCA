@@ -193,6 +193,11 @@ class RecordReaderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rec.parse_stage_id("troppo:corto")
 
+    def test_stage_id_with_and_without_plan_prefix(self):
+        expected = {"case_id": "cloudbed-1_q032", "model": "gemini", "harness": "A1_8R", "stage": "K"}
+        self.assertEqual(rec.parse_stage_id("cloudbed-1_q032:gemini:A1_8R:K"), expected)
+        self.assertEqual(rec.parse_stage_id("plan_v5:cloudbed-1_q032:gemini:A1_8R:K"), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

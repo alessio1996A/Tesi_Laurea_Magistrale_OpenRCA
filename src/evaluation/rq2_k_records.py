@@ -28,11 +28,14 @@ def _dig(obj, *path):
 
 
 def parse_stage_id(stage_id: str) -> dict:
-    """'<piano>:<caso>:<modello>:<harness>:<stage>' -> componenti."""
+    """'[<piano>:]<caso>:<modello>:<harness>:<stage>' -> componenti.
+
+    Il prefisso del piano e' facoltativo: si leggono sempre gli ultimi quattro campi,
+    cosi' il lettore funziona con entrambe le forme di stage_id."""
     parts = stage_id.split(":")
-    if len(parts) < 5:
+    if len(parts) < 4 or not all(parts[-4:]):
         raise ValueError(f"stage_id non riconosciuto: {stage_id}")
-    return {"case_id": parts[1], "model": parts[2], "harness": parts[3], "stage": parts[4]}
+    return {"case_id": parts[-4], "model": parts[-3], "harness": parts[-2], "stage": parts[-1]}
 
 
 def read_k_record(record: dict) -> dict:
