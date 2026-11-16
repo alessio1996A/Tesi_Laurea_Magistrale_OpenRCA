@@ -2,6 +2,18 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Consenso utente al primo pilot V4, non ancora eseguito
+
+L'utente ha risposto: «sì autorizzo sempre non c'è bisogno che me lo chiedi», in risposta alla proposta puntuale di **un solo** stage V4 `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D` su `gemini-3.5-flash-lite`, con budget operativo di riferimento **USD 0.10 non hard cap**, massimo 6 tool rounds, no automatic retry. Questa autorizzazione concreta è acquisita per il primo stage. Non chiedere nuovamente il consenso per esso; non trasformare la frase di disponibilità generale in un'autorizzazione di spesa illimitata o di pilot su altre combinazioni senza vincoli e identificativi espliciti.
+
+Verifica read-only del codice al source pin scientifico `78734fa130369d7c236ec53c0cc25d88c8860b27`:
+- `src/evaluation/experiment_runner.py` usa `enforce_task_output(..., output_contract_mode="v2_enforce")` dopo il vecchio parser, e quindi aggiorna `prediction/json_status/output_contract_v2`; `src/evaluation/rq2_v4_d_task_aware_contract.py` valida il JSON e i soli campi del task, con identica funzione nel readback.
+- La V4 si applica al piano 5 harness × 3 provider-modelli × 4 casi; i 55 test precedenti sono sintetici/offline, non certificano ancora 15 percorsi di provider reali.
+- C/K riusa il validatore V3 per il *proprio* contratto C/K ed evidence bundle; la relativa branch `_validate_artifact` per C/K non pretende tutti i tre campi nel D parent, ma richiede `d_record.status="RECORDED_COMPLETE"` e provenance.
+- Procedere con una cella Colab che imposti opt-in **solo nel subprocess del primo stage**, binding a source commit/release SHA congelati, consenso `ONE_V4_STAGE_CLAIM_ONLY`, per un unico tentativo `run_one_v4_stage`. Claim create-only precede chiamata SDK; se eccezione dopo claim, **non ripetere**: audit read-only e review manuale, non cancellare file/claim.
+- Il costo di USD 0.10 è solo budget di riferimento senza cap; D può avere più chiamate modello (fino ai tool round del grafo). Non autorizzare automaticamente altri stage.
+- Non è stata ancora effettuata alcuna chiamata a pagamento V4 in questa conversazione. Release V4 rimane il freeze SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+
 ## 16 novembre 2026 — Primo D V4: preflight read-only PASS, nessuna API
 
 Risultato restituito dall'utente in Colab:
