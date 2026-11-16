@@ -1,7 +1,7 @@
 """Test offline dell'esecutore V5 reale (serve LangChain: PyCharm/Colab).
 
 Esegue il VERO run_experiment con grafo finto (stessa impalcatura del test V3
-di cattura D) e dimostra che la politica di formato V5 vale per tutti e cinque
+di cattura D) e dimostra che la politica di formato V5.1 vale per tutti e cinque
 gli harness, senza toccare parser/contratti V4. Nessuna API, nessuna chiave.
 Dove manca LangChain (es. sandbox senza pacchetti) i test vengono saltati.
 """
@@ -107,8 +107,21 @@ class V5DCaptureOfflineTests(unittest.TestCase):
         self.assertEqual(receipt["diagnostic_run"]["raw_response"], VALID_D)
         self.assertEqual(capture.format_record()["deviation"], "NONE")
 
-    def test_prose_around_fence_stays_invalid_with_the_real_contract(self):
-        raw = "Ecco la diagnosi:\n" + FENCED
+    def test_text_outside_the_fence_is_unwrapped_with_the_real_contract(self):
+        # V5.1: blocco valido + commento (caso reale del pilota).
+        for name, raw in (("dopo", FENCED + "\n\nQuesta e' un'inferenza."),
+                          ("prima", "Ecco la diagnosi:\n" + FENCED)):
+            with self.subTest(case=name):
+                receipt, capture, _ = self._run(raw)
+                run = receipt["diagnostic_run"]
+                self.assertEqual(run["json_status"], "valid_json")
+                self.assertTrue(run["output_contract_v2"]["valid"])
+                fmt = capture.format_record()
+                self.assertEqual(fmt["deviation"], "FENCE_WITH_OUTSIDE_TEXT")
+                self.assertEqual(fmt["original_response"], raw)
+
+    def test_wrapper_on_the_same_line_stays_invalid_with_the_real_contract(self):
+        raw = "Ecco la diagnosi: " + FENCED
         receipt, capture, _ = self._run(raw)
         run = receipt["diagnostic_run"]
         self.assertEqual(run["raw_response"], raw)
@@ -172,9 +185,18 @@ class V5CKGlueOfflineTests(unittest.TestCase):
         self.assertEqual(outcome["format"]["deviation"], "SINGLE_JSON_FENCE")
         self.assertEqual(outcome["format"]["original_response"], fenced)
 
+    def test_fence_with_outside_text_reaches_the_normalizer_unwrapped(self):
+        raw = '```json\n{"a": 1}\n```\n\nCommento del modello.'
+        outcome, seen = self._go({"raw_response": raw,
+                                  "provider_error": None, "api_attempts": 1})
+        self.assertEqual(seen["call"]["raw_response"], '{"a": 1}')
+        self.assertEqual(outcome["format"]["deviation"],
+                         "FENCE_WITH_OUTSIDE_TEXT")
+        self.assertEqual(outcome["format"]["original_response"], raw)
+
     def test_plain_and_rejected_responses_are_passed_unchanged(self):
         for raw, expected in (('{"a": 1}', "NONE"),
-                              ('Ecco:\n```json\n{"a": 1}\n```',
+                              ('Ecco: ```json\n{"a": 1}\n```',
                                "REJECTED_WRAPPER")):
             with self.subTest(raw=raw):
                 outcome, seen = self._go({"raw_response": raw,

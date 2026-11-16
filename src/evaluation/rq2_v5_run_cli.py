@@ -25,6 +25,9 @@ from evaluation.rq2_v4_unified_gtfree_discovery_plan import (
 from evaluation.rq2_v5_response_normalization import (
     POLICY as FORMAT_POLICY, VERSION as FORMAT_VERSION,
 )
+from evaluation.rq2_v5_retry import (
+    MAX_ATTEMPTS as RETRY_MAX_ATTEMPTS, RETRY_POLICY,
+)
 
 KEY_ENV = {"google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
            "anthropic": ("ANTHROPIC_API_KEY",)}
@@ -33,7 +36,8 @@ PACKAGES = ("langchain-core", "langgraph", "langchain-anthropic",
 MANIFEST = "manifest_v1.json"
 # Campi che devono restare identici in tutti i lotti dello stesso esperimento.
 INVARIANTS = ("protocol", "plan_preview_sha256", "format_policy",
-              "format_version", "C_system_prompt_sha256",
+              "format_version", "retry_policy", "retry_max_attempts",
+              "C_system_prompt_sha256",
               "K_system_prompt_sha256", "d_budgets")
 
 
@@ -79,6 +83,8 @@ def build_manifest(repo: Path, plan: dict) -> dict:
         "plan_preview_sha256": plan["preview_sha256"],
         "format_policy": FORMAT_POLICY,
         "format_version": FORMAT_VERSION,
+        "retry_policy": RETRY_POLICY,
+        "retry_max_attempts": RETRY_MAX_ATTEMPTS,
         **prompt_hashes(),
         "d_budgets": {"max_tool_rounds": D_MAX_ROUNDS,
                       "max_verification_checks": PLANNER_CHECKS,

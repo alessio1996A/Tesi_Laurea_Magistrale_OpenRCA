@@ -451,10 +451,26 @@ def conformity(record: dict) -> dict:
     }
 
 
+def _k_outcome(record: dict) -> str:
+    """Esito di un K completo: candidate / insufficient_evidence / altro.
+
+    Serve a distinguere 'contratto rispettato' da 'regola proposta': un K
+    puo' essere RECORDED_COMPLETE e comunque astenersi.
+    """
+    try:
+        raw = record["receipt"]["artifact"]["raw_response"]
+        status = json.loads(raw).get("status")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return "non_leggibile"
+    return status if status in ("candidate", "insufficient_evidence") else "altro"
+
+
 def summarize(plan: list[dict], store: StageStore) -> dict:
     """Stato complessivo: stage per esito e conformita' per modello."""
     by_cell: dict[str, dict[str, int]] = {}
     conf: dict[str, dict[str, int]] = {}
+    retry: dict[str, dict[str, int]] = {}
+    k_out: dict[str, dict[str, int]] = {}
     pending = orphan = 0
     for row in plan:
         record = store.load_record(row["stage_id"])
@@ -472,17 +488,31 @@ def summarize(plan: list[dict], store: StageStore) -> dict:
             if c["has_output"]:
                 m = conf.setdefault(row["logical_model"], {
                     "with_output": 0, "strict_ok": 0, "tolerant_ok": 0,
-                    "fence": 0, "rejected_wrapper": 0})
+                    "fence": 0, "outside_text": 0, "rejected_wrapper": 0})
                 m["with_output"] += 1
                 m["strict_ok"] += int(bool(c["strict"]))
                 m["tolerant_ok"] += int(bool(c["tolerant"]))
                 m["fence"] += int(c["deviation"] == "SINGLE_JSON_FENCE")
+                m["outside_text"] += int(
+                    c["deviation"] == "FENCE_WITH_OUTSIDE_TEXT")
                 m["rejected_wrapper"] += int(
                     c["deviation"] == "REJECTED_WRAPPER")
+            attempts = ((record.get("provenance") or {}).get("retry") or {}
+                        ).get("attempts") or []
+            if len(attempts) > 1:
+                r = retry.setdefault(row["logical_model"],
+                                     {"retried": 0, "recovered": 0})
+                r["retried"] += 1
+                r["recovered"] += int(record["status"] == STATUS_COMPLETE)
+            if row["stage"] == "K" and record["status"] == STATUS_COMPLETE:
+                k = k_out.setdefault(row["logical_model"], {})
+                outcome_label = _k_outcome(record)
+                k[outcome_label] = k.get(outcome_label, 0) + 1
         by_cell.setdefault(cell, {})
         by_cell[cell][label] = by_cell[cell].get(label, 0) + 1
     return {"stages": len(plan), "pending": pending, "orphan": orphan,
-            "by_cell": by_cell, "conformity_by_model": conf}
+            "by_cell": by_cell, "conformity_by_model": conf,
+            "retry_by_model": retry, "k_outcomes_by_model": k_out}
 
 
 def format_summary(summary: dict) -> str:
@@ -493,8 +523,21 @@ def format_summary(summary: dict) -> str:
         lines.append(
             f"  {model:7s} output={m['with_output']:3d}  "
             f"strict={m['strict_ok']:3d}  tollerante={m['tolerant_ok']:3d}  "
-            f"fence={m['fence']:3d}  wrapper_rifiutati={m['rejected_wrapper']:3d}")
+            f"fence={m['fence']:3d}  fence+testo={m['outside_text']:3d}  "
+            f"wrapper_rifiutati={m['rejected_wrapper']:3d}")
     lines.append("")
+    if summary.get("retry_by_model"):
+        lines.append("Retry per errore di trasporto (secondo tentativo):")
+        for model, r in sorted(summary["retry_by_model"].items()):
+            lines.append(f"  {model:7s} ritentati={r['retried']:3d}  "
+                         f"recuperati={r['recovered']:3d}")
+        lines.append("")
+    if summary.get("k_outcomes_by_model"):
+        lines.append("Esito dei K completi (regola proposta o astensione):")
+        for model, k in sorted(summary["k_outcomes_by_model"].items()):
+            inner = ", ".join(f"{n}={v}" for n, v in sorted(k.items()))
+            lines.append(f"  {model:7s} {inner}")
+        lines.append("")
     lines.append("Esiti per modello|harness|stage:")
     for cell, counts in sorted(summary["by_cell"].items()):
         inner = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))

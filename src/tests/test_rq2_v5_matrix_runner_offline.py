@@ -236,6 +236,54 @@ class MatrixRunnerOfflineTests(unittest.TestCase):
         self.assertEqual(summary["orphan"], 1)
         self.assertEqual(summary["pending"], 2)
 
+    def _write(self, row, status, *, deviation="NONE", raw=None, attempts=None):
+        provenance = {"retry": {"attempts": attempts}} if attempts else {}
+        self.store.write_record(row["stage_id"], {
+            "status": status,
+            "receipt": ({"artifact": {"raw_response": raw}}
+                        if raw is not None else None),
+            "format": {"deviation": deviation}, "provenance": provenance,
+            "error_summary": None, "blocked_by": None,
+        })
+
+    def test_summary_reports_outside_text_retries_and_k_outcomes(self):
+        self._write(self.plan[0], mr.STATUS_COMPLETE,
+                    deviation="FENCE_WITH_OUTSIDE_TEXT", raw="{}",
+                    attempts=[{"attempt": 1}, {"attempt": 2}])
+        self._write(self.plan[1], mr.STATUS_COMPLETE, raw="{}")
+        self._write(self.plan[2], mr.STATUS_COMPLETE,
+                    raw=json.dumps({"status": "insufficient_evidence"}))
+        summary = mr.summarize(self.plan, self.store)
+        m = summary["conformity_by_model"][MODEL]
+        self.assertEqual(m["outside_text"], 1)
+        self.assertEqual(m["tolerant_ok"], 3)
+        self.assertEqual(m["strict_ok"], 2)
+        self.assertEqual(summary["retry_by_model"][MODEL],
+                         {"retried": 1, "recovered": 1})
+        self.assertEqual(summary["k_outcomes_by_model"][MODEL],
+                         {"insufficient_evidence": 1})
+        text = mr.format_summary(summary)
+        self.assertIn("fence+testo=  1", text)
+        self.assertIn("ritentati=  1", text)
+        self.assertIn("insufficient_evidence=1", text)
+        # lo stato per cella non viene alterato dai nuovi conteggi
+        self.assertEqual(summary["by_cell"][f"{MODEL}|A0|K"],
+                         {mr.STATUS_COMPLETE: 1})
+
+    def test_k_outcome_distinguishes_candidate_from_abstention(self):
+        for raw, expected in (
+            (json.dumps({"status": "candidate"}), "candidate"),
+            (json.dumps({"status": "insufficient_evidence"}),
+             "insufficient_evidence"),
+            (json.dumps({"status": "boh"}), "altro"),
+            ("non json", "non_leggibile"),
+        ):
+            with self.subTest(raw=raw):
+                self.assertEqual(
+                    mr._k_outcome({"receipt": {"artifact": {"raw_response": raw}}}),
+                    expected)
+        self.assertEqual(mr._k_outcome({"receipt": None}), "non_leggibile")
+
     # -- piano reale V4 (solo costruzione offline, nessun file dati)
     def test_real_v4_plan_is_valid_and_selectable(self):
         from evaluation.rq2_v4_unified_gtfree_discovery_plan import (

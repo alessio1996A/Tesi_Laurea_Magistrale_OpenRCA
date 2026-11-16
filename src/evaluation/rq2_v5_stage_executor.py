@@ -9,12 +9,15 @@ Unica novita' di formato: PRIMA del parser strict la risposta passa per la
 politica V5 (un solo fence JSON, uguale per tutti i modelli). Il testo
 originale, il suo hash e la deviazione restano registrati.
 
-Dopo il claim c'e' una sola invocazione logica; nessun retry. Questo modulo
-importa LangChain/SDK: usarlo solo dove l'ambiente e' quello pinned.
+Dopo il claim ci sono al massimo DUE tentativi, e il secondo solo per un errore
+di trasporto senza output del modello (politica in rq2_v5_retry.py, uguale per
+tutti): il primo tentativo resta sempre nel record. Questo modulo importa
+LangChain/SDK: usarlo solo dove l'ambiente e' quello pinned.
 """
 from __future__ import annotations
 
 import hashlib
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -40,8 +43,12 @@ from evaluation.rq2_v5_matrix_runner import (
 from evaluation.rq2_v5_response_normalization import (
     apply_policy, wrap_visible_text_extractor,
 )
+from evaluation.rq2_v5_retry import (
+    ck_error_is_transport, d_error_is_transport, error_type,
+    run_with_one_retry,
+)
 
-VERSION = "rq2_v5_stage_executor_v0"
+VERSION = "rq2_v5_stage_executor_v1"
 D_MAX_ROUNDS = 6
 PLANNER_CHECKS = 2
 RECURSION_LIMIT = 30
@@ -113,9 +120,10 @@ def _check_ck_package(package: dict, expected_prompt: str) -> None:
 class V5StageExecutor:
     """prepare(): tutto cio' che puo' fallire offline; run(): una sola chiamata."""
 
-    def __init__(self, *, data_dir: Path, repo_dir: Path):
+    def __init__(self, *, data_dir: Path, repo_dir: Path, sleep=time.sleep):
         self.data_dir = Path(data_dir)
         self.repo_dir = Path(repo_dir)
+        self._sleep = sleep
 
     # ------------------------------------------------------------ prepare
     def prepare(self, row: dict, parents: dict) -> dict:
@@ -180,11 +188,14 @@ class V5StageExecutor:
 
     # ---------------------------------------------------------------- run
     def run(self, row: dict, prepared: dict) -> dict:
-        if row["stage"] == "D":
-            return self._run_d(row, prepared)
-        return self._run_ck(row, prepared)
+        attempt = self._attempt_d if row["stage"] == "D" else self._attempt_ck
+        return run_with_one_retry(
+            lambda number: attempt(row, prepared), sleep=self._sleep,
+        )
 
-    def _run_d(self, row: dict, prepared: dict) -> dict:
+    def _attempt_d(self, row: dict, prepared: dict):
+        """Un tentativo di D. Restituisce (esito, ritentabile, riepilogo)."""
+        started = time.monotonic()
         model = crea_modello_rq2(row["model_provider"], row["model_id"])
         capture = V5DRunnerCapture(harness=row["harness"])
         with capture:
@@ -193,6 +204,13 @@ class V5StageExecutor:
             )
         captured = capture.build_receipt(result)
         fmt = capture.format_record()
+        error = result.get("error")
+        summary = {
+            "error_type": error_type(error),
+            "error_message_sha256": (
+                _sha256_text(error) if type(error) is str else None),
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+        }
         try:
             receipt = normalize_v4_d_capture(
                 stage_id=row["stage_id"], logical_model=row["logical_model"],
@@ -209,11 +227,16 @@ class V5StageExecutor:
                 }},
                 "error_summary": {"code": "V4_RECEIPT_REJECTED",
                                   "detail": str(exc)[:200]},
-            }
+            }, False, summary
+        summary["stage_meter"] = receipt["artifact"].get("stage_meter")
+        retriable = (receipt["status"] == "PROVIDER_ERROR"
+                     and d_error_is_transport(error))
         return {"status": receipt["status"], "receipt": receipt,
-                "format": fmt, "provenance": prepared["provenance"]}
+                "format": fmt, "provenance": prepared["provenance"]
+                }, retriable, summary
 
-    def _run_ck(self, row: dict, prepared: dict) -> dict:
+    def _attempt_ck(self, row: dict, prepared: dict):
+        """Un tentativo di C o K. Restituisce (esito, ritentabile, riepilogo)."""
         from langchain_core.messages import HumanMessage, SystemMessage
 
         messages = prepared["package"]["messages"]
@@ -222,6 +245,9 @@ class V5StageExecutor:
         call = one_ck_call_candidate(
             row["model_provider"], row["model_id"], payload,
         )
+        summary = {k: call.get(k) for k in (
+            "provider_error", "api_attempts", "usage", "finish_reason",
+            "elapsed_seconds")}
         text, fmt = apply_policy(call.get("raw_response"))
         for_receipt = dict(call)
         if call.get("provider_error") is None and text is not None:
@@ -235,13 +261,12 @@ class V5StageExecutor:
             return {
                 "status": STATUS_RECEIPT_REJECTED, "receipt": None,
                 "format": fmt,
-                "provenance": {**prepared["provenance"], "raw_call": {
-                    k: call.get(k) for k in (
-                        "provider_error", "api_attempts", "usage",
-                        "finish_reason", "elapsed_seconds")
-                }},
+                "provenance": {**prepared["provenance"], "raw_call": dict(summary)},
                 "error_summary": {"code": "V4_RECEIPT_REJECTED",
                                   "detail": str(exc)[:200]},
-            }
+            }, False, summary
+        retriable = (receipt["status"] == "PROVIDER_ERROR"
+                     and ck_error_is_transport(call))
         return {"status": receipt["status"], "receipt": receipt,
-                "format": fmt, "provenance": prepared["provenance"]}
+                "format": fmt, "provenance": prepared["provenance"]
+                }, retriable, summary
