@@ -40,8 +40,11 @@ def _run(rule, rows, level="node", **kwargs):
     telemetry = {"node": pd.DataFrame(columns=["timestamp", "cmdb_id", "kpi_name", "value"]),
                  "container": pd.DataFrame(columns=["timestamp", "cmdb_id", "kpi_name", "value"])}
     telemetry[level] = _frame(rows)
+    # Livelli fissati come farebbe il catalogo: ogni KPI dei dati sintetici ha il suo livello.
+    kpi_levels = kwargs.get("kpi_levels") or {r["kpi_name"]: level for r in rows}
     return ex.execute_rule(rule, telemetry, start_unix=START, end_unix=END,
-                           history_start_unix=kwargs.get("history", HISTORY))
+                           history_start_unix=kwargs.get("history", HISTORY),
+                           kpi_levels=kpi_levels)
 
 
 class ThreeValuedLogicTests(unittest.TestCase):
@@ -143,9 +146,11 @@ class GroupDecisionTests(unittest.TestCase):
     def test_all_vs_any_with_one_unknown_condition(self):
         rows = _series("node-1", "cpu", [95.0] * 30)    # nessun "mem"
         conds = [_cond("cpu"), _cond("mem", threshold=1)]
+        # "mem" e' nel catalogo (livello node) ma il componente non ha campioni: sconosciuto.
+        levels = {"cpu": "node", "mem": "node"}
         # all: vero + sconosciuto = sconosciuto -> abstain; any: vero basta -> positive
-        self.assertEqual(_run(_rule(conds, "all"), rows)["decision"], "abstain")
-        self.assertEqual(_run(_rule(conds, "any"), rows)["decision"], "positive")
+        self.assertEqual(_run(_rule(conds, "all"), rows, kpi_levels=levels)["decision"], "abstain")
+        self.assertEqual(_run(_rule(conds, "any"), rows, kpi_levels=levels)["decision"], "positive")
 
 
 class LevelAndSafetyTests(unittest.TestCase):
@@ -166,9 +171,31 @@ class LevelAndSafetyTests(unittest.TestCase):
                      "container": _frame(_series("node-1.svc-0", "c_cpu", FLAT))}
         rule = _rule([_cond("n_cpu"), _cond("c_cpu")])
         result = ex.execute_rule(rule, telemetry, start_unix=START, end_unix=END,
-                                 history_start_unix=HISTORY)
+                                 history_start_unix=HISTORY,
+                                 kpi_levels={"n_cpu": "node", "c_cpu": "container"})
         self.assertEqual(result["decision"], "abstain")
         self.assertEqual(result["reason"]["code"], "mixed_levels")
+
+    def test_level_is_fixed_by_the_catalog_not_by_the_loaded_data(self):
+        # Il KPI e' di container per il catalogo ma la finestra caricata non ha nessun
+        # campione di container: il livello non cambia, i valori sono solo sconosciuti.
+        telemetry = {"node": _frame(_series("node-1", "n_cpu", FLAT)),
+                     "container": pd.DataFrame(columns=["timestamp", "cmdb_id", "kpi_name", "value"])}
+        result = ex.execute_rule(_rule([_cond("c_cpu")]), telemetry, start_unix=START,
+                                 end_unix=END, history_start_unix=HISTORY,
+                                 kpi_levels={"n_cpu": "node", "c_cpu": "container"})
+        self.assertEqual(result["level"], "container")
+        self.assertEqual(result["decision"], "abstain")
+        self.assertEqual(result["reason"]["code"], "no_cells")
+
+    def test_kpi_not_in_the_catalog_is_metric_absent_even_if_data_has_it(self):
+        rows = _series("node-1", "cpu", FLAT)
+        result = _run(_rule([_cond("cpu")]), rows, kpi_levels={"altro": "node"})
+        self.assertEqual(result["reason"]["code"], "metric_absent")
+
+    def test_invalid_level_in_the_map_is_refused(self):
+        with self.assertRaises(ex.RuleExecutionError):
+            _run(_rule([_cond("cpu")]), _series("node-1", "cpu", FLAT), kpi_levels={"cpu": "service"})
 
     def test_pseudocode_is_never_used(self):
         rows = _series("node-1", "cpu", [95.0] * 30)
@@ -188,7 +215,7 @@ class LevelAndSafetyTests(unittest.TestCase):
     def test_no_parameter_can_carry_labels(self):
         names = list(inspect.signature(ex.execute_rule).parameters)
         self.assertEqual(names, ["rule", "telemetry", "start_unix", "end_unix",
-                                 "history_start_unix", "grid_seconds"])
+                                 "history_start_unix", "kpi_levels", "grid_seconds"])
 
     def test_non_finite_samples_are_dropped_not_treated_as_zero(self):
         rows = _series("node-1", "cpu", [float("nan")] * 30)

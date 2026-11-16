@@ -41,6 +41,7 @@ from __future__ import annotations
 import inspect
 import math
 from collections import Counter
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -137,28 +138,26 @@ def _check_rule(rule: dict) -> list[dict]:
     return conditions
 
 
-def rule_level(conditions: list[dict], telemetry: dict[str, pd.DataFrame]) -> tuple[str | None, str | None]:
-    """Livello (node/container) su cui valutare la regola, o (None, motivo)."""
-    metrics = {c["metric"] for c in conditions}
-    present = {}
-    for level in LEVELS:
-        frame = telemetry.get(level)
-        present[level] = set() if frame is None or frame.empty else set(frame["kpi_name"].unique())
-    in_level = {level: metrics <= present[level] for level in LEVELS}
-    if in_level["node"] and in_level["container"]:
-        return None, "ambiguous_level"
-    if in_level["node"]:
-        return "node", None
-    if in_level["container"]:
-        return "container", None
-    # Nessun livello ha tutte le metriche: livelli misti, oppure metrica assente ovunque.
-    touched = [level for level in LEVELS if metrics & present[level]]
-    if len(touched) == 2:
+def rule_level(conditions: list[dict], kpi_levels: Mapping[str, str]) -> tuple[str | None, str | None]:
+    """Livello (node/container) della regola, FISSATO dal catalogo dei KPI.
+
+    `kpi_levels` associa ogni nome di KPI al suo livello, ed e' costruito una volta
+    sola dal catalogo (un KPI che comparisse in entrambi i livelli e' un errore del
+    catalogo, non un caso da risolvere qui). Il livello NON dipende dai dati caricati
+    per una finestra: una finestra senza campioni non puo' cambiare il livello di una
+    regola, puo' solo rendere i suoi valori sconosciuti.
+    Restituisce (livello, None) oppure (None, motivo): metric_absent (almeno un KPI
+    non e' nel catalogo node/container) o mixed_levels (KPI di livelli diversi).
+    """
+    levels = set()
+    for cond in conditions:
+        level = kpi_levels.get(cond["metric"])
+        if level is None:
+            return None, "metric_absent"
+        levels.add(level)
+    if len(levels) != 1:
         return None, "mixed_levels"
-    if len(touched) == 1:
-        # Alcune metriche mancano del tutto nel livello che ne contiene altre.
-        return touched[0], None
-    return None, "metric_absent"
+    return next(iter(levels)), None
 
 
 def _series_by_component(frame: pd.DataFrame, metrics: set[str]) -> dict:
@@ -180,13 +179,14 @@ def _series_by_component(frame: pd.DataFrame, metrics: set[str]) -> dict:
 
 
 def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: int,
-                 end_unix: int, history_start_unix: int,
+                 end_unix: int, history_start_unix: int, kpi_levels: Mapping[str, str],
                  grid_seconds: int = GRID_SECONDS_DEFAULT) -> dict:
     """Valuta una regola K validata su un gruppo di finestra [start_unix, end_unix).
 
     `telemetry` = {"node": DataFrame, "container": DataFrame} con colonne
     timestamp, cmdb_id, kpi_name, value, che devono includere la storia utile alle
-    finestre (almeno da `history_start_unix`). Nessuna etichetta e' accettata.
+    finestre (almeno da `history_start_unix`). `kpi_levels` fissa il livello di ogni KPI
+    (dal catalogo). Nessuna etichetta e' accettata.
     """
     conditions = _check_rule(rule)
     if not (type(start_unix) is int and type(end_unix) is int and start_unix < end_unix):
@@ -195,7 +195,9 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
         raise RuleExecutionError("Passo della griglia non valido")
 
     base = {"executor_version": VERSION, "level": None, "combination": rule["combination"]}
-    level, reason = rule_level(conditions, telemetry)
+    if not all(v in LEVELS for v in kpi_levels.values()):
+        raise RuleExecutionError("Livello di KPI non valido")
+    level, reason = rule_level(conditions, kpi_levels)
     if level is None:
         return {**base, "decision": "abstain", "reason": {"code": reason},
                 "components_total": 0, "components_missing_metric": [],
@@ -203,7 +205,9 @@ def execute_rule(rule: dict, telemetry: dict[str, pd.DataFrame], *, start_unix: 
                 "evaluable_fraction": None, "unknown_by_cause": {},
                 "first_fire_unix_by_component": {}}
 
-    frame = telemetry[level]
+    frame = telemetry.get(level)
+    if frame is None or frame.empty:
+        frame = pd.DataFrame(columns=["timestamp", "cmdb_id", "kpi_name", "value"])
     components = sorted(str(c) for c in frame["cmdb_id"].unique())
     metrics = {c["metric"] for c in conditions}
     series = _series_by_component(frame, metrics)
