@@ -2,6 +2,14 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Preflight REALE in sola lettura del primo C: PASS
+
+Output utente Colab: `RETURN_CODE=0`, `V4_GEMINI_A0_C_READONLY_PREFLIGHT_PASS`, stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:C`; parent D SHA `345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f`; pacchetto C SHA `f6f3ee6c7c95e903c7cf21e56242551a4de62c088e708f810da53078106689e6`; `claims=1, records=1, orphans=0`; nessun claim C/K e nessuna API. Verificati `preview_one_v4_stage`, sorgente e release `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+
+**Prossima esecuzione:** un solo stage C live, stesso caso/harness/provider/modello e source commit `78734fa130369d7c236ec53c0cc25d88c8860b27`, senza rifare D né invocare K; nuova claim C prima del provider, audit read-only anche se errore e NO RETRY; budget di riferimento USD 0.10 non hard cap. Prima della claim confermare che D SHA coincida, C/K non claimed, che pacchetto C SHA sia quello del preflight, e che conteggi restino 1/1/0. Il precedente utente ha autorizzato i pilot a procedere senza domande ripetitive, ma non interpretare questa istruzione come consenso a spesa indiscriminata; mantenere autorizzazioni registrate per singolo stage.
+
+Codice `one_ck_call_candidate` già congelato nel V4 dispatcher: un solo `.invoke` sul provider, errori sanitizzati e senza retry, `normalize_v4_ck_call` per la validazione; non ci sono modifiche ai sorgenti scientifici dopo freeze. Se C è INVALID_OUTPUT o PROVIDER_ERROR, il dispatcher registra K `BLOCKED_DEPENDENCY` senza chiamate. Se eccezione lascia orphan per revisione; non ripetere la cella. Il PASS del preflight NON prova ancora che C produrrà JSON conforme.
+
 ## 16 novembre 2026 — Primo esperimento REALE V4 Gemini A0 D: RECORDED_COMPLETE
 
 **ESITO USER-REPORTED (Colab, 16/11/2026):** `SOURCE_COMMIT_PIN_CLEAN: OK`, `GEMINI_CREDENTIAL: PRESENT`, `PILOT_RETURN_CODE: 0` e `AUDIT_RETURN_CODE: 0`. Primo stage scientifico V4 **eseguito UNA sola volta**: `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D` / `gemini-3.5-flash-lite` / harness `A0`, source pin `78734fa130369d7c236ec53c0cc25d88c8860b27`, release V4 `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
