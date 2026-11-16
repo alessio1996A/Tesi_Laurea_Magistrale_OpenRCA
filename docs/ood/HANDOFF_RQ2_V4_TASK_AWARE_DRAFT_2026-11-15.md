@@ -1,6 +1,33 @@
-# RQ2-V4 — Task-aware D validator, versione DRAFT (15 novembre 2026)
+# RQ2-V4 — Handoff scientifico e cronologia, aggiornato 16 novembre 2026
 
-**Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
+**Il titolo e le indicazioni storiche di DRAFT qui sotto non descrivono lo stato attuale. Leggere prima lo STATO CORRENTE CERTIFICATO.** Codice e release V4 congelati; i risultati reali sono nel ledger.
+
+## STATO CORRENTE CERTIFICATO — 16 novembre 2026 — HAIKU A0 D REALE INVALID_OUTPUT
+
+**ATTENZIONE:** Questo aggiornamento di stato prevale su tutte le indicazioni precedenti del tipo “prossimo pilot Haiku”, che sono cronologia storica. Il codice scientifico V4 resta PINNED al commit `78734fa130369d7c236ec53c0cc25d88c8860b27` e release SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`. NON aggiornare il checkout scientifico a commit di soli documenti, non ricreare release.
+
+**Esito REALE Haiku A0 D (utente, Google Colab):**
+- `PILOT_RETURN_CODE=0`, `AUDIT_RETURN_CODE=0`, `HAIKU_D_ATTEMPT_RECORDED — DO_NOT_REPEAT`. NON interpretare il return code come successo del task.
+- Stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:haiku:A0:D`, modello `claude-haiku-5-5`, provider Anthropic, harness A0, incident `cloudbed-1_q032`, `task_2`.
+- `status=V4_ONE_STAGE_RECORDED`, `record_status=INVALID_OUTPUT`, `record_sha256=1ee61fe908b32bdc439a0a594a7f56cb7b40d0a269fb9ee14c1fd16c039086a1`, `claims_created_this_stage=1`, `automatic_retry_allowed=false`.
+- Discendenti Haiku `:C` e `:K` auto-registrati `BLOCKED_DEPENDENCY`, senza ulteriori claim o chiamate.
+- `json_status=invalid_v2_task_output: OutputContractError: JSON non analizzabile`, `task_contract_valid=false`; `llm_calls=7`, `input_tokens=118569`, `output_tokens=5659`, `token_usage_complete=true`, `observed_model_requests=7`.
+- `raw_text_length=293`, `raw_text_sha256=f22aacb936923868d33c7e0b6f03f07dc0326a0e866451f38a38feac2b2deaac`, `first_text_category=MARKDOWN_CODE_FENCE`, `content_kind=list`, `text_blocks=1`, `nontext_blocks=1`. Non stampare testo raw completo in chat; usare metriche strutturali.
+- Audit definitivo complessivo V4 `claims=5`, `records=9`, `orphans=0`; i record precedenti sono preservati.
+
+**Fotografia comparativa A0 dello stesso incidente q032:**
+
+| Modello | D | C | K | D chiamate e token input/output |
+| --- | --- | --- | --- | --- |
+| Gemini Flash Lite | RECORDED_COMPLETE (sha 345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f) | RECORDED_COMPLETE (sha cdb90c39eb6f5a17c2db6abe572dce8dffa7744b098ced275fd476a2798cc1c7) | PROVIDER_ERROR:GoogleAPIError (sha d2152d39594f4a12843d285d84122e7e3d51a28080b7c1e2974746b1a5ed2edb) | 7; 40570/394 |
+| Claude Sonnet 5.5 | INVALID_OUTPUT (sha ed8e99f4928d4e539a6355d666a5a6b36e76ccb586354dfa341d33ee6fb2404f) | BLOCKED_DEPENDENCY | BLOCKED_DEPENDENCY | 5; 95697/2242 |
+| Claude Haiku 5.5 | INVALID_OUTPUT (sha 1ee61fe908b32bdc439a0a594a7f56cb7b40d0a269fb9ee14c1fd16c039086a1) | BLOCKED_DEPENDENCY | BLOCKED_DEPENDENCY | 7; 118569/5659 |
+
+**Interpretazione rigorosa:** due D Claude reali hanno in comune l'incipit di un code fence Markdown, rifiutato dal parser JSON V2 enforce a posizione 0 (Sonnet). Questo è un pattern da investigare, ma NON dimostra che il JSON interno fosse valido, né che un fix retroattivo sia ammissibile. L'estrazione ha `content_kind=list, text_blocks=1, nontext_blocks=1` per entrambi: non equivale a errore di estrazione certo. Il tentativo Gemini K `GoogleAPIError` non rivela status HTTP o causa esatta; K non è completo. I cinque claim sono stati consumati e non vanno ritentati.
+
+**PROSSIMA AZIONE PRIORITARIA — sola lettura, senza API né modifiche:** audit strutturale *offline* del contenuto racchiuso nel fence per SONNET e HAIKU, sui soli `diagnostic_run.raw_response` già immutabili, senza salvare varianti/correzioni e senza riclassificare l'output. Reportare solo flag (fence completo/linguaggio dichiarato/presenza oggetto JSON internamente parseable, campi task_2 presenti, eventuale testo esterno) e SHA non raw completo, con D/C/K e ledger SHA invariati; nessuna nuova chiamata. Questo aiuta a distinguere il formato restituito dai Claude dalla struttura del contenuto. Valutare poi prosecuzione sperimentale con *nuovi* stage V4 già preregistrati (altri harness/casi) oppure versione scientifica successiva con protocollo di parsing distinto e preregistrato; NON riclassificare V4, non avviare ciecamente molte run costose con output invalido. Tenere presente scadenza tesi 2026-12-01, focus rigore e completamento.
+
+**Regole di continuità:** 5 harness A0/A1/A1_8R/A1_8R_Planning/A1_PAVE, 3 modelli gemini/sonnet/haiku, 4 discovery = 180 stage logici; 11 OOD sigillati; nessuna GT in discovery. Source freeze `78734fa...`; release V4 `52e5b25...`, Colab repo `/content/Tesi_OpenRCA_V4`, Drive root `/content/drive/MyDrive/Tesi_OpenRCA`, SDK pinned `/content/rq2_v2_pinned_sdk_py313`. Ogni stage live ha claim create-only, nessun retry; errore post-claim => manual audit, nessun replay. Non rifare test PyCharm già superati. Richiedere paper o trascrizioni del professore solo se necessari, con motivazione. Alla fine degli esperimenti: refactoring, commenti italiani e rimozione file superflui solo fuori freeze preservando riproducibilità. Utente preferisce codice Colab singola cella, interpretazione risultati, handoff aggiornato prima di nuova chat.
 
 ## STATO PIÙ RECENTE — 16 novembre 2026: forensic Sonnet e preflight Haiku A0 D PASS
 
