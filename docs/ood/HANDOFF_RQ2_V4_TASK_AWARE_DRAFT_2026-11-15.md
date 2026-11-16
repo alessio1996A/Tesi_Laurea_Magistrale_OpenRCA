@@ -2,6 +2,16 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## STATO PIÙ RECENTE (16 novembre 2026) — K REALE GEMINI A0: PROVIDER_ERROR IMMUTABILE
+
+**Output riportato dall'utente (Colab):** `PILOT_RETURN_CODE=0` e `AUDIT_RETURN_CODE=0`; non significano successo semantico K, ma completamento della scrittura/audit. `V4_ONE_STAGE_RECORDED`, `record_status=PROVIDER_ERROR`, `stage_id=rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K`, `record_sha256=d2152d39594f4a12843d285d84122e7e3d51a28080b7c1e2974746b1a5ed2edb`, `descendants_blocked=[]`, `claims_created_this_stage=1`, `automatic_retry_allowed=false`.
+
+Audit indipendente: `claims=3, records=3, orphans=0`; D/C immutati (D `345ebe4bd64ecbc1958988262d677aae76ec977e6001dec52a1cc7b02d921e4f`, C `cdb90c39eb6f5a17c2db6abe572dce8dffa7744b098ced275fd476a2798cc1c7`). Claim K presente, record K `PROVIDER_ERROR` e SHA confermato. `k_observed_model_requests=1`, `k_input_tokens_observed=0`, `k_output_tokens_observed=0`, `k_usage_complete=false`, `k_text_content_kind=not_observed`. **I token 0 sono osservazioni incomplete, NON prova di costo zero.** Non si è ottenuta una regola K registrata. Source pin `78734fa130369d7c236ec53c0cc25d88c8860b27`, release SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be` invariati.
+
+**NON RIESEGUIRE K q032 Gemini A0. NON modificare/azzerare record o claim, né riclassificare K in INVALID_OUTPUT o successo.** Un `PROVIDER_ERROR` nel trasporto C/K può codificare `PROVIDER_ERROR:<classe>[:HTTP_codice]` oppure `PROTOCOL_ERROR:<categoria>`. Il riepilogo Colab precedente non esponeva il codice esatto, quindi la causa non è ancora conosciuta. **Azione successiva:** una cella diagnostica *senza credenziali/opt-in*, usando `V4ScientificLedger` in sola lettura scientifica, mostrare solo `k["artifact"]["provider_error"]` SANITIZZATO, stage status/hash, contatori metering, e attestare D/C SHA + audit 3/3/0, no GT e no retry. Non stampare raw response né SDK error text, token o secret. Se è `PROTOCOL_ERROR`, non attribuirlo automaticamente al provider remoto; indagare dalla categoria. Se `PROVIDER_ERROR`, è un invio logico tentato ma non necessariamente HTTP fatturato.
+
+Una volta classificata la causa, continuare con stage **nuovi** previsti dal piano (possibilmente Sonnet/Haiku per comparazione e isolamento problemi provider), senza cambiare protocollo congelato; nessuna modifica alla release V4. Non dichiarare successo del ciclo D→C→K: D e C sono RECORDED_COMPLETE, K PROVIDER_ERROR. L'utente desidera avanzare agli esperimenti, minimizzando verifiche superflue, preservando rigore e deadline della tesi.
+
 ## 16 novembre 2026 — Preflight K Gemini A0: PASS; prossimo K LIVE unico e limitato
 
 Utente riporta `RETURN_CODE=0`, `V4_GEMINI_A0_K_READONLY_PREFLIGHT_PASS`. Identità esatta: `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K`; source SHA `78734fa130369d7c236ec53c0cc25d88c8860b27`; release V4 SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
