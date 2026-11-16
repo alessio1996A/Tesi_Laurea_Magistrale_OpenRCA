@@ -71,6 +71,18 @@ class CatalogTests(unittest.TestCase):
         self.assertAlmostEqual(stats["coverage_min"], 20 / 30)
         self.assertEqual(stats["coverage_median"], (1.0 + 20 / 30) / 2)
 
+    def test_components_lacking_a_kpi_are_counted(self):
+        manifest = self._manifest([("cloudbed-1_q032", "cloudbed-1")])
+        rows = _rows("node-1", "cpu") + _rows("node-2", "cpu") + _rows("node-2", "mem")
+        zip_path = self._zip({("cloudbed-1", "node_metrics"): rows,
+                              ("cloudbed-1", "container_metrics"): []})
+        catalog = cat.build_catalog(zip_path, manifest, ("cloudbed-1_q032",))
+        entry = catalog["per_case"]["cloudbed-1_q032"]
+        self.assertEqual(entry["components_total"]["node"], 2)
+        node = catalog["aggregate"]["node"]
+        self.assertEqual(node["cpu"]["components_missing_max"], 0)
+        self.assertEqual(node["mem"]["components_missing_max"], 1)  # node-1 non ha "mem"
+
     def test_levels_are_separate(self):
         manifest = self._manifest([("cloudbed-1_q032", "cloudbed-1")])
         zip_path = self._zip({

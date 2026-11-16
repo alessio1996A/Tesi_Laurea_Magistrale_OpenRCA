@@ -152,11 +152,15 @@ def build_catalog(zip_path: Path, manifest_path: Path,
     for case_id in cases:
         case = load_case(manifest_path, case_id)
         window = case["end_unix"] - case["start_unix"]
-        levels = {}
+        levels, totals = {}, {}
         for kind, level in LEVELS.items():
-            levels[level] = kpi_stats(read_window(zip_path, case, kind), window)
-        per_case[case_id] = {"cloudbed": case["cloudbed"],
-                             "window_seconds": window, "levels": levels}
+            frame = read_window(zip_path, case, kind)
+            levels[level] = kpi_stats(frame, window)
+            # Componenti del livello con almeno un campione (di qualunque KPI):
+            # serve a vedere quanti componenti NON hanno un dato KPI.
+            totals[level] = int(frame["cmdb_id"].nunique()) if not frame.empty else 0
+        per_case[case_id] = {"cloudbed": case["cloudbed"], "window_seconds": window,
+                             "components_total": totals, "levels": levels}
 
     # Aggregato: per (livello, KPI) in quali cloudbed compare e con quale passo.
     merged: dict[str, dict[str, dict]] = {}
@@ -165,7 +169,10 @@ def build_catalog(zip_path: Path, manifest_path: Path,
             for kpi, stats in kpis.items():
                 slot = merged.setdefault(level, {}).setdefault(kpi, {
                     "cloudbeds": [], "cases": [], "steps": [], "coverage_min": [],
+                    "missing": [],
                 })
+                slot["missing"].append(
+                    entry["components_total"][level] - stats["components"])
                 if entry["cloudbed"] not in slot["cloudbeds"]:
                     slot["cloudbeds"].append(entry["cloudbed"])
                 slot["cases"].append(case_id)
@@ -181,6 +188,8 @@ def build_catalog(zip_path: Path, manifest_path: Path,
                 "cases": sorted(slot["cases"]),
                 "step_seconds": _median(slot["steps"]),
                 "coverage_min": min(covs) if covs else None,
+                # Massimo, sui casi, di componenti del livello privi di questo KPI.
+                "components_missing_max": max(slot["missing"]),
             }
     steps_by_level = {
         level: _median([v["step_seconds"] for v in kpis.values()])
@@ -205,7 +214,8 @@ def format_catalog(catalog: dict, horizon_steps: int = 5) -> str:
             lines.append(
                 f"  {kpi:<55} cloudbed={'+'.join(c[-1] for c in info['cloudbeds'])} "
                 f"passo={step if step is None else int(step)}s "
-                f"copertura_min={'n/d' if cov is None else format(cov, '.2f')}"
+                f"copertura_min={'n/d' if cov is None else format(cov, '.2f')} "
+                f"componenti_senza_kpi_max={info['components_missing_max']}"
             )
         lines.append("")
     lines.append("Passo mediano per livello e orizzonte globale H proposto:")
