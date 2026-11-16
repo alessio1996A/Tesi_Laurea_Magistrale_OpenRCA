@@ -23,9 +23,27 @@ Aggiunti (senza modificare file RQ1/V2/V3):
 3. `src/evaluation/rq2_v4_unified_gtfree_discovery_plan.py`: nuovo protocollo `rq2_v4_task_aware_d_discovery_v0`; namespace `data/rq2_v4_task_aware_scientific_v1`; **180 stage** su quattro discovery × cinque harness × tre modelli × D/C/K; 11 OOD esclusi; senza lettura dei risultati V3; release inesistente e API non autorizzata.
 4. `src/tests/test_rq2_v4_unified_gtfree_discovery_plan_offline.py`: **3 test aggiunti, da eseguire**: coorte, namespace, identity di harness/modelli e OOD.
 
+## Aggiornamento 16 novembre 2026 — Adapter e ledger V4
+
+L'utente ha eseguito e riportato **`Ran 20 tests in 0.301s — OK`** per i 17 test del contratto D + 3 test di piano V4. Non chiedere di ripeterli senza motivo.
+
+Sono stati poi aggiunti soltanto NUOVI file, da testare:
+- `src/evaluation/rq2_v4_scientific_receipt_adapter_candidate.py`: D `normalize_v4_d_capture` usa `classify_v4_d`; la convalida `validate_v4_scientific_artifact` sullo stesso documento usa `require_v4_d_status`. I metadati di estrazione V3 sono immutati. C/K riusa solo il codice puro V3 tramite mappatura degli stage ID, **mai risultati V3**, mantenendo provenance/contratto C/K.
+- `src/evaluation/rq2_v4_scientific_ledger.py`: indipendente, derivato dalla logica ledger V3 congelata ma con namespace, protocolli, receipt, percorsi, claim/record create-only, lock, hash, readback e status tutti **V4**. Include `data/rq2_v3_unified_scientific_v1` fra le sorgenti storiche da non toccare (controllo symlink only). Il ledger è **hard NO-GO** senza una futura release V4 verificata, perché il gate V4 attuale è esplicitamente bloccante.
+- `src/evaluation/rq2_v4_scientific_source_release_gate.py`: placeholder esplicito, ogni verifica solleva `V4SourceReleaseBlocked` (nessun claim, nessuna API). Il prossimo intervento dovrà implementare il vero gate indipendente con pin di source/release/runtime/Drive.
+- `src/tests/test_rq2_v4_adapter_ledger_offline.py`: **12 nuovi test, NON ancora eseguiti**; usano solo dati sintetici e TemporaryDirectory con mock dichiarato del gate V4 per testare adapter, ledger, immutabilità, no-retry e status tamper. Il gate reale resta NO-GO.
+
+**Prossimo comando PyCharm** sul branch V4 aggiornato, con `git status --short` pulito:
+```powershell
+git pull --ff-only origin feature/rq2-v4-task-aware-ledger-2026-11-15
+$env:PYTHONPATH = "src"
+python -m unittest discover -s src/tests -p "test_rq2_v4_adapter_ledger_offline.py" -v
+```
+Non ripetere ora i 20 test già PASS. L'utente riporterà `Ran 12 tests...` o traceback; se errore, correggere *solo* il nuovo codice V4 con commit tracciabile. Nessun Colab o API.
+
 ## Stato e NO-GO
 
-- Questo è SOLO il primo **incremento offline**. Nessun `rq2_v4_scientific_ledger`, `rq2_v4_scientific_receipt_adapter`, `rq2_v4_scientific_source_release_gate`, `rq2_v4_scientific_single_stage_dispatcher` è stato ancora implementato o autorizzato.
+- La V4 è ancora **offline e non rilasciata**. Adapter V4 e ledger V4 sono stati implementati; il source/release gate è un NO-GO intenzionale; manca un dispatcher V4 e la release create-only. Nessuna nuova API o campagna autorizzata.
 - Il controllo V4 di `expected_faults` usa l'audit già registrato nel runner. In fase di integration/readback source-bound, bisognerà confrontarlo anche con l'istruzione GT-free originale e il manifest/split congelato, senza leggere GT.
 - Il nuovo validatore NON deve essere sostituito con il validatore generale V2/V3 per D; invece i contratti C/K delle evidenze rimangono invariati.
 - Nessun `git pull` nel Colab congelato V3 per provare questa bozza. Nessuna API, nessuna nuova release, nessun retry, nessun OOD.
