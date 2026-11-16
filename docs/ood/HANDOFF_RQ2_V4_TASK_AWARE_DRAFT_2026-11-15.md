@@ -2,6 +2,32 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## 16 novembre 2026 — Primo D V4: preflight read-only PASS, nessuna API
+
+Risultato restituito dall'utente in Colab:
+```json
+{
+  "status": "V4_GEMINI_A0_D_READONLY_PREFLIGHT_PASS",
+  "stage_id": "rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:D",
+  "model_id": "gemini-3.5-flash-lite",
+  "source_commit": "78734fa130369d7c236ec53c0cc25d88c8860b27",
+  "release_sha256": "52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be",
+  "max_tool_rounds_D": 6,
+  "claims_before": 0,
+  "claims_after": 0,
+  "records_before": 0,
+  "records_after": 0,
+  "orphans": 0,
+  "ood_locked": 11,
+  "real_llm_calls": 0,
+  "can_execute_api": false
+}
+```
+
+Processo `RETURN_CODE=0`, `V4 D PREFLIGHT PASS — NESSUNA API ESEGUITA`. Ha costruito ledger V4 con verifica della release e prova runtime, controllato stage e istruzione GT-free, nessun claim/record.
+
+**PROSSIMO PASSO: richiedere approvazione *esplicita* dell'utente per ESATTAMENTE questo nuovo stage V4 Gemini A0 D, budget operativo suggerito USD 0.10 (non hard cap), una sola esecuzione senza retry.** Nessuna autorizzazione è stata ancora acquisita per V4; `can_execute_api=false` in preflight è intenzionale. Non fare partire il pilot, creare claim o invocare il modello prima dell'approvazione. Dopo approvazione eseguire il dispatcher congelato V4 senza aggiornare il checkout/commit scientifico.
+
 ## STATO ATTUALE CERTIFICATO — V4 SCIENTIFIC FREEZE PASS (16 novembre 2026)
 
 **Questa sezione aggiorna/supera le istruzioni storiche “V4 draft/no release” presenti più sotto. Non eseguire le vecchie celle di creazione release, né ripetere freeze o test senza motivo.**
