@@ -93,3 +93,41 @@ def normalize_response(raw: object) -> NormalizedResponse:
         inner, DEVIATION_SINGLE_JSON_FENCE, language or None,
         raw_hash, _sha256(inner),
     )
+
+
+def apply_policy(raw: object) -> tuple[str | None, dict]:
+    """Applica la politica e restituisce (testo per il parser, registro formato).
+
+    Il registro va salvato accanto all'esito di OGNI stage con output del
+    modello. Contiene la risposta originale completa, cosi' l'audit non dipende
+    dal testo normalizzato.
+    """
+    norm = normalize_response(raw)
+    record = {
+        "version": VERSION,
+        "policy": POLICY,
+        "deviation": norm.deviation,
+        "language_tag": norm.language_tag,
+        "raw_sha256": norm.raw_sha256,
+        "text_sha256": norm.text_sha256,
+        "original_response": raw if type(raw) is str else None,
+    }
+    return norm.text, record
+
+
+def wrap_visible_text_extractor(extract, sink: list):
+    """Avvolge l'estrattore del testo visibile del messaggio finale di D.
+
+    Chiamato dal ponte V3 una sola volta per il messaggio finale: qui la
+    stessa politica dei C/K viene applicata al D. I conteggi dei blocchi non
+    cambiano; cambia solo `raw_text` e solo per un singolo fence JSON.
+    `extract` deve restituire una NamedTuple con campo `raw_text`.
+    """
+    def wrapped(content):
+        visible = extract(content)
+        text, record = apply_policy(visible.raw_text)
+        sink.append(record)
+        if record["deviation"] == DEVIATION_SINGLE_JSON_FENCE:
+            return visible._replace(raw_text=text)
+        return visible
+    return wrapped
