@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,7 +36,6 @@ import pandas as pd
 from evaluation import rq2_k_catalog as cat
 from evaluation import rq2_k_l1_preflight as pf
 from evaluation import rq2_k_records as rk
-from evaluation import rq2_k_rule_evaluation as ev
 from evaluation import rq2_k_rule_executor as ex
 from evaluation import rq2_k_run_integrity as integ
 
@@ -48,6 +48,12 @@ CATALOG_RELATIVE = "data/rq2_k_catalog_v1/catalog_discovery.json"
 STORE_RELATIVE = "data/rq2_v5_format_fair_v1"
 
 L1_MIN_EVALUABLE_FRACTION = 0.95
+NEGATIVE_COVERAGE_MIN = 2 / 3      # soglia ESPLORATIVA di L2 (un test la confronta col valutatore)
+
+# Sorgenti congelati: il freeze ne registra l'hash, il run verifica che siano gli stessi.
+# Il modulo di valutazione (lato GT) NON si importa qui: se ne legge solo il file.
+FROZEN_SOURCES = ("rq2_k_rule_executor.py", "rq2_k_rule_evaluation.py", "rq2_rule_group_scorer.py",
+                  "rq2_k_l1_preflight.py", "rq2_k_l1_protocol.py", "rq2_k_records.py")
 UNREACHABLE = ("soglia_sopra_il_massimo_osservato", "soglia_sotto_il_minimo_osservato")
 
 # Parametri CONGELATI (valgono per tutte le regole, fissati prima di aprire i sigillati).
@@ -78,7 +84,7 @@ PARAMETERS = {
                             "quelli che scattano, primo scatto in [t_gt - H_pre, t_gt + H]) e "
                             "copertura dei negativi ammissibili >= soglia esplorativa; altrimenti "
                             "NON_VERIFICATA (prova contraria) o NON_VALUTABILE (lacuna)"),
-           "negative_coverage_min_exploratory": ev.NEGATIVE_COVERAGE_MIN,
+           "negative_coverage_min_exploratory": NEGATIVE_COVERAGE_MIN,
            "reference_component_not_observable": ("il positivo e' NON_VALUTABILE: fuori dai "
                                                  "denominatori di TP/FN, contato e nominato a parte"),
            "negatives_scope": "un TN vale solo per i componenti osservabili, non per l'intero livello",
@@ -105,6 +111,19 @@ def parameters_sha256() -> str:
 
 def _file_sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def sources_sha256() -> dict[str, str]:
+    """SHA-256 dei sorgenti congelati (nomi di file -> hash), letti dal disco."""
+    base = Path(__file__).parent
+    return {name: _file_sha256(base / name) for name in FROZEN_SOURCES}
+
+
+def _declared_version(filename: str) -> str:
+    """`VERSION = "..."` di un modulo, letto dal sorgente senza importarlo."""
+    text = (Path(__file__).parent / filename).read_text(encoding="utf-8")
+    found = re.search(r'^VERSION = "([^"]+)"', text, re.MULTILINE)
+    return found.group(1) if found else "sconosciuta"
 
 
 # ---------------------------------------------------------------- controlli per regola
@@ -170,8 +189,10 @@ def build_freeze(*, table: dict, history: dict, integrity: dict, catalog_sha256:
         "schema": FREEZE_SCHEMA, "protocol_version": VERSION,
         "created_utc": created_utc or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "code_commit": code_commit,
-        "versions": {"preflight": pf.VERSION, "executor": ex.VERSION, "evaluation": ev.VERSION,
+        "versions": {"preflight": pf.VERSION, "executor": ex.VERSION,
+                     "evaluation": _declared_version("rq2_k_rule_evaluation.py"),
                      "semantic_table": pf.SEMANTIC_TABLE_VERSION},
+        "sources_sha256": sources_sha256(),
         "semantic_table_sha256": table["semantic_table_sha256"],
         "parameters": PARAMETERS, "parameters_sha256": parameters_sha256(),
         "run": {"frozen_discovery_commit": integrity["expected_commit"],
@@ -212,6 +233,9 @@ def verify_freeze(freeze: dict, *, table: dict, integrity: dict, catalog_sha256:
         problems.append("schema_diverso")
     if freeze.get("code_commit") != code_commit:
         problems.append(f"commit_del_codice_diverso: {freeze.get('code_commit')} != {code_commit}")
+    if freeze.get("sources_sha256") != sources_sha256():
+        problems.append("sorgenti_diversi: " + ", ".join(
+            sorted(k for k, v in sources_sha256().items() if (freeze.get("sources_sha256") or {}).get(k) != v)))
     if freeze.get("parameters_sha256") != parameters_sha256() or freeze.get("parameters") != PARAMETERS:
         problems.append("parametri_diversi")
     if freeze.get("semantic_table_sha256") != table["semantic_table_sha256"]:
@@ -355,6 +379,7 @@ def render_freeze(freeze: dict) -> str:
     lines = [f"CONGELAMENTO ({freeze['schema']}) | codice {freeze['code_commit']}",
              f"  tabella semantica   : {freeze['versions']['semantic_table']} "
              f"{freeze['semantic_table_sha256']}",
+             f"  sorgenti congelati  : {', '.join(f'{k[:-3]}={v[:8]}' for k, v in sorted(freeze['sources_sha256'].items()))}",
              f"  parametri           : {freeze['parameters_sha256']}  "
              f"(H_pre={freeze['parameters']['h_pre_seconds']} s, H={freeze['parameters']['h_seconds']} s)",
              f"  run (impronta record): {freeze['run']['records_fingerprint_sha256']}",

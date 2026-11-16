@@ -18,6 +18,7 @@ from agent.tools import _get_telemetry_csv_paths
 from evaluation import rq2_k_catalog as cat
 from evaluation import rq2_k_l1_preflight as pf
 from evaluation import rq2_k_l1_protocol as proto
+from evaluation import rq2_k_rule_evaluation as ev
 from evaluation import rq2_k_run_integrity as integ
 from evaluation import rq2_v5_matrix_runner as mr
 
@@ -104,6 +105,30 @@ class ParametersTests(unittest.TestCase):
     def test_parameters_hash_is_pinned(self):
         # Se cambia, serve un nuovo congelamento.
         self.assertEqual(proto.parameters_sha256(), "7875e28f6075eb6e6b1ff3b29f963a06b38dbbc933bfe453fb54041f656a5ce0")
+
+
+class IsolationTests(unittest.TestCase):
+    def test_the_protocol_module_does_not_import_the_ground_truth_side(self):
+        source = Path(proto.__file__).read_text(encoding="utf-8")
+        for forbidden in ("import rq2_k_rule_evaluation", "rq2_rule_group_scorer import",
+                          "rq2_fault_type_eval_policy"):
+            self.assertNotIn("from evaluation " + forbidden, source)
+            self.assertNotIn(forbidden, source.split("FROZEN_SOURCES")[0])
+
+    def test_duplicated_constants_agree_with_the_evaluator(self):
+        self.assertEqual(proto.NEGATIVE_COVERAGE_MIN, ev.NEGATIVE_COVERAGE_MIN)
+        self.assertEqual(proto._declared_version("rq2_k_rule_evaluation.py"), ev.VERSION)
+        self.assertEqual(proto._declared_version("rq2_k_rule_executor.py"), ex_version())
+
+    def test_frozen_sources_exist_and_are_hashed(self):
+        hashes = proto.sources_sha256()
+        self.assertEqual(sorted(hashes), sorted(proto.FROZEN_SOURCES))
+        self.assertTrue(all(len(h) == 64 for h in hashes.values()))
+
+
+def ex_version():
+    from evaluation import rq2_k_rule_executor
+    return rq2_k_rule_executor.VERSION
 
 
 class EligibilityTests(unittest.TestCase):
@@ -195,6 +220,14 @@ class FreezeTests(unittest.TestCase):
         for needle in ("commit_del_codice_diverso", "catalogo_diverso", "impronta_dei_record_diversa",
                        "elenco_delle_eseguibili_diverso"):
             self.assertIn(needle, text)
+        tampered = copy.deepcopy(freeze)
+        tampered["sources_sha256"]["rq2_k_rule_executor.py"] = "0" * 64
+        tampered["sha256_of_body_without_this_field"] = proto._sha(
+            {k: v for k, v in tampered.items() if k != "sha256_of_body_without_this_field"})
+        problems = proto.verify_freeze(tampered, table=table, integrity=INTEGRITY,
+                                       catalog_sha256="a" * 64, code_commit=COMMIT)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("sorgenti_diversi: rq2_k_rule_executor.py", problems[0])
         self.assertIn("integrita_del_run_non_verificata", " ".join(proto.verify_freeze(
             freeze, table=table, integrity={**INTEGRITY, "ok": False},
             catalog_sha256="a" * 64, code_commit=COMMIT)))
