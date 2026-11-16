@@ -155,7 +155,7 @@ def evaluate_all(*, freeze: dict, addendum: dict, l2a: dict, references: list[di
     return results
 
 
-def verify_chain(*, freeze: dict, addendum: dict, l2a: dict, head_commit: str,
+def verify_chain(*, freeze: dict, addendum: dict, l2a: dict, changed_files: list[str],
                  manifest_sha256: str) -> list[str]:
     """Catena freeze -> addendum -> L2a: nessun anello manomesso, stesso codice."""
     problems = []
@@ -178,8 +178,15 @@ def verify_chain(*, freeze: dict, addendum: dict, l2a: dict, head_commit: str,
         problems.append("gruppi_diversi_dall_addendum")
     if addendum["l2_sources_sha256"] != l2x.l2_sources_sha256():
         problems.append("moduli_l2_diversi_dall_addendum")
-    if addendum["l2_code_commit"] != head_commit or l2a["l2_code_commit"] != head_commit:
-        problems.append("commit_l2_diverso")
+    if addendum["loaders_sha256"] != l2x.loaders_sha256():
+        problems.append("loader_diversi_dall_addendum")
+    if l2a["l2_code_commit"] != addendum["l2_code_commit"]:
+        problems.append("commit_l2_incoerente_con_l2a")
+    if addendum["freeze_code_commit"] != freeze["code_commit"]:
+        problems.append("commit_del_freeze_diverso")
+    bad = [p for p in changed_files if not l2x._is_allowed_after_freeze(p)]
+    if bad:
+        problems.append("file_cambiati_dopo_il_freeze: " + ", ".join(bad))
     if addendum["manifest_sha256"] != manifest_sha256:
         problems.append("manifest_diverso_dall_addendum")
     if addendum["parameters_sha256"] != freeze["parameters_sha256"]:
@@ -249,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     l2a = json.loads((root / l2x.L2A_RELATIVE).read_text(encoding="utf-8"))
     manifest_path = root / cat.MANIFEST_RELATIVE
     problems = verify_chain(freeze=freeze, addendum=addendum, l2a=l2a,
-                            head_commit=cat._git_head(args.repo_dir),
+                            changed_files=l2x._git_changed_files(args.repo_dir, freeze["code_commit"]),
                             manifest_sha256=proto._file_sha256(manifest_path))
     if problems:
         print("CATENA DI HASH NON COERENTE, L2b non parte:", *problems, sep="\n  - ")

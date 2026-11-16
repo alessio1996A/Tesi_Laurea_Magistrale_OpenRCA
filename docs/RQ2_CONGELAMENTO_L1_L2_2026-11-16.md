@@ -83,7 +83,8 @@ componenti osservabili.
 1. `freeze` (scrive `freeze.json`, create-only). **Eseguito il 16 novembre.**
 2. `run` (verifica il freeze, esegue L1 sui 4 incidenti di discovery, scrive `l1_report.json`,
    create-only). **Eseguito il 16 novembre**; lo legge GPT insieme ad Alessio.
-3. **Proposta, in attesa dell'approvazione di GPT e di Alessio** (registro, riga 24):
+3. **Approvata da GPT il 16 novembre** (registro, righe 24-26). Ordine: implementazione, addendum
+   congelato senza telemetria ne' GT dei sigillati, verifica di GPT e Alessio, poi L2a e L2b:
    * `addendum` (create-only): elenco degli 11 sigillati e dei gruppi temporali, hash del
      release pre-registrato, del manifest, del report L1 e dei due moduli L2. Non legge telemetria.
    * L2a, `run --authorize-sealed-telemetry`: esegue la regola congelata sui gruppi e scrive le
@@ -92,3 +93,11 @@ componenti osservabili.
      chiama il valutatore con i parametri del freeze e scrive il verdetto.
 4. Se il codice cambia dopo il freeze, oltre a nuovi moduli L2, test e documenti, serve un nuovo
    congelamento, dichiarato. Dopo l'addendum non puo' cambiare nulla, nemmeno un commento nei moduli L2.
+
+## 6. Nota sui commit
+
+La prima versione di questo documento e del registro citava il commit di codice
+`2474886a551044565b062806a12a6ff9730b3299`. Il freeze eseguito il 16 novembre registra invece
+`88e46580c38dd89cbfae8076ba0752776c1c12b5`, commit successivo che isola il modulo L1 dal lato
+ground truth e aggiunge l'hash dei sorgenti congelati. Vale il commit registrato nel freeze;
+`freeze.json` non e' stato modificato. L'addendum riporta la stessa annotazione.

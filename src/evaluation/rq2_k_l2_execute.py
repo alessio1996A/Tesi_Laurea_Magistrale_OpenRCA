@@ -44,8 +44,50 @@ ADDENDUM_RELATIVE = "data/rq2_k_freeze_v1/l2_addendum.json"
 L2A_RELATIVE = "data/rq2_k_l2_v1/l2a_decisions.json"
 RELEASE_RELATIVE = "data/rq2/RQ2_SCIENTIFIC_DISCOVERY_RELEASE_V1.json"      # dentro il repository
 L2_SOURCES = ("rq2_k_l2_execute.py", "rq2_k_l2_scoring.py")
+# Moduli gia' esistenti che L2a/L2b usano per leggere telemetria, manifest e archivio: ne registriamo
+# l'hash nell'addendum (percorsi relativi a `src`). Un test controlla che coprano tutti gli import.
+LOADER_FILES = ("agent/tools.py", "evaluation/rq2_k_catalog.py", "evaluation/rq2_k_l1_preflight.py",
+                "evaluation/rq2_k_l1_protocol.py", "evaluation/rq2_k_rule_executor.py",
+                "evaluation/rq2_k_rule_evaluation.py", "evaluation/rq2_rule_group_scorer.py",
+                "evaluation/ood_class_inventory.py", "evaluation/ood_holdout_preflight.py",
+                "evaluation/v2_case_window_audit.py")
+WINDOW_COLUMNS = ("case_id", "cloudbed", "start_unix", "end_unix")        # le sole colonne lette
 ALLOWED_AFTER_FREEZE_FILES = frozenset("src/evaluation/" + name for name in L2_SOURCES)
 ALLOWED_AFTER_FREEZE_PREFIXES = ("src/tests/", "docs/")
+
+
+GROUP_DEFINITION = ("Componenti connesse delle finestre [start, end] dei casi sigillati, nello stesso "
+                    "cloudbed, con estremi inclusi (due finestre che si toccano o si sovrappongono sono lo "
+                    "stesso gruppo); finestra del gruppo = unione; id W01.. ordinati per cloudbed, inizio, "
+                    "primo case_id. Il numero deve coincidere con test_window_groups del release.")
+POPULATION_POLICY = ("Popolazione osservabile: componenti del livello con almeno un campione finito per "
+                     "ogni KPI della regola nella finestra del gruppo; gli esclusi sono contati e nominati; "
+                     "un negativo vale solo per la popolazione.")
+DECISIONS_FORMAT = ("File create-only `l2a_decisions.json` con corpo e SHA-256 del corpo. Per ogni regola e "
+                    "gruppo: decisione (positive/negative/abstain/error), popolazione, componenti esclusi con "
+                    "KPI mancanti, componenti che scattano e primo istante di scatto (unix), celle vere/false/"
+                    "sconosciute, copertura di popolazione; `decisions_sha256` = SHA-256 della mappa "
+                    "gruppo -> decisione. L2b verifica tutti gli hash PRIMA di leggere la ground truth.")
+HANDLING = {
+    "reference_incomplete": ("un gruppo con una classe non riconosciuta nella ground truth ha "
+                             "reference_complete=false: fuori dai denominatori di TP, FP, TN, FN, contato "
+                             "come non valutabile"),
+    "reference_component_not_observable": ("positivo con componente di riferimento fuori dalla popolazione: "
+                                           "NON_VALUTABILE, fuori dai denominatori, contato e nominato a parte; "
+                                           "non e' un falso negativo"),
+    "abstain_or_error": ("astensione o errore su un positivo o su un negativo: nessuna conclusione, riportato "
+                         "nella copertura; sui positivi impedisce VERIFICATA_OPERATIVAMENTE"),
+    "negative_scope": "un negativo vale solo per i componenti osservabili, non per l'intero livello",
+    "no_complete_positive": "nessun positivo completo e valutabile: NON_VALUTABILE",
+}
+ANNOTATIONS = (
+    "Il documento di congelamento (prima versione) e il registro citavano il commit di codice "
+    "2474886a551044565b062806a12a6ff9730b3299; il freeze effettivamente eseguito il 16 novembre registra "
+    "invece 88e46580c38dd89cbfae8076ba0752776c1c12b5, commit successivo che isola il modulo L1 dal lato "
+    "ground truth e aggiunge l'hash dei sorgenti congelati. Vale il commit registrato nel freeze. "
+    "freeze.json non e' stato modificato.",
+    "Le regole candidate, i risultati L1, il commit di discovery ddb2ca4 e i parametri non cambiano.",
+)
 
 
 class L2ScopeError(ValueError):
@@ -60,9 +102,12 @@ def load_cases(manifest_path: Path, case_ids) -> list[dict]:
         raise L2ScopeError("Elenco dei casi vuoto o con duplicati")
     if set(ids) & set(cat.DISCOVERY_CASES):
         raise L2ScopeError("Un caso di discovery non puo' stare nell'insieme sigillato")
-    manifest = pd.read_csv(manifest_path)
-    if cat.GT_COLUMNS & set(manifest.columns):
+    header = set(pd.read_csv(manifest_path, nrows=0).columns)
+    if cat.GT_COLUMNS & header:
         raise L2ScopeError("Il manifest contiene colonne di ground truth.")
+    if not set(WINDOW_COLUMNS) <= header:
+        raise L2ScopeError("Il manifest non ha le colonne delle finestre.")
+    manifest = pd.read_csv(manifest_path, usecols=list(WINDOW_COLUMNS))      # nessun altro campo
     cases = []
     for case_id in ids:
         rows = manifest.loc[manifest["case_id"] == case_id]
@@ -109,6 +154,11 @@ def l2_sources_sha256() -> dict[str, str]:
     return {name: proto._file_sha256(base / name) for name in L2_SOURCES}
 
 
+def loaders_sha256() -> dict[str, str]:
+    base = Path(__file__).parent.parent
+    return {name: proto._file_sha256(base / name) for name in LOADER_FILES}
+
+
 def _git_changed_files(repo_dir: Path, base_commit: str) -> list[str]:
     out = subprocess.run(["git", "-C", str(repo_dir), "diff", "--name-only", base_commit, "HEAD"],
                          check=True, capture_output=True, text=True).stdout
@@ -133,9 +183,10 @@ def verify_frozen_inputs(freeze: dict, *, table: dict, integrity: dict, catalog_
     return problems
 
 
-def build_addendum(*, freeze: dict, release: dict, release_sha256: str, manifest_sha256: str,
-                   l1_report: dict, l1_report_sha256: str, cases: list[dict], l2_sources: dict,
-                   l2_code_commit: str, created_utc: str | None = None) -> dict:
+def build_addendum(*, freeze: dict, freeze_file_sha256: str, release: dict, release_sha256: str,
+                   manifest_sha256: str, l1_report: dict, l1_report_sha256: str, cases: list[dict],
+                   l2_sources: dict, loaders: dict, l2_code_commit: str,
+                   created_utc: str | None = None) -> dict:
     if not proto.freeze_is_intact(freeze):
         raise L2ScopeError("Freeze manomesso: nessun addendum")
     if len(str(l2_code_commit)) != 40:
@@ -168,15 +219,22 @@ def build_addendum(*, freeze: dict, release: dict, release_sha256: str, manifest
         "schema": ADDENDUM_SCHEMA, "protocol_version": VERSION,
         "created_utc": created_utc or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "freeze_sha256": freeze["sha256_of_body_without_this_field"],
+        "freeze_file_sha256": freeze_file_sha256,
         "freeze_code_commit": freeze["code_commit"], "l2_code_commit": l2_code_commit,
         "l2_sources_sha256": dict(sorted(l2_sources.items())),
+        "loaders_sha256": dict(sorted(loaders.items())),
+        "window_source": {"file": "data/processed/benchmark_inputs_market.csv (manifest GT-free)",
+                          "columns_read": list(WINDOW_COLUMNS), "sha256": manifest_sha256},
         "release_sha256": release_sha256, "manifest_sha256": manifest_sha256,
         "l1_report_sha256": l1_report_sha256, "l1_admitted_to_l2": sorted(l1_report["admitted_to_l2"]),
         "sealed_case_ids": sealed, "sealed_case_ids_sha256": proto._sha(sealed),
         "expected_group_count": release["test_window_groups"],
+        "group_definition": GROUP_DEFINITION,
         "groups": groups, "groups_sha256": proto._sha(groups),
         "rules": rules, "rules_sha256": proto._sha(rules),
-        "parameters_sha256": freeze["parameters_sha256"],
+        "parameters": freeze["parameters"], "parameters_sha256": freeze["parameters_sha256"],
+        "population_policy": POPULATION_POLICY, "decisions_format": DECISIONS_FORMAT,
+        "handling": HANDLING, "annotations": list(ANNOTATIONS),
         "rules_tested": freeze["rules_tested"],
         "procedure": ("L2a (questo modulo): esecuzione della regola sui gruppi, senza GT, decisioni "
                       "sigillate con hash. L2b (rq2_k_l2_scoring, processo separato): lettura della "
@@ -198,7 +256,10 @@ def verify_addendum(addendum: dict, **inputs) -> list[str]:
     """Ricostruisce l'addendum dagli stessi ingressi e nomina ogni differenza."""
     if not addendum_is_intact(addendum):
         return ["addendum_manomesso"]
-    rebuilt = build_addendum(created_utc=addendum["created_utc"], **inputs)
+    # Il commit e' informativo (un commit di soli documenti dopo l'addendum non lo invalida):
+    # contano gli hash dei moduli L2, dei loader, dei parametri e dei file congelati.
+    rebuilt = build_addendum(created_utc=addendum["created_utc"],
+                             **{**inputs, "l2_code_commit": addendum["l2_code_commit"]})
     return [f"{key}_diverso" for key in sorted(rebuilt) if rebuilt[key] != addendum.get(key)]
 
 
@@ -210,7 +271,8 @@ def _rule_from_row(row: dict) -> dict:
                            for c in row["conditions"]]}
 
 
-def run_l2a(*, addendum: dict, freeze: dict, table: dict, catalog: dict, zip_path: Path) -> dict:
+def run_l2a(*, addendum: dict, freeze: dict, table: dict, catalog: dict, zip_path: Path,
+            head_commit: str = "non_registrato") -> dict:
     """Esegue le regole dell'addendum sui gruppi. Nessuna etichetta in ingresso."""
     if not addendum_is_intact(addendum):
         raise L2ScopeError("Addendum manomesso")
@@ -251,7 +313,7 @@ def run_l2a(*, addendum: dict, freeze: dict, table: dict, catalog: dict, zip_pat
     body = {"schema": RESULT_SCHEMA, "protocol_version": VERSION,
             "addendum_sha256": addendum["sha256_of_body_without_this_field"],
             "freeze_sha256": addendum["freeze_sha256"], "l2_code_commit": addendum["l2_code_commit"],
-            "uses_ground_truth": False, "ground_truth_opened": False,
+            "run_head_commit": head_commit, "uses_ground_truth": False, "ground_truth_opened": False,
             "groups": addendum["groups"], "rules": out_rules, "history_files_missing": missing_files}
     return {**body, "sha256_of_body_without_this_field": proto._sha(body)}
 
@@ -268,6 +330,8 @@ def render_addendum(addendum: dict) -> str:
              f"  manifest            : {addendum['manifest_sha256']}",
              f"  moduli L2           : " + ", ".join(f"{k[:-3]}={v[:8]}"
                                                        for k, v in addendum["l2_sources_sha256"].items()),
+             f"  freeze (file)       : {addendum['freeze_file_sha256']}",
+             f"  loader              : {len(addendum['loaders_sha256'])} file con hash",
              f"  sigillati           : {len(addendum['sealed_case_ids'])} casi, "
              f"{len(addendum['groups'])} gruppi (release: {addendum['expected_group_count']}) "
              f"{addendum['groups_sha256'][:16]}"]
@@ -277,6 +341,7 @@ def render_addendum(addendum: dict) -> str:
     for rule in addendum["rules"]:
         lines.append(f"  regola: {rule['rule_name']} -> {rule['target_fault_type']}")
         lines += [f"    CAUTELA: {c}" for c in rule["caveats"]]
+    lines += [f"  NOTA: {note}" for note in addendum["annotations"]]
     lines.append(f"  corpo: {addendum['sha256_of_body_without_this_field']}")
     return "\n".join(lines)
 
@@ -312,12 +377,14 @@ def _load_inputs(args, ctx: dict) -> dict:
     release = json.loads(release_path.read_text(encoding="utf-8"))
     return {"freeze": freeze, "problems": problems, "release": release,
             "inputs": {"freeze": freeze, "release": release,
+                       "freeze_file_sha256": proto._file_sha256(root / proto.FREEZE_RELATIVE),
                        "release_sha256": proto._file_sha256(release_path),
                        "manifest_sha256": proto._file_sha256(ctx["manifest"]),
                        "l1_report": json.loads(report_path.read_text(encoding="utf-8")),
                        "l1_report_sha256": proto._file_sha256(report_path),
                        "cases": load_cases(ctx["manifest"], release["test_case_ids"]),
-                       "l2_sources": l2_sources_sha256(), "l2_code_commit": ctx["code_commit"]}}
+                       "l2_sources": l2_sources_sha256(), "loaders": loaders_sha256(),
+                       "l2_code_commit": ctx["code_commit"]}}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -357,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print("Freeze e addendum verificati.\n")
     report = run_l2a(addendum=addendum, freeze=loaded["freeze"], table=ctx["table"],
-                     catalog=ctx["catalog"], zip_path=ctx["zip"])
+                     catalog=ctx["catalog"], zip_path=ctx["zip"], head_commit=ctx["code_commit"])
     print(render_l2a(report))
     if not args.no_write:
         target = ctx["root"] / L2A_RELATIVE

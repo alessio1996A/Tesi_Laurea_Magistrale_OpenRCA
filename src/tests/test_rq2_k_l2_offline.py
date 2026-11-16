@@ -91,6 +91,13 @@ class LoadCasesTests(unittest.TestCase):
         cases = l2x.load_cases(self.path, ["cloudbed-1_q2"])
         self.assertEqual(cases, [_case("cloudbed-1_q2", "cloudbed-1", 30, 40)])
 
+    def test_only_the_window_columns_are_read(self):
+        _write_manifest(self.path, [_case("cloudbed-1_q1", "cloudbed-1", 10, 20)],
+                        {"instruction": "testo della domanda", "task_index": "task_3"})
+        with mock.patch.object(l2x.pd, "read_csv", wraps=pd.read_csv) as spy:
+            l2x.load_cases(self.path, ["cloudbed-1_q1"])
+        self.assertIn(list(l2x.WINDOW_COLUMNS), [c.kwargs.get("usecols") for c in spy.call_args_list])
+
     def test_ground_truth_columns_are_refused(self):
         _write_manifest(self.path, [_case("cloudbed-1_q1", "cloudbed-1", 10, 20)], {"reason": "x"})
         with self.assertRaises(l2x.L2ScopeError):
@@ -121,9 +128,10 @@ def _fixture(case_ids=("s1", "s2", "s3")):
              _case("s2", "cloudbed-1", START + 9000, START + 10800),
              _case("s3", "cloudbed-1", START + 14400, START + 16200)]
     release = {"test_case_ids": list(case_ids), "test_window_groups": 2}
-    inputs = {"freeze": freeze, "release": release, "release_sha256": "r" * 64, "manifest_sha256": "m" * 64,
-              "l1_report": l1_report, "l1_report_sha256": "l" * 64, "cases": cases,
-              "l2_sources": l2x.l2_sources_sha256(), "l2_code_commit": L2_COMMIT}
+    inputs = {"freeze": freeze, "freeze_file_sha256": "z" * 64, "release": release, "release_sha256": "r" * 64,
+              "manifest_sha256": "m" * 64, "l1_report": l1_report, "l1_report_sha256": "l" * 64, "cases": cases,
+              "l2_sources": l2x.l2_sources_sha256(), "loaders": l2x.loaders_sha256(),
+              "l2_code_commit": L2_COMMIT}
     return table, freeze, inputs
 
 
@@ -140,6 +148,25 @@ class AddendumTests(unittest.TestCase):
         self.assertEqual(addendum["parameters_sha256"], proto.parameters_sha256())
         self.assertEqual(set(addendum["l2_sources_sha256"]), set(l2x.L2_SOURCES))
         self.assertEqual(addendum, l2x.build_addendum(created_utc="2026-11-17T00:00:00Z", **inputs))
+
+    def test_addendum_carries_everything_gpt_asked_for(self):
+        _, freeze, inputs = _fixture()
+        addendum = l2x.build_addendum(**inputs)
+        self.assertEqual(addendum["freeze_sha256"], freeze["sha256_of_body_without_this_field"])
+        self.assertEqual(addendum["freeze_file_sha256"], "z" * 64)
+        self.assertEqual(addendum["freeze_code_commit"], freeze["code_commit"])
+        self.assertEqual(set(addendum["loaders_sha256"]), set(l2x.LOADER_FILES))
+        self.assertEqual(addendum["parameters"], freeze["parameters"])
+        self.assertEqual(addendum["rules"][0]["rule_sha256"], freeze["l2_eligible"][0][1])
+        self.assertEqual(addendum["window_source"]["columns_read"], list(l2x.WINDOW_COLUMNS))
+        for key in ("group_definition", "population_policy", "decisions_format"):
+            self.assertTrue(addendum[key], key)
+        self.assertEqual(set(addendum["handling"]), {"reference_incomplete", "reference_component_not_observable",
+                                                      "abstain_or_error", "negative_scope", "no_complete_positive"})
+        notes = " ".join(addendum["annotations"])
+        self.assertIn("2474886a551044565b062806a12a6ff9730b3299", notes)
+        self.assertIn("88e46580c38dd89cbfae8076ba0752776c1c12b5", notes)
+        self.assertIn("freeze.json non e' stato modificato", notes)
 
     def test_tampering_is_detected(self):
         _, _, inputs = _fixture()
@@ -180,11 +207,19 @@ class AddendumTests(unittest.TestCase):
         for key, value, expected in (("release_sha256", "x" * 64, "release_sha256_diverso"),
                                      ("manifest_sha256", "y" * 64, "manifest_sha256_diverso"),
                                      ("l1_report_sha256", "z" * 64, "l1_report_sha256_diverso"),
-                                     ("l2_code_commit", "f" * 40, "l2_code_commit_diverso")):
+                                     ("freeze_file_sha256", "q" * 64, "freeze_file_sha256_diverso")):
             changed = {**inputs, key: value}
             self.assertIn(expected, l2x.verify_addendum(addendum, **changed))
         changed = {**inputs, "l2_sources": {**inputs["l2_sources"], "rq2_k_l2_scoring.py": "0" * 64}}
         self.assertIn("l2_sources_sha256_diverso", l2x.verify_addendum(addendum, **changed))
+        changed = {**inputs, "loaders": {**inputs["loaders"], "agent/tools.py": "0" * 64}}
+        self.assertIn("loaders_sha256_diverso", l2x.verify_addendum(addendum, **changed))
+
+    def test_a_docs_only_commit_after_the_addendum_does_not_invalidate_it(self):
+        _, _, inputs = _fixture()
+        addendum = l2x.build_addendum(**inputs)
+        later = {**inputs, "l2_code_commit": "f" * 40}
+        self.assertEqual(l2x.verify_addendum(addendum, **later), [])
 
     def test_frozen_inputs_accept_only_new_l2_files_tests_and_docs(self):
         table, freeze, _ = _fixture()
@@ -217,6 +252,24 @@ class IsolationTests(unittest.TestCase):
         code = Path(l2x.__file__).read_text(encoding="utf-8").split('"""', 2)[2]
         for forbidden in ("record.csv", "scoring_points"):
             self.assertNotIn(forbidden, code)
+
+    def test_every_project_import_of_the_l2_modules_has_a_recorded_hash(self):
+        import ast
+        covered = set(l2x.LOADER_FILES) | {"evaluation/" + n for n in l2x.L2_SOURCES}
+        for module in (l2x, l2b):
+            tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                names = []
+                if isinstance(node, ast.ImportFrom) and node.module:
+                    names = [f"{node.module}.{a.name}" for a in node.names] + [node.module]
+                elif isinstance(node, ast.Import):
+                    names = [a.name for a in node.names]
+                for name in names:
+                    if name.split(".")[0] in ("evaluation", "agent"):
+                        candidate = name.replace(".", "/") + ".py"
+                        exists = (Path(l2x.__file__).parent.parent / candidate).exists()
+                        if exists:
+                            self.assertIn(candidate, covered, f"{module.__name__}: {name}")
 
     def test_no_function_parameter_can_carry_labels(self):
         for fn in (l2x.run_l2a, l2x.build_addendum, l2x.build_window_groups, l2x.load_cases):
@@ -522,7 +575,7 @@ class ChainTests(unittest.TestCase):
         self.l2a["sha256_of_body_without_this_field"] = proto._sha(self.l2a)
 
     def _problems(self, **change):
-        args = {"freeze": self.freeze, "addendum": self.addendum, "l2a": self.l2a, "head_commit": L2_COMMIT,
+        args = {"freeze": self.freeze, "addendum": self.addendum, "l2a": self.l2a, "changed_files": [],
                 "manifest_sha256": "m" * 64} | change
         return l2b.verify_chain(**args)
 
@@ -538,7 +591,11 @@ class ChainTests(unittest.TestCase):
         tampered = copy.deepcopy(self.l2a)
         tampered["rules"][0]["rule_sha256"] = "0" * 64
         self.assertEqual(self._problems(l2a=tampered), ["decisioni_l2a_manomesse"])
-        self.assertEqual(self._problems(head_commit="f" * 40), ["commit_l2_diverso"])
+        self.assertEqual(self._problems(changed_files=["docs/a.md", "src/tests/t.py"]), [])
+        self.assertEqual(self._problems(changed_files=["src/evaluation/rq2_k_rule_executor.py"]),
+                         ["file_cambiati_dopo_il_freeze: src/evaluation/rq2_k_rule_executor.py"])
+        self.assertEqual(self._problems(l2a=self._rehash({**self.l2a, "l2_code_commit": "f" * 40})),
+                         ["commit_l2_incoerente_con_l2a"])
         self.assertEqual(self._problems(manifest_sha256="x" * 64), ["manifest_diverso_dall_addendum"])
         gt = self._rehash({**{k: v for k, v in self.l2a.items()}, "uses_ground_truth": True})
         self.assertEqual(self._problems(l2a=gt), ["l2a_dichiara_uso_di_gt"])
@@ -546,6 +603,8 @@ class ChainTests(unittest.TestCase):
         self.assertEqual(self._problems(l2a=other), ["addendum_sha_non_coerente_con_l2a"])
         with mock.patch.object(l2x, "l2_sources_sha256", return_value={"rq2_k_l2_scoring.py": "0" * 64}):
             self.assertEqual(self._problems(), ["moduli_l2_diversi_dall_addendum"])
+        with mock.patch.object(l2x, "loaders_sha256", return_value={"agent/tools.py": "0" * 64}):
+            self.assertEqual(self._problems(), ["loader_diversi_dall_addendum"])
 
 
 # ----------------------------------------------------------------------------------- CLI end-to-end
@@ -642,11 +701,24 @@ class CliTests(unittest.TestCase):
         self.assertIn("decisioni_l2a_manomesse", text)
         self.assertFalse((self.root / l2b.L2B_RELATIVE).exists())
 
-    def test_run_refuses_a_different_code_commit_or_a_different_release(self):
+    def test_a_failed_chain_never_reads_the_ground_truth(self):
         self._l2a("addendum")
-        code, text = self._call(l2x, ["run", "--authorize-sealed-telemetry"], commit="f" * 40)
+        self._l2a("run", "--authorize-sealed-telemetry")
+        path = self.root / l2x.L2A_RELATIVE
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["rules"][0]["decisions"]["W01"] = "negative"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with mock.patch.object(l2b, "read_reference_sources", side_effect=AssertionError("GT letta")) as spy:
+            code, _ = self._call(l2b, ["--authorize-ground-truth"])
         self.assertEqual(code, 2)
-        self.assertIn("l2_code_commit_diverso", text)
+        spy.assert_not_called()
+
+    def test_run_refuses_changed_loaders_or_a_different_release_but_not_a_docs_commit(self):
+        self._l2a("addendum")
+        with mock.patch.object(l2x, "loaders_sha256", return_value={"agent/tools.py": "0" * 64}):
+            code, text = self._call(l2x, ["run", "--authorize-sealed-telemetry"])
+        self.assertEqual(code, 2)
+        self.assertIn("loaders_sha256_diverso", text)
         self.assertFalse((self.root / l2x.L2A_RELATIVE).exists())
         release = self.root / l2x.RELEASE_RELATIVE
         release.write_text(json.dumps({"test_case_ids": [c for c, _, _ in self.sealed], "test_window_groups": 3,
@@ -654,6 +726,16 @@ class CliTests(unittest.TestCase):
         code, text = self._l2a("run", "--authorize-sealed-telemetry")
         self.assertEqual(code, 2)
         self.assertIn("release_sha256_diverso", text)
+
+    def test_a_later_docs_commit_does_not_block_l2a_and_is_recorded(self):
+        self._l2a("addendum")
+        code, text = self._call(l2x, ["run", "--authorize-sealed-telemetry"], commit="f" * 40)
+        self.assertEqual(code, 0, text)
+        report = json.loads((self.root / l2x.L2A_RELATIVE).read_text(encoding="utf-8"))
+        self.assertEqual(report["run_head_commit"], "f" * 40)
+        self.assertEqual(report["l2_code_commit"], L2_COMMIT)
+        code, text = self._call(l2b, ["--authorize-ground-truth"], commit="f" * 40)
+        self.assertEqual(code, 0, text)
 
     def test_changes_to_frozen_code_after_the_freeze_block_everything(self):
         code, text = self._l2a("addendum", "--no-write") if False else self._call(
