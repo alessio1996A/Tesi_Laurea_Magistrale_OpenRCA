@@ -2,6 +2,16 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## STATO PIÙ RECENTE — 16 novembre 2026: forensic Sonnet e preflight Haiku A0 D PASS
+
+L'utente ha riportato `RETURN_CODE=0` dalla sola cella offline con due report.
+
+**A. FORENSIC SONNET D (read-only, nessun replay):** `SONNET_D_FORENSIC_READONLY_PASS`, `record_status=INVALID_OUTPUT`, record SHA `ed8e99f4928d4e539a6355d666a5a6b36e76ccb586354dfa341d33ee6fb2404f`; `task_index=task_2`, `json_status=invalid_v2_task_output: OutputContractError: JSON non analizzabile`. `raw_text_length=397`, raw SHA256 `7dc1dc31eec8f6e2b89ee67e9e66de1128cdcd462ba2000c0c2a2252e0bd295d`, `first_text_category=MARKDOWN_CODE_FENCE`, `json_parse_status=JSON_DECODE_ERROR`, reason `Expecting value` a posizione `0`; provenienza `content_kind=list`, `text_blocks=1`, `nontext_blocks=1`. **Conclusione:** risposta era presente ma *iniziava con fence Markdown*, non JSON puro; non è dimostrato che il contenuto interno fosse JSON corretto e non va riclassificato né corretto nel record o nei contratti. Source/release frozen.
+
+**B. PREFLIGHT HAIKU A0 D (read-only):** `V4_HAIKU_A0_D_READONLY_PREFLIGHT_PASS`, stage `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:haiku:A0:D`, modello `claude-haiku-5-5`, provider Anthropic, harness A0, assenza claim/record Haiku, 11 casi OOD locked; `claims=4, records=6, orphans=0`; tutti i record Gemini e Sonnet preservati; `new_api_calls=0`, `can_execute_api=false`.
+
+**PROSSIMO PASSO**: UN SOLO stage Haiku A0 D live tracciato, mai ritentato, source pin scientifico `78734fa130369d7c236ec53c0cc25d88c8860b27` release SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`. L'utente ha già espresso autorizzazione a continuare pilot delimitati, senza richieste ripetitive; per Haiku utilizzare riferimento autorizzativo `USER_CHAT_HAIKU_A0_D_20261116`, budget di riferimento indicativo **USD 0.50 non hard cap**; una sola esecuzione con opt-in processo e claim prima di provider; `ANTHROPIC_API_KEY` da Colab Secrets. Audit indipendente dopo il pilot senza credenziali né opt-in; stato aspettato se D completo: 5 claims / 7 records / 0 orphans; se D INVALID_OUTPUT/PROVIDER_ERROR, vengono scritti anche C/K BLOCKED_DEPENDENCY, cioè 5 claims / 9 records / 0 orphans. In caso di orphan, fermarsi, niente retry. K Gemini e Sonnet D SHA da verificare. Non eseguire automaticamente C/K Haiku.
+
 ## STATO CORRENTE — 16 novembre 2026: Claude Sonnet A0 D REALE INVALID_OUTPUT, C/K BLOCCATI
 
 L'utente ha riportato da Colab `PILOT_RETURN_CODE=0`, `AUDIT_RETURN_CODE=0`, `V4_SONNET_D_PILOT_FINISHED — NO_FURTHER_STAGE`. **Lo status scientifico è D = INVALID_OUTPUT, non successo D.** La registrazione e i controlli scientifici sono riusciti.
