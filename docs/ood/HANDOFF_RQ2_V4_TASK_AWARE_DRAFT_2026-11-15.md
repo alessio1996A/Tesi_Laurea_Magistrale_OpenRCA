@@ -2,6 +2,28 @@
 
 **Nessuna API, nessun nuovo claim/record, nessuna nuova release.** Il codice di V3 e gli esperimenti congelati restano intatti.
 
+## AGGIORNAMENTO FORENSE (16 novembre 2026) — K Gemini A0: GoogleAPIError
+
+L'utente ha eseguito audit **read-only, senza API** `V4_K_ERROR_FORENSIC_READONLY_PASS` (RETURN_CODE 0) e confermato:
+```
+stage: rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K
+k_record_sha256: d2152d39594f4a12843d285d84122e7e3d51a28080b7c1e2974746b1a5ed2edb
+error_category: PROVIDER_INVOKE_EXCEPTION
+sanitized_error_code: PROVIDER_ERROR:GoogleAPIError
+observed_model_requests: 1
+usage_complete: false
+claims/records/orphans: 3/3/0
+d_and_c_complete: true
+k_record_preserved: true
+new_model_calls: 0
+automatic_retry_allowed: false
+```
+**Interpretazione:** l'SDK Google ha sollevato `GoogleAPIError` nel `model.invoke` dello stage K. Il codice registrato è SANITIZZATO e **non contiene HTTP status o messaggio**: non si può dichiarare che fosse 429, 503, quota, timeout, errore di credenziale o causa precisa. Provider_error è esito scientifico irreversibile; 0 token osservati NON dimostrano 0 consumo. D e C RESTANO complete; K NON è complete né regola candidata valida. **NON ripetere K e non aggiornare/falsificare il ledger**.
+
+**Prossimo obiettivo**: test cross-provider con un nuovo stage reale indipendente, preferibilmente `rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:sonnet:A0:D`, modello preregistrato `claude-sonnet-5-5` su provider `anthropic`. Prima un solo preflight `preview_one_v4_stage` read-only, verificando 3 claims / 3 records / 0 orphans, K Gemini irreversibile, nuovo D Sonnet claim/record assenti, OOD sigillato, source/release pinned. Per Sonnet la credenziale Colab è attesa come `ANTHROPIC_API_KEY` e **non va esposta**. Attenzione al budget di Sonnet, storicamente più elevato e non hardcap: non assumere che il riferimento di USD 0.10 per i singoli stage Gemini basti per D Sonnet, che può avere 7+ richieste e input pesante. Non eseguire più di un nuovo stage per cella. Dopo preview PASS pianificare un solo D Sonnet con budget identificato/assenso specifico, nessun replay. Se serve risparmio valutare Haiku per primo, ma non cambiare protocollo o parametri scientifici congelati.
+
+Le prove mock precedenti garantiscono solo percorsi testati offline. Non occorrono papers/trascrizioni relatore per questo troubleshooting. Codice scientifico congelato SHA `78734fa130369d7c236ec53c0cc25d88c8860b27`; V4 release SHA `52e5b25cd71f3621d69b1e979a4457cd741242bddff3f49eae936588196330be`.
+
 ## STATO PIÙ RECENTE (16 novembre 2026) — K REALE GEMINI A0: PROVIDER_ERROR IMMUTABILE
 
 **Output riportato dall'utente (Colab):** `PILOT_RETURN_CODE=0` e `AUDIT_RETURN_CODE=0`; non significano successo semantico K, ma completamento della scrittura/audit. `V4_ONE_STAGE_RECORDED`, `record_status=PROVIDER_ERROR`, `stage_id=rq2_v4_task_aware_d_discovery_v0:cloudbed-1_q032:gemini:A0:K`, `record_sha256=d2152d39594f4a12843d285d84122e7e3d51a28080b7c1e2974746b1a5ed2edb`, `descendants_blocked=[]`, `claims_created_this_stage=1`, `automatic_retry_allowed=false`.
