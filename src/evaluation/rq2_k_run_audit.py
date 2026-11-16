@@ -12,6 +12,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from evaluation import rq2_output_contracts as contracts
+
 VERSION = "rq2_k_run_audit_v1"
 COMPLETE = "RECORDED_COMPLETE"
 _HEAD, _TAIL = 240, 160
@@ -36,6 +38,27 @@ def _clip(text: object) -> str | None:
     return text if len(text) <= _HEAD + _TAIL else f"{text[:_HEAD]} [...] {text[-_TAIL:]}"
 
 
+def probe_k_contract(raw: object) -> str:
+    """Perche' una risposta K e' stata rifiutata dal contratto (solo lettura).
+
+    Rivalida il testo originale con il contratto V4, dando come elenco degli ID di
+    evidenza ammessi quelli che la risposta stessa dichiara: cosi' un ID inventato
+    non maschera altre violazioni. Se passa, l'unica causa possibile e' un ID non
+    presente nei log reali dei tool. Non esegue nulla e non corregge nulla.
+    """
+    if not isinstance(raw, str):
+        return "risposta originale assente"
+    try:
+        body = json.loads(raw)
+        ids = body.get("evidence_ids") if isinstance(body, dict) else None
+        declared = sorted({i for i in ids if isinstance(i, str)}) if isinstance(ids, list) else []
+        contracts.validate_candidate_rule(raw, allowed_evidence_ids=declared)
+    except (ValueError, TypeError) as exc:
+        return f"violazione: {exc}"
+    return ("nessuna violazione con gli ID dichiarati: la causa e' un evidence_id "
+            "non presente nei log reali dei tool")
+
+
 def audit(records: list[dict]) -> dict:
     status = Counter(r.get("status") for r in records)
     retried, non_complete = [], []
@@ -48,8 +71,10 @@ def audit(records: list[dict]) -> dict:
         if len(attempts) > 1:
             retried.append({
                 "stage_id": rec["stage_id"], **ident,
-                "attempts": [{k: a.get(k) for k in ("attempt", "status", "error_type",
-                                                    "elapsed_seconds")} for a in attempts],
+                "attempts": [{k: _clip(a.get(k)) if k == "provider_error" else a.get(k)
+                              for k in ("attempt", "status", "error_type", "provider_error",
+                                        "api_attempts", "finish_reason", "elapsed_seconds")}
+                             for a in attempts],
                 "final_status": rec.get("status")})
         if rec.get("status") != COMPLETE:
             non_complete.append({
@@ -57,6 +82,9 @@ def audit(records: list[dict]) -> dict:
                 "format_deviation": fmt.get("deviation"),
                 "error_summary": _clip(rec.get("error_summary")),
                 "original_response": _clip(fmt.get("original_response")),
+                "contract_probe": (probe_k_contract(fmt.get("original_response"))
+                                   if ident["stage"] == "K"
+                                   and rec.get("status") == "INVALID_OUTPUT" else None),
                 "blocked_by": rec.get("blocked_by")})
     return {
         "audit_version": VERSION, "records": len(records),
@@ -73,13 +101,16 @@ def render(report: dict) -> str:
     for item in report["retried"]:
         lines.append(f"  - {item['stage_id']}  esito finale: {item['final_status']}")
         for a in item["attempts"]:
-            lines.append(f"      tentativo {a['attempt']}: {a['status']}, "
-                         f"errore={a['error_type']}, {a['elapsed_seconds']} s")
+            lines.append(f"      tentativo {a['attempt']}: {a['status']}, errore={a['error_type']}, "
+                         f"provider_error={a['provider_error']}, chiamate_api={a['api_attempts']}, "
+                         f"finish={a['finish_reason']}, {a['elapsed_seconds']} s")
     lines += ["", f"Stage non completi: {len(report['non_complete'])}"]
     for item in report["non_complete"]:
         lines += [f"  - {item['stage_id']}  [{item['status']}]  formato: {item['format_deviation']}",
                   f"      error_summary: {item['error_summary']}",
                   f"      risposta originale: {item['original_response']}"]
+        if item["contract_probe"]:
+            lines.append(f"      sonda contratto K: {item['contract_probe']}")
         if item["blocked_by"]:
             lines.append(f"      bloccato da: {item['blocked_by']}")
     lines += ["", "Deviazioni di formato per modello:"]

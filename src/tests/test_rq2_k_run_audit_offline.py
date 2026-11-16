@@ -20,7 +20,8 @@ class AuditTests(unittest.TestCase):
         self.records = [
             _rec("c1:gemini:A0:D"),
             _rec("c1:gemini:A1:D", attempts=[
-                {"attempt": 1, "status": "PROVIDER_ERROR", "error_type": "ServerError", "elapsed_seconds": 3.0},
+                {"attempt": 1, "status": "PROVIDER_ERROR", "error_type": None, "elapsed_seconds": 3.0,
+                 "provider_error": "PROVIDER_ERROR: 503", "api_attempts": 1, "finish_reason": None},
                 {"attempt": 2, "status": "RECORDED_COMPLETE", "error_type": None, "elapsed_seconds": 40.0}]),
             _rec("c1:haiku:A1:K", status="INVALID_OUTPUT", error_summary="schema non valido",
                  original="x" * 1000),
@@ -47,6 +48,11 @@ class AuditTests(unittest.TestCase):
         self.assertLess(len(item["original_response"]), 500)
         self.assertIn("[...]", item["original_response"])
 
+    def test_provider_error_of_the_first_attempt_is_visible(self):
+        report = aud.audit(self.records)
+        self.assertEqual(report["retried"][0]["attempts"][0]["provider_error"], "PROVIDER_ERROR: 503")
+        self.assertIn("provider_error=PROVIDER_ERROR: 503", aud.render(report))
+
     def test_render_and_load_do_not_modify_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             for i, rec in enumerate(self.records):
@@ -57,6 +63,46 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertIn("Stage ritentati: 1", text)
         self.assertIn("Stage non completi: 2", text)
+
+
+def _insufficient(**override):
+    body = {"schema_version": "rq2_candidate_rule_v0", "status": "insufficient_evidence",
+            "hypothesized_fault_type": "Unconfirmed: nulla di certo", "rule_name": None,
+            "scope": "cloudbed-1", "evidence_ids": ["E001"], "required_signals": [],
+            "conditions": [], "combination": None, "abstain_when": ["Manca la serie temporale"],
+            "counterexamples": [], "limitations": ["Un solo picco osservato"], "pseudocode": None}
+    body.update(override)
+    return json.dumps(body)
+
+
+class ContractProbeTests(unittest.TestCase):
+    def test_valid_abstention_points_to_unknown_evidence_ids(self):
+        self.assertIn("evidence_id", aud.probe_k_contract(_insufficient()))
+
+    def test_abstention_with_detector_logic_is_named(self):
+        signal = {"metric": "m", "unit": "u", "aggregation": "max", "window_seconds": 60}
+        condition = dict(signal, operator=">", threshold=1.0)
+        text = aud.probe_k_contract(_insufficient(required_signals=[signal], conditions=[condition]))
+        self.assertIn("Insufficient evidence cannot assert detector logic", text)
+
+    def test_overlong_limitation_is_named(self):
+        text = aud.probe_k_contract(_insufficient(limitations=["x" * 2500]))
+        self.assertIn("exceeds 2000 characters", text)
+
+    def test_missing_field_and_non_text(self):
+        body = json.loads(_insufficient())
+        del body["pseudocode"]
+        self.assertIn("expected fields", aud.probe_k_contract(json.dumps(body)))
+        self.assertEqual(aud.probe_k_contract(None), "risposta originale assente")
+
+    def test_audit_probes_only_invalid_k_stages(self):
+        bad = _rec("c1:haiku:A1:K", status="INVALID_OUTPUT",
+                   original=_insufficient(limitations=["x" * 2500]))
+        other = _rec("c1:haiku:A1:C", status="INVALID_OUTPUT", original="{}")
+        report = aud.audit([bad, other])
+        probes = {e["stage"]: e["contract_probe"] for e in report["non_complete"]}
+        self.assertIn("exceeds 2000", probes["K"])
+        self.assertIsNone(probes["C"])
 
 
 if __name__ == "__main__":
