@@ -16,8 +16,10 @@ Garanzie
     verifica sul sorgente.
   * Il freeze originale resta valido: `run` ricalcola tabella, parametri, record e catalogo, e
     accetta solo modifiche al codice che siano nuovi file L2, test o documenti.
-  * I gruppi sono componenti connesse di finestre (estremi inclusi, stesso cloudbed), come nella
-    partizione pre-registrata; il loro numero deve coincidere con `test_window_groups` del release.
+  * I gruppi sono componenti connesse di finestre semiaperte [inizio, fine) nello stesso cloudbed,
+    con la stessa sovrapposizione stretta dell'audit pre-registrato (`v2_case_window_audit._overlap`:
+    due finestre che si toccano in un estremo NON si sovrappongono); il loro numero deve coincidere
+    con `test_window_groups` del release.
   * Il manifest e' rifiutato se contiene colonne di ground truth; i casi di discovery sono rifiutati.
 """
 from __future__ import annotations
@@ -56,10 +58,12 @@ ALLOWED_AFTER_FREEZE_FILES = frozenset("src/evaluation/" + name for name in L2_S
 ALLOWED_AFTER_FREEZE_PREFIXES = ("src/tests/", "docs/")
 
 
-GROUP_DEFINITION = ("Componenti connesse delle finestre [start, end] dei casi sigillati, nello stesso "
-                    "cloudbed, con estremi inclusi (due finestre che si toccano o si sovrappongono sono lo "
-                    "stesso gruppo); finestra del gruppo = unione; id W01.. ordinati per cloudbed, inizio, "
-                    "primo case_id. Il numero deve coincidere con test_window_groups del release.")
+GROUP_DEFINITION = ("Componenti connesse delle finestre semiaperte [start, end) dei casi sigillati, nello "
+                    "stesso cloudbed, con sovrapposizione stretta (start_a < end_b e start_b < end_a), "
+                    "identica a v2_case_window_audit._overlap usata dall'audit pre-registrato: due finestre "
+                    "che si toccano solo in un estremo restano gruppi distinti; finestra del gruppo = "
+                    "unione; id W01.. ordinati per cloudbed, inizio, primo case_id. Il numero deve "
+                    "coincidere con test_window_groups del release.")
 POPULATION_POLICY = ("Popolazione osservabile: componenti del livello con almeno un campione finito per "
                      "ogni KPI della regola nella finestra del gruppo; gli esclusi sono contati e nominati; "
                      "un negativo vale solo per la popolazione.")
@@ -125,7 +129,7 @@ def load_cases(manifest_path: Path, case_ids) -> list[dict]:
 
 
 def build_window_groups(cases: list[dict]) -> list[dict]:
-    """Componenti connesse di finestre nello stesso cloudbed (estremi inclusi)."""
+    """Componenti connesse di finestre semiaperte nello stesso cloudbed (sovrapposizione stretta)."""
     parent = {c["case_id"]: c["case_id"] for c in cases}
 
     def find(x: str) -> str:
@@ -135,8 +139,8 @@ def build_window_groups(cases: list[dict]) -> list[dict]:
         return x
 
     for a, b in itertools.combinations(cases, 2):
-        if (a["cloudbed"] == b["cloudbed"] and a["start_unix"] <= b["end_unix"]
-                and b["start_unix"] <= a["end_unix"]):
+        if (a["cloudbed"] == b["cloudbed"] and a["start_unix"] < b["end_unix"]
+                and b["start_unix"] < a["end_unix"]):
             parent[find(a["case_id"])] = find(b["case_id"])
     members: dict[str, list[dict]] = {}
     for case in cases:

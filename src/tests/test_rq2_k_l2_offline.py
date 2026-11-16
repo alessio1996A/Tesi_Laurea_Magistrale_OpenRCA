@@ -43,23 +43,40 @@ def _write_manifest(path: Path, cases, extra_columns=None):
 
 
 class WindowGroupTests(unittest.TestCase):
-    def test_touching_windows_form_one_group(self):
+    def test_windows_that_only_touch_at_an_endpoint_stay_apart(self):
+        # Come nell'audit pre-registrato: finestre semiaperte, sovrapposizione stretta.
         groups = l2x.build_window_groups([_case("a", "cloudbed-1", 0, 100), _case("b", "cloudbed-1", 100, 200)])
+        self.assertEqual([g["case_ids"] for g in groups], [["a"], ["b"]])
+
+    def test_an_overlap_of_one_second_makes_one_group(self):
+        groups = l2x.build_window_groups([_case("a", "cloudbed-1", 0, 100), _case("b", "cloudbed-1", 99, 200)])
         self.assertEqual(len(groups), 1)
         self.assertEqual((groups[0]["start_unix"], groups[0]["end_unix"]), (0, 200))
         self.assertEqual(groups[0]["case_ids"], ["a", "b"])
 
-    def test_a_gap_of_one_second_keeps_groups_apart(self):
-        self.assertEqual(len(l2x.build_window_groups(
-            [_case("a", "cloudbed-1", 0, 100), _case("b", "cloudbed-1", 101, 200)])), 2)
+    def test_the_definition_is_the_same_as_the_preregistered_audit(self):
+        """Stesse coppie sovrapposte di `v2_case_window_audit._overlap` su finestre di ogni tipo."""
+        from evaluation import v2_case_window_audit as audit
+        windows = [(0, 100), (100, 200), (99, 150), (150, 150 + 1), (300, 400), (350, 360), (400, 500),
+                   (0, 500), (600, 601), (601, 700)]
+        for cloudbed_b in ("cloudbed-1", "cloudbed-2"):
+            for i, (a0, a1) in enumerate(windows):
+                for j, (b0, b1) in enumerate(windows):               # entrambi gli ordini
+                    if i == j:
+                        continue
+                    a, b = _case("a", "cloudbed-1", a0, a1), _case("b", cloudbed_b, b0, b1)
+                    expected = audit._overlap({**a, "start_unix": str(a0), "end_unix": str(a1)},
+                                              {**b, "start_unix": str(b0), "end_unix": str(b1)})
+                    self.assertEqual(len(l2x.build_window_groups([a, b])) == 1, expected,
+                                     (a0, a1, cloudbed_b, b0, b1))
 
     def test_same_window_in_different_cloudbeds_is_not_grouped(self):
         self.assertEqual(len(l2x.build_window_groups(
             [_case("a", "cloudbed-1", 0, 100), _case("b", "cloudbed-2", 0, 100)])), 2)
 
     def test_chains_are_connected_transitively(self):
-        groups = l2x.build_window_groups([_case("a", "cloudbed-1", 0, 100), _case("c", "cloudbed-1", 200, 300),
-                                          _case("b", "cloudbed-1", 100, 200)])
+        groups = l2x.build_window_groups([_case("a", "cloudbed-1", 0, 101), _case("c", "cloudbed-1", 200, 300),
+                                          _case("b", "cloudbed-1", 100, 201)])
         self.assertEqual([g["case_ids"] for g in groups], [["a", "b", "c"]])
 
     def test_ids_and_order_do_not_depend_on_input_order(self):
@@ -73,7 +90,7 @@ class WindowGroupTests(unittest.TestCase):
 
     def test_eleven_cases_can_make_ten_groups(self):
         cases = [_case(f"c{i}", "cloudbed-1", i * 1000, i * 1000 + 500) for i in range(10)]
-        cases.append(_case("c10", "cloudbed-1", 500, 900))                  # tocca c0
+        cases.append(_case("c10", "cloudbed-1", 400, 900))                  # si sovrappone a c0
         self.assertEqual(len(l2x.build_window_groups(cases)), 10)
 
 
@@ -125,7 +142,7 @@ def _fixture(case_ids=("s1", "s2", "s3")):
     l1_report = {"freeze_sha256": freeze["sha256_of_body_without_this_field"], "uses_ground_truth": False,
                  "sealed_incidents_opened": False, "admitted_to_l2": [stage]}
     cases = [_case("s1", "cloudbed-1", START + 7200, START + 9000),
-             _case("s2", "cloudbed-1", START + 9000, START + 10800),
+             _case("s2", "cloudbed-1", START + 8999, START + 10800),
              _case("s3", "cloudbed-1", START + 14400, START + 16200)]
     release = {"test_case_ids": list(case_ids), "test_window_groups": 2}
     inputs = {"freeze": freeze, "freeze_file_sha256": "z" * 64, "release": release, "release_sha256": "r" * 64,
@@ -616,7 +633,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self._main_l1("freeze")[0], 0)
         self.assertEqual(self._main_l1("run")[0], 0)
         s = START
-        self.sealed = [("cloudbed-1_q1", s + 7200, s + 9000), ("cloudbed-1_q2", s + 9000, s + 10800),
+        self.sealed = [("cloudbed-1_q1", s + 7200, s + 9000), ("cloudbed-1_q2", s + 8999, s + 10800),
                        ("cloudbed-1_q3", s + 14400, s + 16200), ("cloudbed-1_q4", s + 21600, s + 23400)]
         rows = [{"case_id": c, "cloudbed": "cloudbed-1", "query_index": 0, "task_index": "task_3",
                  "instruction": "x", "start_unix": a, "end_unix": b} for c, a, b in
