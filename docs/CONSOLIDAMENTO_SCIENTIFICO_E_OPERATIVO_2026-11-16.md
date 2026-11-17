@@ -334,6 +334,43 @@ relazione: A1_8R → Planning, Sonnet −27,9% token e −22,1% tempo; Haiku +17
 **Letture non ammesse.** Un miglioramento universale dell'harness; un confronto causale con l'RCA-agent
 originale; una graduatoria tra modelli (le condizioni di provider e budget non sono identiche).
 
+### 3.1b RQ1, analisi esplorativa per copertura delle regole (17 novembre, post hoc)
+
+**Che cos'è.** Le 295 run di EVALUATION20, con i punteggi ufficiali **già congelati** (scoring su `raw_response`),
+divise per classe del guasto: 15 incidenti con classe tra le otto coperte da regola, 5 con classe fuori dalle
+dodici note (l'etichetta non è salvata dallo script; sono presumibilmente le classi di rete R03–R05, **da
+verificare**), 0 misti; 3 multiguasto. Modulo `evaluation/rq1_coverage_stratification.py`, report
+`data/rq1_coverage_v1/strata_v2.json` (SHA-256 `f8f9bc5c9fbfabc2978c6a1ef762f9e0c998f9a9aafe0f8fa0f2e792821758f3`).
+Prima di leggere i numeri, lo script ha riprodotto le 15 medie della tabella 3.1 (esito OK), 0 discordanze di hash,
+5 run senza punteggio (errori di Gemini mai riprovati). Controllo di separazione (registro, riga 36): nessuna delle
+quattro classi di RQ2 in development (0 su 92) né in evaluation (0 su 23), quindi nessuna nei 20 incidenti.
+
+Differenza media appaiata per incidente (vittorie/pareggi/sconfitte); coperta n = 12–15 per cella, non coperta n = 5.
+
+| Confronto | Strato | Gemini | Sonnet | Haiku | Tre modelli insieme |
+|---|---|---|---|---|---|
+| A1 − A0 | coperta | +0,167 (4/9/0) | +0,339 (8/6/1) | +0,150 (4/10/1) | 16/25/2 |
+| A1 − A0 | non coperta | −0,100 (0/4/1) | +0,100 (1/4/0) | −0,100 (1/3/1) | 2/11/2 |
+| A1_8R − A1 | coperta | −0,091 (0/9/3) | +0,050 (3/10/2) | +0,128 (4/9/2) | 7/28/7 |
+| A1_8R − A1 | non coperta | 0,000 (0/5/0) | 0,000 (0/5/0) | −0,200 (0/4/1) | 0/14/1 |
+
+(Il totale su tre modelli conta lo stesso incidente tre volte: descrittivo, non indipendente.)
+
+**Letture ammesse.**
+1. Il guadagno delle evidenze deterministiche (A0 → A1) sta quasi tutto negli incidenti con classe coperta, con
+   segno positivo su tutti e tre i modelli; nei 5 non coperti non c'è guadagno.
+2. Le otto regole sopra A1 non mostrano un effetto netto nemmeno dove esistono (7 vittorie, 7 sconfitte): il
+   segno dipende dal modello (Gemini negativo, Sonnet quasi nullo, Haiku positivo). Fuori dalle loro classi non
+   danneggiano (0/14/1). L'ipotesi "il vantaggio delle regole si concentra dove le regole esistono" **non è
+   sostenuta** da questi dati.
+3. Per la tesi: il contributo robusto di RQ1 è lo strato delle evidenze; l'effetto marginale delle regole è
+   incerto e dipende dal modello, in linea con la non monotonia già dichiarata in 3.1.
+
+**Letture non ammesse.** Che le regole "non servano" (strati piccoli, una replica, effetto dipendente dal modello);
+conclusioni sulle classi di rete; un nesso causale tra classe e guadagno (classe e difficoltà del compito possono
+coincidere). Gli strati sono scelti **dopo** aver visto i risultati complessivi; la scelta di leggere questo
+confronto è fissata nel registro (riga 35) prima di vederlo.
+
 ### 3.2 RQ2, K per modello e per harness
 
 I 60 K sono 4 incidenti × 3 modelli × 5 harness. Le colonne `candidate` e "non validi" vengono dalla tabella
@@ -620,10 +657,9 @@ RQ2-A (scoring offline di D e C, 17 novembre) e lettura qualitativa dei testi li
    (sezione breve, esplorativa); la lettura della riga 1 del registro (sez. 4); se candidata + spiegazione +
    pseudocodice, con la verifica umana come lavoro futuro, basta per RQ2. La domanda è da scrivere come bozza,
    senza inviarla.
-3b. Due analisi offline in sola lettura, scritte il 17 novembre e **da eseguire in Colab** (registro riga 35):
-   `rq1_coverage_stratification strata` (A1_8R contro A1 per classe coperta o non coperta, con verifica di
-   riprodurre prima le 15 medie di sez. 3.1) e `separation` (le quattro classi di RQ2 non devono comparire in
-   development, evaluation o mixed_quarantine). Gli esiti vanno in sez. 3.1 e nel registro.
+3b. Due analisi offline in sola lettura, **eseguite il 17 novembre** (registro righe 35–38): la stratificazione di
+   RQ1 per copertura (sez. 3.1b) e il controllo di separazione (0 delle quattro classi in development e
+   evaluation). Resta da verificare quali classi siano i 5 incidenti non coperti.
 4. Refactoring essenziale (sez. 6): al più due giorni.
 5. Ricostruzione delle tre classi di guasto non coperte (sez. 1.1) e, se serve, ricontrollo del confronto
    con l'archivio Microsoft (cella Colab già predisposta).
