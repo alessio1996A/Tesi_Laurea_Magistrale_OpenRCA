@@ -156,9 +156,11 @@ def d_entry(record: dict | None) -> dict:
 def c_entry(record: dict | None) -> dict:
     """Stato, decisione e tipo di guasto di uno stage C."""
     if record is None:
-        return {"status": "MISSING", "decision": None, "predicted_fault_type": None}
+        return {"status": "MISSING", "decision": None,
+                "predicted_fault_type": None, "predicted_component": None}
     status = record.get("status")
-    out = {"status": status, "decision": None, "predicted_fault_type": None}
+    out = {"status": status, "decision": None, "predicted_fault_type": None,
+           "predicted_component": None}
     if status != STATUS_COMPLETE:
         return out
     raw = _dig(record, "receipt", "artifact", "raw_response")
@@ -170,6 +172,7 @@ def c_entry(record: dict | None) -> dict:
         raise ScoringError("C completo con decisione non valida: " + record["stage_id"])
     out["decision"] = body["decision"]
     out["predicted_fault_type"] = body.get("predicted_fault_type")
+    out["predicted_component"] = body.get("predicted_component")
     return out
 
 
@@ -351,6 +354,43 @@ def run_scoring(records_dir, market_zip, openrca_dir) -> dict:
     }
 
 
+def list_free_text(records_dir) -> list[dict]:
+    """Testo libero proposto da D e C, cella per cella. NON legge la ground truth.
+
+    Serve a leggere con gli occhi cosa ha scritto il modello, perche' la
+    corrispondenza esatta dello scorer e della politica lessicale non lo mostra.
+    """
+    table = index_records(load_records(Path(records_dir)))
+    rows = []
+    for case, model, harness, stage in planned_cells():
+        record = table.get((case, model, harness, stage))
+        base = {"stage": stage, "case_id": case, "model": model, "harness": harness}
+        if stage == "D":
+            entry = d_entry(record)
+            reasons, components, times = [], [], []
+            if entry["prediction"]:
+                try:
+                    parsed = json.loads(entry["prediction"])
+                except ValueError:
+                    parsed = None
+                for item in (parsed.values() if isinstance(parsed, dict) else []):
+                    if isinstance(item, dict):
+                        reasons.append(str(item.get("root cause reason", "")))
+                        components.append(str(item.get("root cause component", "")))
+                        times.append(str(item.get("root cause occurrence datetime", "")))
+            rows.append({**base, "status": entry["status"],
+                         "text": " | ".join(r for r in reasons if r) or None,
+                         "component": " | ".join(c for c in components if c) or None,
+                         "datetime": " | ".join(t for t in times if t) or None})
+        else:
+            entry = c_entry(record)
+            rows.append({**base, "status": entry["status"],
+                         "text": entry["predicted_fault_type"] if entry["decision"] == "diagnosis"
+                         else ("(astensione)" if entry["decision"] == "abstain" else None),
+                         "component": entry["predicted_component"], "datetime": None})
+    return rows
+
+
 def plan_check(records_dir) -> dict:
     """Senza ground truth: quante celle D e C ci sono e con che stato."""
     table = index_records(load_records(Path(records_dir)))
@@ -376,6 +416,18 @@ def write_report_create_only(report: dict, path: Path) -> str:
     finally:
         os.close(fd)
     return hashlib.sha256(data).hexdigest()
+
+
+def write_text_create_only(text: str, path: Path) -> None:
+    data = text.encode("utf-8")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    try:
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def format_summary(report: dict) -> str:
@@ -411,9 +463,26 @@ def main(argv=None) -> int:
     parser.add_argument("--out", help="report JSON di uscita (create-only)")
     parser.add_argument("--plan-check", action="store_true",
                         help="solo conteggio delle celle, senza ground truth")
+    parser.add_argument("--list-text", action="store_true",
+                        help="stampa il testo libero di D e C (senza ground truth)")
+    parser.add_argument("--csv-out", help="con --list-text: CSV create-only")
     args = parser.parse_args(argv)
     if args.plan_check:
         print(json.dumps(plan_check(args.records_dir), indent=2, sort_keys=True))
+        return 0
+    if args.list_text:
+        rows = list_free_text(args.records_dir)
+        for r in rows:
+            print(f"{r['stage']} | {r['case_id']} | {r['model']:6s} | {r['harness']:15s} | "
+                  f"{(r['text'] or r['datetime'] or '-')[:110]} | {(r['component'] or '-')[:40]}")
+        if args.csv_out:
+            buf = io.StringIO()
+            writer = csv.DictWriter(buf, fieldnames=[
+                "stage", "case_id", "model", "harness", "status", "text", "component", "datetime"])
+            writer.writeheader()
+            writer.writerows(rows)
+            write_text_create_only(buf.getvalue(), Path(args.csv_out))
+            print("\nCSV scritto (create-only): " + args.csv_out)
         return 0
     if not (args.market_zip and args.openrca_dir):
         parser.error("servono --market-zip e --openrca-dir")

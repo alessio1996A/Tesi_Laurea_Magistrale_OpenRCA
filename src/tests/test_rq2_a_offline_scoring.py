@@ -178,6 +178,21 @@ class RQ2AScoringTests(unittest.TestCase):
             with self.assertRaises(s.ScoringError):
                 s.load_official_evaluate(tmp)
 
+    def test_list_free_text_reads_d_and_c_without_ground_truth(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            write_all(tmp, c_label={("cloudbed-1_q032", "haiku", "A0"): "DNS timeout"})
+            rows = s.list_free_text(tmp)
+            self.assertEqual(len(rows), 120)
+            c = [r for r in rows if r["stage"] == "C" and r["model"] == "haiku"
+                 and r["harness"] == "A0" and r["case_id"] == "cloudbed-1_q032"][0]
+            self.assertEqual(c["text"], "DNS timeout")
+            d = [r for r in rows if r["stage"] == "D"][0]
+            self.assertEqual(d["component"], "x")
+            target = Path(tmp) / "t.csv"
+            s.write_text_create_only("a\n", target)
+            with self.assertRaises(FileExistsError):
+                s.write_text_create_only("b\n", target)
+
     def test_report_is_create_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "r.json"
