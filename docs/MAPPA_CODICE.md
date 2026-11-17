@@ -21,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 36 | 37 |
+| A. Nucleo del codice finale | 98 | 25 | 40 | 33 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -115,11 +115,11 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/rq2_v5_matrix_runner.py` | 546 | RQ2-V5: runner a matrice, magro e riprendibile (solo libreria standard). | - | da fare (EN 0, senza docstring 19) |
-| `evaluation/rq2_v5_response_normalization.py` | 162 | RQ2-V5.1: normalizzazione del formato della risposta, UGUALE per tutti i modelli. | - | da fare (EN 0, senza docstring 3) |
+| `evaluation/rq2_v5_matrix_runner.py` | 706 | RQ2-V5: runner a matrice, magro e riprendibile (solo libreria standard). | - | completo |
+| `evaluation/rq2_v5_response_normalization.py` | 203 | RQ2-V5.1: normalizzazione del formato della risposta, UGUALE per tutti i modelli. | - | completo |
 | `evaluation/rq2_v5_retry.py` | 95 | RQ2-V5: politica di retry unica, dichiarata PRIMA del run scientifico. | - | completo |
-| `evaluation/rq2_v5_run_cli.py` | 260 | RQ2-V5: riga di comando per Colab (check, run, summary). | - | da fare (EN 0, senza docstring 11) |
-| `evaluation/rq2_v5_stage_executor.py` | 273 | RQ2-V5: esecutore reale di D, C e K per il runner a matrice. | - | da fare (EN 0, senza docstring 7) |
+| `evaluation/rq2_v5_run_cli.py` | 335 | RQ2-V5: riga di comando per Colab (check, run, summary). | - | completo |
+| `evaluation/rq2_v5_stage_executor.py` | 349 | RQ2-V5: esecutore reale di D, C e K per il runner a matrice. | - | completo |
 
 **RQ2 catena V2 (piano unificato, ledger, release)**
 
