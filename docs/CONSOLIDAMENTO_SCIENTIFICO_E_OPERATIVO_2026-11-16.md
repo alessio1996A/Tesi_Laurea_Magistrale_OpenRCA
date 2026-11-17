@@ -338,12 +338,20 @@ originale; una graduatoria tra modelli (le condizioni di provider e budget non s
 
 **Che cos'è.** Le 295 run di EVALUATION20, con i punteggi ufficiali **già congelati** (scoring su `raw_response`),
 divise per classe del guasto: 15 incidenti con classe tra le otto coperte da regola, 5 con classe fuori dalle
-dodici note (l'etichetta non è salvata dallo script; sono presumibilmente le classi di rete R03–R05, **da
-verificare**), 0 misti; 3 multiguasto. Modulo `evaluation/rq1_coverage_stratification.py`, report
+dodici note (l'etichetta non è salvata dallo script; lettura diretta di `record.csv` il 17 novembre: sono tutte
+classi di rete senza regola, vedi sotto), 0 misti; 3 multiguasto. Modulo `evaluation/rq1_coverage_stratification.py`, report
 `data/rq1_coverage_v1/strata_v2.json` (SHA-256 `f8f9bc5c9fbfabc2978c6a1ef762f9e0c998f9a9aafe0f8fa0f2e792821758f3`).
 Prima di leggere i numeri, lo script ha riprodotto le 15 medie della tabella 3.1 (esito OK), 0 discordanze di hash,
 5 run senza punteggio (errori di Gemini mai riprovati). Controllo di separazione (registro, riga 36): nessuna delle
 quattro classi di RQ2 in development (0 su 92) né in evaluation (0 su 23), quindi nessuna nei 20 incidenti.
+
+**I 5 incidenti non coperti** (lettura diretta di `record.csv`, riga = numero dopo `q`; verificata la
+numerazione su tre casi noti): cloudbed-1_q012 (pod shippingservice-1, *container network packet
+retransmission*); cloudbed-1_q058 (pod frontend2-0, *container network packet corruption*); cloudbed-2_q031
+(servizio recommendationservice, *container network latency*); cloudbed-2_q054 (pod shippingservice-0,
+*container network packet corruption*); cloudbed-2_q074 (servizio frontend, *container network latency*).
+Sono quindi le tre classi di rete senza rilevatore affidabile (R03–R05): lo strato "non coperta" coincide con
+"guasti di rete", e il confronto va letto così, non come "classi sconosciute".
 
 Differenza media appaiata per incidente (vittorie/pareggi/sconfitte); coperta n = 12–15 per cella, non coperta n = 5.
 
@@ -367,7 +375,7 @@ Differenza media appaiata per incidente (vittorie/pareggi/sconfitte); coperta n 
    incerto e dipende dal modello, in linea con la non monotonia già dichiarata in 3.1.
 
 **Letture non ammesse.** Che le regole "non servano" (strati piccoli, una replica, effetto dipendente dal modello);
-conclusioni sulle classi di rete; un nesso causale tra classe e guadagno (classe e difficoltà del compito possono
+conclusioni generali sui guasti di rete (5 incidenti, due cloudbed); un nesso causale tra classe e guadagno (classe e difficoltà del compito possono
 coincidere). Gli strati sono scelti **dopo** aver visto i risultati complessivi; la scelta di leggere questo
 confronto è fissata nel registro (riga 35) prima di vederlo.
 
@@ -681,7 +689,7 @@ RQ2-A (scoring offline di D e C, 17 novembre) e lettura qualitativa dei testi li
    senza inviarla.
 3b. Due analisi offline in sola lettura, **eseguite il 17 novembre** (registro righe 35–38): la stratificazione di
    RQ1 per copertura (sez. 3.1b) e il controllo di separazione (0 delle quattro classi in development e
-   evaluation). Resta da verificare quali classi siano i 5 incidenti non coperti.
+   evaluation). I 5 incidenti non coperti sono tutti di rete (registro riga 40).
 4. Refactoring essenziale (sez. 6): al più due giorni.
 5. Ricostruzione delle tre classi di guasto non coperte (sez. 1.1) e, se serve, ricontrollo del confronto
    con l'archivio Microsoft (cella Colab già predisposta).
