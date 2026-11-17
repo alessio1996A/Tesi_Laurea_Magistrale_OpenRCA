@@ -1,11 +1,15 @@
 # Consolidamento scientifico e operativo — chiusura della fase sperimentale RQ2
 
-**Data:** 16 novembre 2026. **Branch:** `feature/rq2-k-executor-2026-11-16`.
+**Data:** 16 novembre 2026; **revisione del 17 novembre 2026** (sezioni 0, 1.2, 1.2b, 1.2c, 1.4, 4, 5, 8, 9).
+**Branch:** `feature/rq2-k-executor-2026-11-16`; la revisione sta su `feature/rq2a-offline-scoring-2026-11-17`.
 **Commit di partenza:** `5b51b3286d3354252e9b41e0f1e1f6b1d5c2ba47`.
 **Natura del documento:** solo documentazione. Nessun codice, record, manifest, report o
 artefatto è stato modificato o cancellato per scriverlo; nessuna chiamata a un modello; nessun
 nuovo protocollo di valutazione. I numeri provengono da file già congelati o dal registro; gli unici
 calcoli nuovi sono sottrazioni dichiarate (sezione 3.2) e conteggi sul repository (sezione 6).
+La revisione del 17 novembre riporta anche l'esito di RQ2-A (sezione 1.2b), calcolato offline da un modulo
+nuovo (`evaluation/rq2_a_offline_scoring.py`, non bloccato da hash) sui record già congelati: nessuna
+chiamata a modelli (`provider_calls` 0), nessun record modificato.
 
 **Decisione che questo documento registra** (GPT + Alessio, 16 novembre): la fase sperimentale di
 RQ2 è chiusa. Nessuna nuova campagna LLM, nessuna nuova regola, soglia o configurazione, nessuna
@@ -20,15 +24,16 @@ essenziale e soprattutto alla scrittura della tesi.
 |---|---|---|
 | RQ1 (harness che migliora la RCA) | **Sperimentazione conclusa**; approvata dal relatore il 10 novembre. Resta la scrittura | sez. 1.1 |
 | RQ2, D→C→K | **Run concluso e congelato**: 180 stage, 60 K, 8 regole candidate, 49 `insufficient_evidence`, 3 non validi con il contratto strict | sez. 1.2 |
-| RQ2, verifica L1/L2 (esplorativa) | **Conclusa e congelata**: esito `NON_VERIFICATA` sull'unica regola ammessa | sez. 1.3 |
+| RQ2-A (D e C sui 4 discovery, scoring offline) | **Eseguita il 17 novembre**, descrittiva: lo strumento non misura l'identificazione della classe; lettura qualitativa a parte | sez. 1.2b, 1.2c |
+| RQ2, verifica L1/L2 (esplorativa) | **Conclusa e congelata**: esito `NON_VERIFICATA` sull'unica regola ammessa; nella tesi diventa una sezione breve, protocollo in appendice | sez. 1.3 e 5 |
 | Pipeline human-in-the-loop | **Non implementata, lavoro futuro dichiarato** | sez. 1.4 |
 | Refactoring | **Da fare**, essenziale e controllato, dopo la revisione di questo documento | sez. 6 e 8 |
 | Scrittura della tesi | **Da fare** | sez. 5 e 8 |
 
 **Cosa resta aperto prima della consegna** (dettaglio in sez. 8): revisione di questo documento;
-conferma col relatore di come presentare RQ2 e L1/L2 (punto in sez. 4); chiarimento della data di
-consegna (1 dicembre nel messaggio di Alessio, 5 dicembre in `CONTESTO_ALLINEAMENTO_GPT_2026-11-16.md`);
-refactoring essenziale; scrittura.
+conferma col relatore di come presentare RQ2 e L1/L2 (punto in sez. 4); refactoring essenziale; scrittura.
+**Consegna: 5 dicembre 2026** (confermata da Alessio il 17 novembre; il "1 dicembre" era un errore di un
+contesto precedente, registro riga 34).
 
 ---
 
@@ -123,15 +128,82 @@ namespace `data/rq2_v5_format_fair_v1`).**
   audit V4 e dichiarata prima del run; si riportano sempre sia la conformità strict sia quella tollerante
   (Gemini 60/60 strict; Haiku 45 strict + 12 con fence accettato + 3 non validi; Sonnet 59 strict + 1
   fence, registro riga 13).
-- Il confronto sull'accuratezza di D con lo scorer ufficiale (perimetro "RQ2-A", registro riga 11) è
-  descritto nel protocollo ma **non risulta eseguito**: non ne ho trovato l'esito né nel registro né su Drive
-  (ricerca per titolo). Se la tesi non lo esegue, va dichiarato come non eseguito, non omesso.
+- Il confronto sull'accuratezza di D con lo scorer ufficiale (perimetro "RQ2-A", registro riga 11) è stato
+  **eseguito il 17 novembre** (sezione 1.2b, registro riga 33). Il suo esito è quasi tutto zero per limiti
+  dello strumento, non per un risultato sulla capacità dell'agente.
 - I token tra provider non sono confrontabili alla pari (Claude: `max_tokens=4096` condiviso con
   l'eventuale ragionamento esteso).
 - Il codice dell'harness e dei protocolli è stato scritto con l'assistenza di Claude Sonnet 5.5, che è anche uno dei tre
   modelli valutati: conflitto di interesse da elencare tra le minacce alla validità (registro, "Limiti dichiarati").
 
 **Lavoro futuro.** Vedi 1.4.
+
+### 1.2b RQ2-A — D e C sui 4 incidenti di discovery (scoring offline, eseguito il 17 novembre)
+
+**Che cos'è.** Scoring a posteriori dei 120 record D e C già congelati (4 incidenti × 3 modelli × 5 harness ×
+D e C): D con lo scorer ufficiale OpenRCA, C con la politica congelata `rq2_fault_type_eval_policy_v1_candidate`.
+Nessuna chiamata a modelli. Modulo `src/evaluation/rq2_a_offline_scoring.py` (commit `6c8ca00` e `ab0b62f`, 11 test
+sintetici): rilegge ogni record verificandone l'hash SHA-256, rifiuta record fuori piano e incidenti sigillati,
+scrive un solo report create-only. Report: `data/rq2_a_offline_v1/report.json` su Drive, SHA-256
+`96051ba2c6a30038d9f90e247f141a36c8d7ab29b5bfb2e99ff74a25bb9d66d2`, impronta dei record `c7ce184b…263f`
+(`records_read` 120, `provider_calls` 0). Scorer ufficiale: commit `2a481ae63cb045c3eadbeca9eddaa10ec1151979`,
+`evaluate.py` SHA-256 `9a1c235139266c32b0e95c7e9938591b8fe014aad4cde95580f73f13a54d53f1` (verificato prima dell'uso).
+
+**Risultati (descrittivi: 4 incidenti, una esecuzione per cella, nessun intervallo).**
+
+| D, punteggio medio sui 4 incidenti | A0 | A1 | A1_8R | A1_8R_Planning | A1_PAVE |
+|---|---|---|---|---|---|
+| Gemini | 0 | 0 | 0 | 0 | 0 |
+| Sonnet | 0 | 0,25 | 0,25 | 0,25 | 0,25 |
+| Haiku | 0 | 0,25 | 0,25 | 0,25 | 0,25 |
+
+- L'unico punteggio non nullo è `cloudbed-2_q026` (task_1: solo l'orario del guasto, tolleranza ±1 minuto):
+  Sonnet e Haiku lo trovano con A1, A1_8R, A1_8R_Planning e A1_PAVE (8 celle su 8), con A0 no (0 su 2); Gemini
+  mai. Gli altri tre incidenti (q032, q050, q045) sono task_2, cioè chiedono il motivo: 0 in tutte le 45 celle.
+- Confronto appaiato A1_8R contro A1: 12 pareggi su 12 (nessuna vittoria, nessuna sconfitta, per ciascun modello).
+- C, tipo di guasto: 0 corrette su 60, 0 con una classe nota sbagliata. 13 astensioni (Gemini 10, Haiku 3,
+  Sonnet 0) e 47 diagnosi in testo libero che la politica lessicale non riconduce a nessuna classe.
+
+**Perché gli zeri sul motivo non sono un risultato.** Lo scorer ufficiale confronta il motivo per stringa
+esatta con l'etichetta di classe; il prompt di D non elenca le etichette; la politica di C non ha un vocabolario
+delle quattro classi (il prompt di C vieta di assumere un elenco predefinito). Le etichette esatte arrivano
+all'agente solo attraverso le regole, che per le quattro classi non esistono per progetto. Quindi con questi
+strumenti l'identificazione della classe **non è misurabile**, né in positivo né in negativo.
+
+**Cosa si può affermare.**
+1. Con le evidenze deterministiche (A1) i due modelli Claude trovano l'orario del guasto in 1 incidente su 4,
+   con A0 in nessuno; stessa direzione di RQ1, ma è un solo incidente.
+2. Le otto regole sono neutre fuori dalle classi che coprono (12/12 pareggi, sempre su 4 incidenti).
+3. Nient'altro: nessuna affermazione sull'identificazione della classe, sul miglioramento della generazione di
+   candidate attribuibile all'harness, né sulla superiorità della candidata formalizzabile (#8) rispetto a quelle
+   prodotte da A0 (verdetto L2 `NON_VERIFICATA`, n = 1; C e K vedono solo la traiettoria degli strumenti).
+
+### 1.2c RQ2-A — lettura qualitativa dei testi liberi di D e C (post hoc, non cieca, non è una metrica)
+
+Elenco in sola lettura prodotto da `--list-text` (senza ground truth; CSV `data/rq2_a_offline_v1/testo_libero_D_C.csv`
+su Drive), affiancato a mano alle classi vere del report. **Lettura mia, fatta dopo aver visto le classi vere,
+senza una rubrica fissata prima, su testo troncato a 120 caratteri.** I conteggi sono conteggi di lettura, non
+risultati: in tesi vanno usati come esempi, non come numeri.
+
+| Caso (classe vera) | D, testo libero | C, testo libero |
+|---|---|---|
+| q032, container process termination | 11 celle su 15 scrivono esaurimento o carico di memoria di cartservice-0; nessuna nomina un riavvio | 1 su 15 nomina "container restart / process termination (pod kill)": Sonnet, A1_8R_Planning, la cella da cui nasce la candidata #8. La stessa cella aveva scritto in D "node disk space consumption" |
+| q050, node CPU spike | CPU a livello di nodo (node-6): A0 0/3, A1 2/3, A1_8R, A1_8R_Planning e A1_PAVE 9/9. Con le regole molte celle scrivono "node CPU load" | Sonnet nomina node CPU spike o saturazione in 3 celle su 5 (A1, A1_8R_Planning, A1_PAVE); Haiku sospetta la CPU di node-6 in 2 celle; Gemini si astiene in 4 su 5 |
+| q026, container write I/O load | task_1: solo l'orario. Minuto giusto in 8/8 celle Claude con A1 o superiore; con A0 l'orario è arrotondato a 22:00 | I/O in scrittura o iowait in 8 celle su 15, nessuna con A0 né con A1_8R_Planning; solo Sonnet A1_8R scrive "container write I/O load"; gli altri parlano di disco o iowait del nodo |
+| q045, container packet loss | A0 e A1: 6/6 sul percorso productcatalogservice verso TiDB (DNS, connessioni interrotte), nessuna scrive "packet loss". A1_8R, A1_8R_Planning, A1_PAVE: 7 celle su 9 si spostano su adservice (eccezione NullPointer, CPU, I/O) | Sonnet A0 scrive "DNS resolution failure / network packet loss", unica cella con "packet loss"; Haiku descrive timeout DNS o di rete verso il database in 4 celle su 5 |
+
+**Che cosa se ne ricava (e con quale forza).**
+- Nei casi q050 e q026 le evidenze A1 portano il testo libero verso la famiglia giusta più di A0, nella
+  stessa direzione di RQ1; il punteggio ufficiale non lo vede, perché confronta l'etichetta esatta.
+- L'etichetta di classe esatta compare in 6 celle di C su 60, tutte di Sonnet (q032 1, q050 3, q026 1, q045 1).
+  Haiku descrive il sintomo (timeout DNS, saturazione di disco) senza nominare la classe; Gemini si astiene in 10
+  celle C su 20. È un dato sul "livello di dettaglio delle spiegazioni dei diversi modelli" chiesto dal relatore,
+  da trattare come osservazione.
+- Le varianti con regole non migliorano rispetto ad A1 (12/12 pareggi). Due ipotesi **da non affermare**, da
+  verificare solo leggendo le traiettorie: (i) in q050 la regola R07 ("node CPU load", dichiarata nel codice
+  come "solo aumento persistente; non lo spike") suggerisce un'etichetta vicina ma diversa da quella vera;
+  (ii) in q045 le varianti con regole spostano l'attenzione su adservice; se sia uno spostamento sbagliato dipende
+  dal componente vero, che non ho letto.
 
 ### 1.3 RQ2 — verifica esplorativa L1/L2 delle candidate
 
@@ -175,6 +247,23 @@ Inoltre: tabella di corrispondenza dichiarata a priori tra nomi di riferimento (
 componenti della telemetria; estensione dell'esecutore a log, trace e metriche di servizio (oggi le 5
 candidate non formalizzabili restano fuori); ripetizioni e un campione di verifica indipendente più ampio;
 le altre tre classi non coperte.
+
+**Architettura duale** (idea del relatore nell'incontro del 5 novembre, da presentare solo come concetto): un
+motore deterministico sempre attivo, che applica le regole verificate; un ramo LLM che si attiva quando il
+motore non spiega l'anomalia, produce diagnosi, spiegazione e pseudo-regola candidata e le consegna al
+supervisore umano; solo dopo la verifica e l'autorizzazione la regola entra nel motore. Il relatore ha
+detto che non va implementata.
+
+**Illustrazione del rapporto al supervisore** (esempio **illustrativo**, non l'output di un sistema
+implementato; i campi usano i fatti congelati della candidata #8):
+
+| Campo | Contenuto |
+|---|---|
+| Proposta | `container_start_time_advance_restart_detector`, classe container process termination |
+| Origine | Sonnet, A1_8R_Planning, incidente di discovery `cloudbed-1_q032` (D → C → K) |
+| Verifica eseguita | L1 passata; L2 su 11 incidenti sigillati (10 gruppi): `NON_VERIFICATA`, 2 falsi positivi su 7 gruppi negativi; rilevazione non stimabile (3 gruppi con la classe, non osservabili con il confronto per nome) |
+| Limiti dichiarati | caso di studio su una sola regola; rileva un riavvio osservabile, non prova la causa; nomi dei componenti non allineati tra riferimenti e telemetria |
+| Decisione del supervisore | spazio per l'autorizzazione o il rifiuto (non implementato) |
 
 ---
 
@@ -284,26 +373,36 @@ che metà delle candidate venga dall'harness A0 e nessuna da A1_PAVE **non** è 
 | Pipeline | D → C → K su incidenti di discovery | L1 (esecuzione GT-free sui 4 casi di discovery); L2 (11 incidenti sigillati, 10 gruppi) |
 | Prodotto | Regole candidate strutturate | Esito di verifica di una sola candidata |
 | Risultato | 180 stage, 60 K, 8 candidate | `NON_VERIFICATA` (2 FP su 7 negativi) |
-| Ruolo nella tesi | **Contributo principale di RQ2** | **Approfondimento esplorativo**, caso di studio |
+| Ruolo nella tesi | **Contributo principale di RQ2** (con RQ2-A e lettura qualitativa) | **Sezione breve** del capitolo RQ2, caso di studio; protocollo in appendice |
 | Human-in-the-loop, integrazione automatica | Solo lavoro futuro | Non implementati |
 
-**Fonti e discrepanza da dichiarare.** Le istruzioni di progetto parlano di trasformare la conoscenza in
-regole deterministiche "dopo opportuna verifica". La riga 1 del registro (autori "Relatore + Alessio",
-approvazione esplicita) descrive la RQ2 minima come "4 classi escluse, D→C→K, **verifica su incidenti
-sigillati**; human-in-the-loop e integrazione automatica solo come lavoro futuro". Quindi una verifica sui
-sigillati, in forma generica, risulta già nel perimetro; invece il protocollo L1/L2 nei suoi dettagli
-(popolazione osservabile, H_pre/H, soglia 2/3, Clopper-Pearson, due processi L2a/L2b) è stato progettato
-dopo, con GPT e Alessio (registro righe 8–12 e 20–28), e **non risulta approvato dal relatore**.
+**Fonti e discrepanza da dichiarare.** Il perimetro viene da tre fonti: le istruzioni di progetto (trasformare
+la conoscenza in regole deterministiche "dopo opportuna verifica"); la riga 1 del registro; la trascrizione
+dell'incontro col relatore del 5 novembre (REGIS 3), che non è nel repository. Nella trascrizione il relatore
+chiede, per RQ2, di far spiegare all'LLM la regola e lo pseudocodice, di confrontare il livello di dettaglio
+delle spiegazioni dei diversi modelli e di usare casi non usati nello sviluppo; la pipeline human-in-the-loop
+(l'agente riferisce a un supervisore umano, che autorizza l'integrazione) e l'architettura duale sono lavoro
+futuro che «non la dobbiamo implementare». La trascrizione non fissa una data di consegna.
 
-**Scelta per la tesi.** Presentare D→C→K come risultato principale di RQ2 e L1/L2 come approfondimento
-esplorativo che mostra che *generare ≠ validare*, dichiarando in una frase la lettura adottata. La
-conferma col relatore di quale lettura corrisponda all'accordo resta un punto aperto (sez. 8).
+La formula "**verifica su incidenti sigillati**" della riga 1 del registro **non compare nella trascrizione**:
+è la nostra traduzione operativa di "prendere un caso non usato nello sviluppo". La verifica da parte del
+supervisore umano è lavoro futuro. Il protocollo L1/L2 nei suoi dettagli (popolazione osservabile, H_pre/H,
+soglia 2/3, Clopper-Pearson, due processi L2a/L2b) è stato progettato dopo, con GPT e Alessio (registro righe
+8–12 e 20–28), e **non risulta approvato dal relatore**: va presentato come esplorativo.
+
+**Scelta per la tesi (revisione del 17 novembre).** D→C→K, RQ2-A e la lettura qualitativa dei testi sono il
+corpo di RQ2. L1/L2 diventa una **sezione breve dentro il capitolo RQ2**, che mostra che *generare ≠ validare*;
+il protocollo (freeze, addendum, L2a/L2b) va in appendice. Le soglie (H_pre = 60 s, H = 300 s, 2/3 di copertura
+dei negativi, criteri di ammissione) sono **convenzioni di progetto**, non tolleranze dello scorer Microsoft né
+valori derivati dai dati. La conferma col relatore di quale lettura corrisponda all'accordo resta un punto
+aperto (sez. 8).
 
 ---
 
 ## 5. Proposta di indice della tesi
 
-Spazio predominante a RQ1 e a D→C→K; L1/L2 come approfondimento breve. Le percentuali sono indicative.
+Spazio predominante a RQ1 e a RQ2; L1/L2 come sezione breve del capitolo RQ2 (revisione del 17 novembre).
+Le percentuali sono indicative.
 
 1. **Introduzione** (≈5%): contesto, problema, domande RQ1 e RQ2, contributi, struttura.
 2. **Background e stato dell'arte** (≈10%): RCA nei sistemi a microservizi; OpenRCA 1.0 e il sistema Market;
@@ -317,19 +416,22 @@ Spazio predominante a RQ1 e a D→C→K; L1/L2 come approfondimento breve. Le pe
    contratto di output V2.
 5. **RQ1 — risultati** (≈18%): development; EVALUATION20; ablazioni appaiate; efficienza; confronto
    contestuale con l'archivio Microsoft; analisi dei limiti.
-6. **RQ2 — D→C→K** (≈22%): le quattro classi; pipeline e contratti; politica di formato V5.1; matrice di 180
-   stage; risultati (60 K, 8 candidate, 49, 3); analisi delle 8 candidate e della loro formalizzabilità.
-7. **Approfondimento esplorativo L1/L2** (≈8%): protocollo (freeze, addendum, L2a/L2b), risultati, limite sui
-   nomi, *generare ≠ validare*.
-8. **Discussione e minacce alla validità** (≈7%): campioni piccoli, una replica, dipendenza dal provider,
+6. **RQ2 — D→C→K** (≈28%): le quattro classi; pipeline e contratti; politica di formato V5.1; matrice di 180
+   stage; risultati (60 K, 8 candidate, 49, 3); analisi delle 8 candidate e della loro formalizzabilità; RQ2-A
+   (scoring offline di D e C, con i limiti dello strumento) e lettura qualitativa dei testi liberi, con il confronto
+   tra modelli sul livello di dettaglio delle spiegazioni (≈8%); **sezione breve su L1/L2** (≈4%): esito
+   `NON_VERIFICATA`, limite sui nomi, *generare ≠ validare*.
+7. **Discussione e minacce alla validità** (≈9%): campioni piccoli, una replica, dipendenza dal provider,
    decisioni a posteriori dichiarate (politica di formato), confronto retrospettivo, codice scritto con un modello
-   che è anche valutato.
-9. **Lavoro futuro** (≈4%): pipeline human-in-the-loop, tabella di corrispondenza dei nomi, estensione
+   che è anche valutato, strumenti di misura che non vedono l'identificazione della classe.
+8. **Lavoro futuro** (≈7%): pipeline human-in-the-loop e architettura duale (solo concetto, con il rapporto
+   illustrativo della sez. 1.4 etichettato come illustrazione), tabella di corrispondenza dei nomi, estensione
    dell'esecutore a log/trace/servizio, repliche, classi restanti, OpenRCA 2.0.
-10. **Conclusioni** (≈3%).
+9. **Conclusioni** (≈3%).
 
-**Appendici:** tabella delle 8 candidate; commit, hash e artefatti (sez. 7); mappa del codice e istruzioni
-di riproduzione; registro delle decisioni (`REGISTRO_DECISIONI_RQ2.md`).
+**Appendici:** tabella delle 8 candidate; protocollo L1/L2 (freeze, addendum, L2a/L2b, parametri come convenzioni
+di progetto); testi liberi di D e C per i 4 casi (CSV); commit, hash e artefatti (sez. 7); mappa del codice e
+istruzioni di riproduzione; registro delle decisioni (`REGISTRO_DECISIONI_RQ2.md`).
 
 ---
 
@@ -492,34 +594,36 @@ nel testo estratto dal PDF: va riletto dal file originale prima di citarlo.
 ## 8. Concluso e ancora aperto prima della consegna
 
 **Concluso:** esperimenti RQ1 (approvati il 10 novembre); run RQ2 D→C→K; L1; L2a/L2b; documento di esito L2;
-registro delle decisioni (righe 1–31); questo consolidamento.
+RQ2-A (scoring offline di D e C, 17 novembre) e lettura qualitativa dei testi liberi; registro delle decisioni
+(righe 1–34); questo consolidamento.
 
 **Aperto, in ordine di dipendenza:**
 1. Revisione di questo documento (GPT supporta, decide Claude con Alessio).
-2. **Data di consegna.** Messaggio di Alessio: 1 dicembre 2026. `CONTESTO_ALLINEAMENTO_GPT_2026-11-16.md`:
-   5 dicembre, con la nota che "1 dicembre" era un errore di un contesto precedente. Da una delle due va
-   verificata la data ufficiale. Il piano sotto ipotizza il caso peggiore (1 dicembre).
-3. Punto da concordare col relatore: come presentare RQ2 (risultato centrale = D→C→K) e L1/L2 (esplorativo);
-   la lettura della riga 1 del registro (sez. 4); RQ2-A non eseguita.
+2. **Data di consegna: 5 dicembre 2026**, confermata da Alessio il 17 novembre (registro riga 34). Il "1 dicembre"
+   delle versioni precedenti di questo documento era un errore e non va più usato.
+3. Punto da concordare col relatore: come presentare RQ2 (risultato centrale = D→C→K con RQ2-A) e L1/L2
+   (sezione breve, esplorativa); la lettura della riga 1 del registro (sez. 4); se candidata + spiegazione +
+   pseudocodice, con la verifica umana come lavoro futuro, basta per RQ2. La domanda è da scrivere come bozza,
+   senza inviarla.
 4. Refactoring essenziale (sez. 6): al più due giorni.
 5. Ricostruzione delle tre classi di guasto non coperte (sez. 1.1) e, se serve, ricontrollo del confronto
    con l'archivio Microsoft (cella Colab già predisposta).
 6. Scrittura della tesi (indice in sez. 5).
 
-**Calendario proposto (caso 1 dicembre):**
+**Calendario proposto (consegna il 5 dicembre; numerazione dei capitoli come in sez. 5):**
 
 | Periodo | Attività |
 |---|---|
-| 16–17 nov | Revisione di questo documento; correzioni minime |
-| 17–18 nov | Refactoring essenziale su branch separato (sez. 6); intanto, capitoli 1–2 |
-| 18–21 nov | Capitoli 3–4 (benchmark e harness) |
-| 21–24 nov | Capitolo 5 (RQ1) |
-| 24–27 nov | Capitoli 6–7 (RQ2 e L1/L2) |
-| 27–29 nov | Capitoli 8–10, appendici, figure e bibliografia |
-| 29–30 nov | Revisione completa, controllo numeri e hash contro questo documento |
-| 1 dic | Consegna (se la data è il 5 dicembre: 4 giorni di margine per le correzioni del relatore) |
+| 17–19 nov | Revisione di questo documento; refactoring essenziale su branch separato (sez. 6); intanto, capitoli 1–2 |
+| 19–22 nov | Capitoli 3–4 (benchmark e harness) |
+| 22–26 nov | Capitolo 5 (RQ1) |
+| 26–30 nov | Capitolo 6 (RQ2: D→C→K, RQ2-A, sezione breve L1/L2) |
+| 30 nov–2 dic | Capitoli 7–9, appendici, figure e bibliografia |
+| 2–4 dic | Revisione completa; controllo dei numeri e degli hash contro questo documento; correzioni |
+| 5 dic | Consegna |
 
-Il relatore va informato prima dei capitoli 5–7, che sono quelli con più interpretazione.
+Il relatore va informato prima dei capitoli 5 e 6 (RQ1 e RQ2), che sono quelli con più interpretazione. Il
+calendario ha circa tre giorni di margine tra la fine della scrittura e la consegna.
 
 ---
 
@@ -533,6 +637,15 @@ Il relatore va informato prima dei capitoli 5–7, che sono quelli con più inte
 - Commit e branch: `git ls-remote`, `git merge-base`, confronto degli alberi con `git diff --name-status`.
 - La tabella V3: da `docs/ARCHITETTURA_E_RISULTATI_V3.md`.
 - Moduli e righe: analisi statica con `ast` su 156 moduli.
+
+**Verificato il 17 novembre (RQ2-A):** il report `data/rq2_a_offline_v1/report.json` è stato riletto da Drive:
+i punteggi di D per modello e harness, i 12 pareggi A1_8R contro A1, le 13 astensioni di C (Gemini 10, Haiku 3,
+Sonnet 0) e le 47 diagnosi non mappate, le classi vere dei 4 casi, `provider_calls` 0 e `records_read` 120, gli hash
+dello scorer ufficiale. Il modulo di scoring ha 11 test sintetici superati (commit `6c8ca00` e `ab0b62f`, pushati).
+**Non verificato:** la lettura qualitativa della sez. 1.2c è mia, post hoc e non cieca; il componente vero di
+q045 e le traiettorie degli strumenti di q050 e q045 (necessarie per le due ipotesi della sez. 1.2c); che nessun
+incidente delle quattro classi sia nei gruppi development o evaluation di RQ1 (l'audit GT ha coperto solo il gruppo
+OOD).
 
 **Trascritto da documenti, non ricalcolato:** la tabella di EVALUATION20 e le ablazioni (relazione del 9
 novembre su Drive). Le somme per modello e il totale (295 run, 41 strict, 28 strict+V2, 215 conformi) sono
