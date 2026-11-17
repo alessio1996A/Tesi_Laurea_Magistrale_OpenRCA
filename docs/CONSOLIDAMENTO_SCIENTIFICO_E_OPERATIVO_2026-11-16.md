@@ -363,6 +363,21 @@ confermarle in sola lettura.
 attribuire a un modello o a un harness una maggiore capacità di produrre regole. In particolare, il fatto
 che metà delle candidate venga dall'harness A0 e nessuna da A1_PAVE **non** è un risultato sull'harness.
 
+**Candidate per harness e categoria L1 (aggiunta del 17 novembre; conteggio dalla tabella della sez. 2).**
+
+| Harness | Stage K | Candidate | Eseguibili (L1) | Formalizzabili |
+|---|---:|---:|---:|---:|
+| A0 | 12 | 4 (#1, #2, #5, #6) | 1 (#6, non classificabile) | 0 |
+| A1, A1_8R, A1_8R_Planning, A1_PAVE (insieme) | 48 | 4 (#3, #4, #7, #8) | 2 (#3 non classificabile; #8) | 1 (#8) |
+
+Come si legge: A0 produce più candidate (4 su 12 contro 4 su 48). Le candidate prodotte con l'harness sono
+eseguibili 2 su 4 contro 1 su 4, e l'unica formalizzabile viene da A1_8R_Planning; ma quella regola ha
+verdetto `NON_VERIFICATA` e le differenze riguardano uno o due casi. **Non si afferma** che l'harness migliori la
+qualità delle candidate; si riporta come **osservazione e ipotesi per lavoro futuro** ("l'harness non aumenta
+il numero di candidate e potrebbe spostarne la natura verso segnali eseguibili sul catalogo"). Un test di
+questa ipotesi richiede incidenti non ancora usati: le quattro classi non ne hanno più (4 di discovery e 11
+sigillati già aperti da L2).
+
 ---
 
 ## 4. Perimetro concordato col relatore e verifica aggiuntiva L1/L2
@@ -605,6 +620,10 @@ RQ2-A (scoring offline di D e C, 17 novembre) e lettura qualitativa dei testi li
    (sezione breve, esplorativa); la lettura della riga 1 del registro (sez. 4); se candidata + spiegazione +
    pseudocodice, con la verifica umana come lavoro futuro, basta per RQ2. La domanda è da scrivere come bozza,
    senza inviarla.
+3b. Due analisi offline in sola lettura, scritte il 17 novembre e **da eseguire in Colab** (registro riga 35):
+   `rq1_coverage_stratification strata` (A1_8R contro A1 per classe coperta o non coperta, con verifica di
+   riprodurre prima le 15 medie di sez. 3.1) e `separation` (le quattro classi di RQ2 non devono comparire in
+   development, evaluation o mixed_quarantine). Gli esiti vanno in sez. 3.1 e nel registro.
 4. Refactoring essenziale (sez. 6): al più due giorni.
 5. Ricostruzione delle tre classi di guasto non coperte (sez. 1.1) e, se serve, ricontrollo del confronto
    con l'archivio Microsoft (cella Colab già predisposta).
