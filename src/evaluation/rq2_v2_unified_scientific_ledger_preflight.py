@@ -8,6 +8,18 @@ Qualunque mismatch di SHA/HEAD/status/root/namespace produce STOP.
 Il namespace e' distinto da RQ1, RQ2 V1, dal pilot Sonnet V2 e
 dal journal sintetico. La creazione di una release richiedera'
 un'implementazione distinta, espressamente autorizzata e testata.
+
+Contenuto
+---------
+- costanti: cartella (namespace) dei futuri dati scientifici, file della release, cartelle dei
+  claim e dei record, e l'elenco dei percorsi storici che NON vanno toccati;
+- `UnifiedScientificLedgerBlocked`: errore "stop, condizioni non dimostrate" (usato anche dal
+  ledger scientifico `rq2_v2_unified_scientific_ledger`);
+- `_strict_absolute`: accetta solo cartelle assolute, senza `..` e senza link;
+- `_repository_commit`: HEAD di git e stato "pulito/sporco" del checkout;
+- `_check_namespace`: verifica che il futuro namespace sia ancora libero e che i percorsi storici
+  non siano link (senza leggerli);
+- `preview_scientific_ledger_gate`: il controllo completo, in sola lettura.
 """
 from __future__ import annotations
 
@@ -25,12 +37,17 @@ from evaluation.rq2_v2_unified_release_blueprint import (
 )
 
 VERSION = "rq2_v2_unified_scientific_ledger_preflight_v0"
+# Cartella dei futuri dati scientifici e i suoi tre percorsi (relativi alla radice dei dati):
+# il file della release, le richieste di esecuzione ("claims") e i risultati ("records").
 NAMESPACE = Path("data/rq2_v2_unified_scientific_v1")
 RELEASE_FILE = NAMESPACE / "release_v1.json"
 CLAIMS = NAMESPACE / "claims"
 RECORDS = NAMESPACE / "records"
+# Forme ammesse: hash di commit git (SHA-1, 40 caratteri) e SHA-256 (64 caratteri).
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+# Percorsi degli esperimenti precedenti: qui si verifica solo che non siano link simbolici,
+# senza mai leggerli o modificarli.
 HISTORICAL = (
     Path("data/rq2"),
     Path("data/rq2_v2_provenance"),
@@ -44,6 +61,10 @@ class UnifiedScientificLedgerBlocked(RuntimeError):
 
 
 def _strict_absolute(root: Path, label: str) -> Path:
+    """Restituisce `root` solo se e' un `Path` assoluto, senza `..`, non un link e una cartella.
+
+    `label` e' il nome da mostrare nel messaggio d'errore ("data root", "repository root").
+    """
     if (
         not isinstance(root, Path)
         or not root.is_absolute()
@@ -56,6 +77,13 @@ def _strict_absolute(root: Path, label: str) -> Path:
 
 
 def _repository_commit(repo: Path) -> tuple[str, str]:
+    """Restituisce `(HEAD, stato)` del checkout git in `repo`.
+
+    HEAD e' l'hash di 40 caratteri del commit corrente; lo stato e' l'output di
+    `git status --porcelain` (stringa vuota = checkout pulito, nessun file modificato o nuovo).
+    Solleva `UnifiedScientificLedgerBlocked` se non e' un checkout git, se git non risponde
+    entro 10 secondi o se HEAD non ha la forma di un hash.
+    """
     git = repo / ".git"
     if git.is_symlink() or not git.exists():
         raise UnifiedScientificLedgerBlocked("Not a Git checkout")
@@ -78,6 +106,11 @@ def _repository_commit(repo: Path) -> tuple[str, str]:
 
 
 def _check_namespace(data_dir: Path) -> dict:
+    """Verifica che il futuro namespace scientifico sia libero e restituisce i suoi percorsi.
+
+    Passi: 1) nessun percorso storico (ne' `data`) e' un link simbolico; 2) `data`, se esiste,
+    e' una cartella; 3) namespace, file della release, claim e record NON devono ancora esistere.
+    """
     # NON leggere o modificare i risultati degli esperimenti precedenti.
     # Verificare soltanto l'assenza di symlink nei path riservati.
     data = data_dir / "data"
@@ -88,6 +121,7 @@ def _check_namespace(data_dir: Path) -> dict:
             )
     if data.exists() and not data.is_dir():
         raise UnifiedScientificLedgerBlocked("Bad data directory")
+    # Il futuro namespace deve essere ancora vuoto: nessuna release gia' creata.
     for path in (
         data_dir / NAMESPACE, data_dir / RELEASE_FILE,
         data_dir / CLAIMS, data_dir / RECORDS,
@@ -113,23 +147,39 @@ def preview_scientific_ledger_gate(
 
     L'expected_commit e' un valore fissato esternamente e non desunto da
     HEAD (per evitare un falso 'freeze' del codice corrente).
+
+    Argomenti (per nome): `data_dir` (radice dei dati), `repo_dir` (radice del repository) e
+    `expected_commit` (hash git atteso). Restituisce il riepilogo "preflight superato ma nessuna
+    release", con hash del piano, del blueprint e dei file sorgente.
+
+    Passi: 1) commit atteso ben formato; 2) cartelle sicure; 3) HEAD uguale al commit atteso e
+    checkout pulito; 4) namespace libero; 5) preview delle sorgenti e blueprint; 6) preview e
+    blueprint devono dichiarare "nessuna API, nessuna release" e avere hash coerenti;
+    7) si assembla il riepilogo.
     """
+    # 1. Il commit atteso arriva dall'esterno e deve avere la forma di un hash git.
     if type(expected_commit) is not str or not _SHA1.fullmatch(expected_commit):
         raise UnifiedScientificLedgerBlocked("External pinned commit required")
+    # 2. Cartelle sicure.
     data = _strict_absolute(data_dir, "data root")
     repo = _strict_absolute(repo_dir, "repository root")
+    # 3. HEAD uguale al commit atteso e nessuna modifica locale.
     head, status = _repository_commit(repo)
     if status or head != expected_commit:
         raise UnifiedScientificLedgerBlocked(
             "Git HEAD mismatch or dirty checkout: STOP"
         )
+    # 4. Namespace dei dati ancora libero.
     namespace = _check_namespace(data)
+    # 5. Preview delle sorgenti (G4A) e blueprint (G4B), entrambi senza autorizzazione API.
     source = preview_unified_source_bound(
         data_dir=data, src_root=repo / "src",
     )
     blueprint = build_unified_release_blueprint(
         source_preview=source,
     )
+    # 6. Coerenza: nulla e' eseguibile ne' congelato, 180 stage, hash del blueprint ben formato
+    # e uguale a quello del piano della preview.
     if (
         type(source) is not dict
         or source.get("can_execute_api") is not False
@@ -147,11 +197,14 @@ def preview_scientific_ledger_gate(
         or type(blueprint.get("blueprint_sha256")) is not str
         or not _SHA256.fullmatch(blueprint["blueprint_sha256"])
         or blueprint.get("source_plan_sha256") != source.get("plan_preview_sha256")
-        or blueprint.get("model_ids") is not None  # Schema stays in entries.
+        # Il blueprint non ha `model_ids` al livello alto: gli identificativi dei modelli
+        # stanno dentro `entries`.
+        or blueprint.get("model_ids") is not None
     ):
         raise UnifiedScientificLedgerBlocked(
             "Unfrozen source/blueprint identity mismatch"
         )
+    # 7. Riepilogo: l'hash dei file sorgente e' lo SHA-256 del loro dizionario in forma canonica.
     result = {
         "version": VERSION,
         "status": "LEDGER_NAMESPACE_PREFLIGHT_PASS_BUT_NO_RELEASE",

@@ -8,6 +8,18 @@ Usa lo STESSO validatore del ledger scientifico per evitare che
 la classification del futuro dispatcher diverga dal readback. Una
 misura incompleta significa "token osservati", MAI "fattura zero".
 Il conteggio invocazioni logiche non e' un conteggio HTTP garantito.
+
+Contenuto
+---------
+- `_row`: trova nel piano la riga di uno stage e ne verifica l'identita';
+- `_meter`, `_from_metrics`, `_from_usage`: costruiscono il "contatore di stage" (richieste e
+  token OSSERVATI) dalle metriche di D o dall'uso di token di C/K;
+- `_classify_with_ledger`: decide se la ricevuta e' un esito completo o un output non valido,
+  usando lo stesso validatore del ledger scientifico;
+- `normalize_d_run`, `normalize_ck_call`: i due punti d'ingresso, per D e per C/K.
+
+Esiti: `RECORDED_COMPLETE`, `INVALID_OUTPUT` oppure `PROVIDER_ERROR`; nessuna ricevuta autorizza
+chiamate API (`can_execute_api` e' sempre False).
 """
 from __future__ import annotations
 
@@ -21,7 +33,10 @@ from evaluation.rq2_v2_unified_scientific_ledger import (
 )
 
 VERSION = "rq2_v2_unified_provider_result_adapter_v0"
+# Nome dello schema del contatore di stage (richieste e token osservati).
 METER_SCHEMA = "rq2_v2_unified_stage_meter_v0"
+# Forma ammessa del codice d'errore del provider: un prefisso noto, i due punti e un nome breve
+# di caratteri sicuri. Nessun testo libero dell'SDK puo' finire nel record.
 ERROR_CODE = re.compile(
     r"(?:SDK_CONSTRUCTION_ERROR|PROVIDER_ERROR|PROTOCOL_ERROR):"
     r"[A-Za-z0-9_.:-]{1,100}\Z"
@@ -33,6 +48,12 @@ class UnifiedProviderReceiptBlocked(ValueError):
 
 
 def _row(*, stage_id: str, logical_model: str, stage: str) -> dict:
+    """Riga del piano per `stage_id`, dopo aver verificato modello logico e stage.
+
+    Tutti e tre gli argomenti devono essere stringhe esatte. Solleva
+    `UnifiedProviderReceiptBlocked` se lo stage non e' nel piano discovery (ad esempio un caso OOD)
+    o se modello e stage non coincidono con quelli della riga.
+    """
     if (
         type(stage_id) is not str or type(logical_model) is not str
         or type(stage) is not str
@@ -53,6 +74,12 @@ def _row(*, stage_id: str, logical_model: str, stage: str) -> dict:
 
 def _meter(*, attempts: int, input_observed: int,
            output_observed: int, complete: bool) -> dict:
+    """Contatore di stage: richieste al modello e token OSSERVATI (non una fattura).
+
+    `attempts` va da 0 a 492 (massimo teorico del piano), i token sono interi non negativi,
+    `complete` indica se l'uso di token e' completo. Il costo in dollari resta "UNKNOWN" e il
+    tetto di spesa non e' garantito.
+    """
     if (
         type(attempts) is not int or attempts < 0 or attempts > 492
         or type(input_observed) is not int or input_observed < 0
@@ -72,6 +99,13 @@ def _meter(*, attempts: int, input_observed: int,
 
 
 def _from_metrics(metrics: object, *, can_be_zero: bool) -> dict:
+    """Contatore di stage per D, dalle metriche del runner RQ1.
+
+    Argomenti: `metrics` (dizionario del runner) e `can_be_zero` (True solo se D ha avuto un
+    errore, e allora zero chiamate sono ammesse). Se l'uso di token e' dichiarato completo, input,
+    output e totale devono essere coerenti; altrimenti si tengono i conteggi osservabili e si
+    segna "incompleto".
+    """
     if type(metrics) is not dict:
         raise UnifiedProviderReceiptBlocked("Missing D runner metrics")
     calls = metrics.get("llm_calls")
@@ -101,6 +135,11 @@ def _from_metrics(metrics: object, *, can_be_zero: bool) -> dict:
 
 
 def _from_usage(usage: object, *, attempts: int) -> dict:
+    """Contatore di stage per C/K, dal dizionario `usage` del trasporto.
+
+    `attempts` puo' essere solo 0 o 1 (C/K fa al piu' una chiamata). Per l'uso di token valgono
+    le stesse regole di `_from_metrics`: completo = coerente, incompleto = conteggi osservati.
+    """
     if type(attempts) is not int or attempts not in (0, 1):
         raise UnifiedProviderReceiptBlocked("CK must be zero/one SDK invoke")
     if type(usage) is not dict or type(usage.get("complete")) is not bool:
@@ -128,6 +167,11 @@ def _from_usage(usage: object, *, attempts: int) -> dict:
 def _classify_with_ledger(
     *, row: dict, artifact: dict, d_record: dict | None,
 ) -> str:
+    """Stato della ricevuta: prima si prova come COMPLETO, poi come OUTPUT NON VALIDO.
+
+    Usa lo stesso validatore del ledger scientifico (`_validate_artifact`). Se la ricevuta non
+    e' coerente con nessuno dei due stati solleva `UnifiedProviderReceiptBlocked`.
+    """
     try:
         _validate_artifact(row, "RECORDED_COMPLETE", artifact, d_record)
     except UnifiedScientificLedgerBlocked as original:
@@ -148,10 +192,20 @@ def normalize_d_run(
 
     Un errore del runner usa un codice redatto + hash, senza salvare
     testo potenzialmente contenente token/credenziali.
+
+    Argomenti: `stage_id` e `logical_model` (devono coincidere con una riga D del piano) e
+    `run` (risultato del runner RQ1, dizionario). Restituisce la ricevuta normalizzata:
+    versione, stage, stato, artefatto (diagnosi + contatore, oppure codice d'errore + contatore)
+    e dichiarazioni "nessuna API, costo sconosciuto".
+
+    Passi: 1) riga del piano; 2) l'origine del run (caso, variante, modello, provider, contratto
+    di output, turni di tool) deve coincidere col piano; 3) contatore dalle metriche;
+    4) se c'e' un errore si registra solo un codice con hash, altrimenti si classifica l'esito.
     """
     row = _row(stage_id=stage_id, logical_model=logical_model, stage="D")
     if type(run) is not dict:
         raise UnifiedProviderReceiptBlocked("RQ1 D run must be dict")
+    # Identita' attesa del run D, ricavata dal piano: qualsiasi scostamento blocca la ricevuta.
     required = {
         "case_id": row["case_id"],
         "variant": row["harness"],
@@ -201,6 +255,15 @@ def normalize_ck_call(
 
     Per K, lo stato del parent C deve essere verificato dal ledger G4F
     prima di qualsiasi dispatch: il parser non sostituisce tale gate.
+
+    Argomenti: `stage_id` e `logical_model` (riga C o K del piano), `call` (dizionario del
+    trasporto C/K gia' ottenuto) e `diagnostic_run` (il D da cui si parte). Restituisce la
+    ricevuta normalizzata, con la stessa forma di `normalize_d_run`.
+
+    Passi: 1) lo stage deve essere C o K e presente nel piano; 2) il D deve avere provenienza
+    attendibile per quel caso, modello e harness; 3) contatore dall'uso di token;
+    4) con errore del provider: solo un codice sicuro e nessun testo di risposta; senza errore:
+    una sola chiamata e un testo di risposta, poi classificazione dell'esito.
     """
     if type(stage_id) is not str:
         raise UnifiedProviderReceiptBlocked("Stage ID must be text")

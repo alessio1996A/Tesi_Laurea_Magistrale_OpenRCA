@@ -7,6 +7,18 @@ NON è un dispatcher e NON autorizza una release/scadenza economica.
 L'input deve essere una preview G4A source-bound già verificata dal
 chiamante. I limiti invocazioni sono del grafo LangGraph, non HTTP effettive
 (ritenti trasporto/SDK sono ancora da certificare nel gate scientifico).
+
+Contenuto
+---------
+- costanti: versione, stato "bloccato", namespace candidato dei dati e tetti di invocazioni
+  per stage (D con ReAct 7, D con Planning/PAVE 5, C e K senza tool 1);
+- `UnifiedRQ2BlueprintError`: errore "condizione non dimostrata";
+- `_hash`: SHA-256 canonico di un oggetto JSON;
+- `_verify_source_preview`: controlla che la preview G4A sia quella attesa, campo per campo;
+- `build_unified_release_blueprint`: costruisce l'elenco dei 180 stage e il blueprint completo.
+
+Matrice: 4 casi di discovery x 5 harness x 3 modelli = 60 esecuzioni D, altrettante C e K,
+cioe' 180 stage logici; nel caso peggiore 252 + 120 + 120 = 492 invocazioni del grafo.
 """
 from __future__ import annotations
 
@@ -23,11 +35,15 @@ from evaluation.rq2_v2_unified_release_preflight import (
 )
 
 VERSION = "rq2_v2_unified_release_blueprint_v0"
+# Stato dichiarato del blueprint: bozza, ogni esecuzione bloccata, nessuna API.
 STATUS = "DRAFT_ALL_EXECUTION_BLOCKED_NO_API"
+# Cartella candidata per i dati scientifici della futura release (qui solo proposta).
 SCIENTIFIC_NAMESPACE_CANDIDATE = "data/rq2_v2_unified_scientific_v1"
+# Un hash SHA-256 valido: 64 caratteri esadecimali minuscoli.
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-# Bound logico di invoke D: 6 tool round + 1 final ReAct;
-# Planning/PAVE: 4 exploration round + 1 final. Non HTTP garanti.
+# Limite logico di invocazioni del modello per uno stage D: con ReAct 6 round di tool +
+# 1 finale; con Planning/PAVE 4 round di esplorazione + 1 finale. Non sono richieste HTTP
+# garantite (i ritenti dell'SDK non sono contati qui).
 REACT_D_MAX_INVOKES = 7
 PLANNER_D_MAX_INVOKES = 5
 TOOL_FREE_CK_MAX_INVOKES = 1
@@ -38,6 +54,7 @@ class UnifiedRQ2BlueprintError(ValueError):
 
 
 def _hash(obj: object) -> str:
+    """SHA-256 canonico di `obj`: JSON con chiavi ordinate, senza spazi, UTF-8, NaN vietato."""
     raw = json.dumps(
         obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
         allow_nan=False,
@@ -46,6 +63,14 @@ def _hash(obj: object) -> str:
 
 
 def _verify_source_preview(source: dict, plan: dict) -> None:
+    """Verifica che la preview G4A `source` corrisponda esattamente al piano `plan`.
+
+    Controlli: 1) e' un dizionario; 2) gli hash dei file sorgente riguardano proprio i percorsi
+    attesi e sono SHA-256 ben formati; 3) i due hash dei prompt di sistema (C e K) sono presenti;
+    4) ogni campo dichiarativo ha valore E tipo identici a quelli attesi (versione, conteggi,
+    hash del piano, e tutti i "non ancora" della release). Solleva
+    `UnifiedRQ2BlueprintError` al primo scostamento.
+    """
     if type(source) is not dict:
         raise UnifiedRQ2BlueprintError("G4A source report required")
     file_hashes = source.get("source_files_sha256")
@@ -60,6 +85,8 @@ def _verify_source_preview(source: dict, plan: dict) -> None:
         for field in ("C_system_prompt_sha256", "K_system_prompt_sha256")
     ):
         raise UnifiedRQ2BlueprintError("Missing prompt hashes")
+    # Valori attesi, uno per campo: il confronto sotto richiede lo stesso tipo (un `True` non
+    # puo' sostituire un `1`) e lo stesso valore.
     exact = {
         "version": SOURCE_VERSION,
         "protocol": PLAN_VERSION,
@@ -100,9 +127,23 @@ def _verify_source_preview(source: dict, plan: dict) -> None:
 
 
 def build_unified_release_blueprint(*, source_preview: dict) -> dict:
-    """Descrizione auditabile e NON eseguibile dei 180 stage della Opzione A."""
+    """Descrizione auditabile e NON eseguibile dei 180 stage della Opzione A.
+
+    Argomento: `source_preview`, la preview G4A source-bound gia' verificata dal chiamante.
+    Restituisce il blueprint: metadati, elenco `entries` dei 180 stage, conteggi per modello,
+    tetto di invocazioni e prerequisiti ancora mancanti, piu' `blueprint_sha256`.
+
+    Passi: 1) ricostruisce il piano offline e verifica la preview; 2) per ogni riga del piano
+    crea lo stage con il suo tetto di invocazioni; 3) controlla che gli stage siano 180 e
+    distinti; 4) controlla che ogni modello abbia 20 stage D, 20 C e 20 K; 5) ricalcola il
+    tetto totale (deve essere 492); 6) assembla il blueprint e ne calcola l'hash.
+    """
+    # 1. Piano offline e verifica della preview.
     plan = build_offline_discovery_plan()
     _verify_source_preview(source_preview, plan)
+    # 2. Un elemento per ogni riga del piano. Gli harness Planning e PAVE usano il motore a
+    # pianificazione (5 invocazioni D); gli altri tre il ReAct (7 invocazioni D); C e K non
+    # usano tool e fanno una sola invocazione.
     stages = []
     for row in plan["entries"]:
         stage = row["stage"]
@@ -134,8 +175,10 @@ def build_unified_release_blueprint(*, source_preview: dict) -> dict:
             "candidate_transport_retries_verified": False,
             "stage_execution_permission": "BLOCKED_NO_RELEASE",
         })
+    # 3. Matrice completa: 180 stage con identificativi tutti diversi.
     if len(stages) != 180 or len({x["stage_id"] for x in stages}) != 180:
         raise UnifiedRQ2BlueprintError("Not the complete 180-stage matrix")
+    # 4. Conteggio degli stage per modello e tipo: ognuno deve avere 20 D, 20 C e 20 K.
     per_model = {
         model: {
             "D": sum(x["logical_model"] == model and x["stage"] == "D"
@@ -150,14 +193,19 @@ def build_unified_release_blueprint(*, source_preview: dict) -> dict:
     if any(counts != {"D": 20, "C": 20, "K": 20}
            for counts in per_model.values()):
         raise UnifiedRQ2BlueprintError("Unbalanced provider stage counts")
+    # 5. Tetto totale di invocazioni del grafo, se tutti gli stage venissero raggiunti.
     total_graph_invocations_upper = sum(
         row["max_logical_model_invocations_candidate"] for row in stages
     )
-    # 3 ReAct harness * 4 cases * 3 models * 7 invocations D=252
-    # 2 planner harness * 4 cases * 3 models * 5 D = 120
-    # C/K 60+60 = 120; invocations <=492 if all stages reached.
+    # Conto di controllo:
+    #   3 harness ReAct * 4 casi * 3 modelli * 7 invocazioni D = 252
+    #   2 harness a pianificazione * 4 casi * 3 modelli * 5 invocazioni D = 120
+    #   C/K: 60 + 60 = 120
+    #   totale <= 492 invocazioni, se tutti gli stage vengono raggiunti.
     if total_graph_invocations_upper != 492:
         raise UnifiedRQ2BlueprintError("Graph-level budget calculation drift")
+    # 6. Blueprint: tutti i campi "puo' fare" sono False e "non ancora" sono dichiarati; l'hash
+    # finale copre l'intero contenuto `core`.
     core = {
         "version": VERSION,
         "status": STATUS,

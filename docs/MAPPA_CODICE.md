@@ -21,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 40 | 33 |
+| A. Nucleo del codice finale | 98 | 25 | 49 | 24 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -125,17 +125,17 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/rq2_v2_ck_provider_transport_candidate.py` | 108 | Versioned RQ2 C/K transport CANDIDATE (NOT connected to scientific live). | - | da fare (EN 3, senza docstring 1) |
-| `evaluation/rq2_v2_ck_text_extraction_candidate.py` | 62 | Candidate uniform C/K text extraction policy; OFFLINE, not wired to live. | - | da fare (EN 3, senza docstring 1) |
-| `evaluation/rq2_v2_unified_discovery_plan.py` | 230 | Piano OFFLINE e NON eseguibile per RQ2-V2: 5 harness x 3 modelli. | - | da fare (EN 0, senza docstring 2) |
+| `evaluation/rq2_v2_ck_provider_transport_candidate.py` | 143 | CANDIDATO versionato di trasporto C/K per RQ2 (NON collegato al live scientifico). | - | completo |
+| `evaluation/rq2_v2_ck_text_extraction_candidate.py` | 85 | Politica CANDIDATA di estrazione uniforme del testo C/K; OFFLINE, non collegata al live. | - | completo |
+| `evaluation/rq2_v2_unified_discovery_plan.py` | 274 | Piano OFFLINE e NON eseguibile per RQ2-V2: 5 harness x 3 modelli. | - | completo |
 | `evaluation/rq2_v2_unified_live_stage_preflight.py` | 221 | G4H — source-bound preview di UN SOLO stage scientifico Opzione A. | - | completo |
 | `evaluation/rq2_v2_unified_provenance_gate.py` | 131 | Gate OFFLINE per la provenance D nella RQ2-V2 comune ai cinque agenti. | - | completo |
-| `evaluation/rq2_v2_unified_provider_result_adapter.py` | 251 | G4J: normalizza SOLO ricevute D/C/K verso il ledger RQ2-V2 unificato. | - | da fare (EN 0, senza docstring 5) |
-| `evaluation/rq2_v2_unified_release_blueprint.py` | 212 | RQ2-V2 UNIFICATA — descrizione offline della futura release G4B. | - | da fare (EN 1, senza docstring 2) |
-| `evaluation/rq2_v2_unified_release_preflight.py` | 209 | G4A RQ2-V2 unificata: preview source-bound GT-free, NON una release. | - | da fare (EN 0, senza docstring 2) |
-| `evaluation/rq2_v2_unified_scientific_ledger.py` | 784 | RQ2-V2 Opzione A: ledger scientifico comune create-only, NO MODEL API. | - | da fare (EN 2, senza docstring 15) |
-| `evaluation/rq2_v2_unified_scientific_ledger_preflight.py` | 189 | G4D: guardia READ-ONLY del FUTURO ledger scientifico RQ2-V2. | - | da fare (EN 0, senza docstring 3) |
-| `evaluation/rq2_v2_unified_scientific_release_contract.py` | 204 | G4E RQ2 V2: contratto della FUTURA release scientifica, solo dati. | - | da fare (EN 0, senza docstring 3) |
+| `evaluation/rq2_v2_unified_provider_result_adapter.py` | 314 | G4J: normalizza SOLO ricevute D/C/K verso il ledger RQ2-V2 unificato. | - | completo |
+| `evaluation/rq2_v2_unified_release_blueprint.py` | 260 | RQ2-V2 UNIFICATA — descrizione offline della futura release G4B. | - | completo |
+| `evaluation/rq2_v2_unified_release_preflight.py` | 241 | G4A RQ2-V2 unificata: preview source-bound GT-free, NON una release. | - | completo |
+| `evaluation/rq2_v2_unified_scientific_ledger.py` | 962 | RQ2-V2 Opzione A: ledger scientifico comune create-only, NO MODEL API. | - | completo |
+| `evaluation/rq2_v2_unified_scientific_ledger_preflight.py` | 242 | G4D: guardia READ-ONLY del FUTURO ledger scientifico RQ2-V2. | - | completo |
+| `evaluation/rq2_v2_unified_scientific_release_contract.py` | 250 | G4E RQ2 V2: contratto della FUTURA release scientifica, solo dati. | - | completo |
 
 **RQ2 catena V3 (piano, ponte D, ricevute)**
 

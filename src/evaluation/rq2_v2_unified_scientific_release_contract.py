@@ -8,6 +8,15 @@ economica. La futura produzione dovra' verificare ulteriori gate
 
 Tutti gli hash in questo modulo sono identificatori di integrita', non
 firme crittografiche di una persona e non autorizzano pagamenti.
+
+Contenuto
+---------
+- `REQUIRED_KEYS`: l'insieme esatto dei campi che una release deve avere (ne' di piu' ne' di meno);
+- `UnifiedReleaseContractError`: errore "requisito della release non verificabile";
+- `canonical_release`, `release_digest`: forma canonica JSON della release e suo SHA-256;
+- `_money`: valida il massimale in dollari (testo decimale, al massimo al centesimo);
+- `validate_future_release`: la verifica completa, che confronta la release con piano,
+  preview delle sorgenti e blueprint e restituisce un esito SENZA alcun permesso di esecuzione.
 """
 from __future__ import annotations
 
@@ -28,10 +37,15 @@ from evaluation.rq2_v2_unified_release_preflight import (
 )
 
 VERSION = "rq2_v2_unified_scientific_release_contract_v0"
+# Nome dello schema della release e cartella dei dati scientifici a cui si riferisce.
 RELEASE_SCHEMA = "rq2_v2_unified_scientific_discovery_release_v1"
 RELEASE_NAMESPACE = "data/rq2_v2_unified_scientific_v1"
+# Forme ammesse: hash di commit git (SHA-1, 40 caratteri) e hash SHA-256 (64 caratteri).
 _SHA1 = re.compile(r"[0-9a-f]{40}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+# Campi obbligatori della release: identita' del codice e dei dati, modelli e harness, limiti,
+# politiche di trasporto e di scrittura, approvazione economica. Un campo in piu' o in meno
+# invalida la release.
 REQUIRED_KEYS = frozenset({
     "schema", "protocol", "phase", "source_commit", "blueprint_sha256",
     "source_plan_sha256", "split_sha256", "manifest_sha256",
@@ -54,6 +68,11 @@ class UnifiedReleaseContractError(ValueError):
 
 
 def canonical_release(value: object) -> bytes:
+    """Forma canonica della release in byte UTF-8: JSON con chiavi ordinate e senza spazi.
+
+    Solleva `UnifiedReleaseContractError` se il valore non e' serializzabile (NaN, tipi non
+    JSON, annidamento eccessivo) o se supera i 100.000 byte.
+    """
     try:
         result = json.dumps(
             value, sort_keys=True, separators=(",", ":"),
@@ -67,10 +86,16 @@ def canonical_release(value: object) -> bytes:
 
 
 def release_digest(value: object) -> str:
+    """SHA-256 (esadecimale) della forma canonica di `value`."""
     return hashlib.sha256(canonical_release(value)).hexdigest()
 
 
 def _money(value: object) -> Decimal:
+    """Converte il massimale in dollari (testo decimale) in `Decimal`, dopo averlo validato.
+
+    Regole: una stringa non vuota di al massimo 32 caratteri, numero finito, maggiore di zero e
+    non oltre 10.000, con al massimo due decimali (centesimi).
+    """
     # USD e' un massimale operativo autorizzato, NON un hard-cap del
     # provider. L'uso di Decimal elimina ambiguita' binarie dei float.
     if type(value) is not str or not value or len(value) > 32:
@@ -95,7 +120,18 @@ def validate_future_release(
     Il chiamante successivo dovra' provare che source_preview proviene
     da verifica GT-free REALE, non da mock. Nemmeno l'esito OK di
     questa funzione autorizza una singola chiamata provider.
+
+    Argomenti (tutti per nome): `release` (dizionario della release), `source_preview` (preview
+    delle sorgenti), `blueprint` (blueprint G4B), `externally_approved_sha256` (SHA-256 della
+    release ricevuto dall'esterno) e `expected_source_commit` (commit git atteso).
+    Restituisce un riepilogo con stato "contenuto validato, nessuna autorita' di esecuzione".
+
+    Passi: 1) pin esterni ben formati; 2) campi della release esatti; 3) l'hash della release
+    coincide col pin; 4) ogni campo dichiarativo coincide con quello atteso (valore e tipo);
+    5) preview e blueprint sono quelli attesi e coerenti con la release; 6) versioni di runtime
+    fissate; 7) riferimento d'approvazione presente; 8) massimale in dollari valido.
     """
+    # 1. Pin ricevuti dall'esterno: SHA-256 della release e commit git, entrambi ben formati.
     if (
         type(externally_approved_sha256) is not str
         or not _SHA256.fullmatch(externally_approved_sha256)
@@ -103,13 +139,17 @@ def validate_future_release(
         or not _SHA1.fullmatch(expected_source_commit)
     ):
         raise UnifiedReleaseContractError("External digest/commit pin required")
+    # 2. La release ha esattamente i campi richiesti; preview e blueprint sono dizionari.
     if type(release) is not dict or set(release) != REQUIRED_KEYS:
         raise UnifiedReleaseContractError("Unknown/missing release fields")
     if type(source_preview) is not dict or type(blueprint) is not dict:
         raise UnifiedReleaseContractError("Verified source and blueprint required")
+    # 3. La release non e' stata modificata dopo l'approvazione esterna.
     if release_digest(release) != externally_approved_sha256:
         raise UnifiedReleaseContractError("Pinned release SHA mismatch")
 
+    # 4. Valori attesi per i campi dichiarativi, ricavati dal piano e dai pin: il confronto
+    # sotto richiede stesso tipo e stesso valore (un `True` non puo' sostituire un `1`).
     plan = build_offline_discovery_plan()
     matches = {
         "schema": RELEASE_SCHEMA,
@@ -148,6 +188,8 @@ def validate_future_release(
         if type(release.get(name)) is not type(value) or release[name] != value:
             raise UnifiedReleaseContractError("Release field mismatch: " + name)
 
+    # 5. Preview e blueprint devono essere quelli attesi (versione, stato, hash del piano, 180
+    # stage, nessuna API eseguibile) e coerenti fra loro e con la release.
     if (
         source_preview.get("version") != SOURCE_VERSION
         or source_preview.get("status") != "OFFLINE_SOURCE_BOUND_NO_RELEASE_NO_API"
@@ -166,6 +208,7 @@ def validate_future_release(
         or blueprint.get("can_run_ood_test") is not False
     ):
         raise UnifiedReleaseContractError("Untrusted source preview or blueprint")
+    # 6. Versioni di runtime: dizionario non vuoto di stringhe brevi (nome -> versione).
     runtime = release["runtime_versions"]
     if (
         type(runtime) is not dict or not runtime
@@ -173,13 +216,16 @@ def validate_future_release(
                or not v or len(v) > 60 for k, v in runtime.items())
     ):
         raise UnifiedReleaseContractError("Unpinned runtime versions")
+    # 7. Riferimento all'approvazione esterna: testo non vuoto, al massimo 200 caratteri.
     approval_ref = release["approval_reference"]
     if (
         type(approval_ref) is not str or not approval_ref.strip()
         or len(approval_ref) > 200
     ):
         raise UnifiedReleaseContractError("Explicit external approval reference required")
+    # 8. Massimale in dollari valido (solo controllo: il valore non viene usato qui).
     _money(release["approved_total_usd_limit"])
+    # Esito: tutti i campi "puo' fare / e' implementato" restano False o zero.
     return {
         "version": VERSION,
         "status": "RELEASE_CONTENT_VALIDATED_NO_EXECUTION_AUTHORITY",

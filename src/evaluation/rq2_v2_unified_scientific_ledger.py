@@ -14,6 +14,22 @@ Il lock per processo e' solo un meccanismo candidato da verificare
 sul filesystem reale Google Drive PRIMA della release scientifica.
 Una release futura dovra' includere questo file nell'inventario
 source-bound, verificare trasporti e approvazione API separatamente.
+
+Contenuto
+---------
+- costanti: stati ammessi di un record, chiavi vietate (ground truth), limite di dimensione;
+- funzioni di utilita': `_canonical`/`_sha` (JSON e hash canonici), `_no_gt` (nessuna chiave
+  di ground truth), `_read`/`_write_once` (lettura sicura e scrittura create-only),
+  `_meter` (ricevuta del contatore), `_validate_artifact` (l'output di uno stage e' coerente
+  con il suo stato), `_writer_lock` (lock di scrittura del sistema operativo);
+- `UnifiedScientificLedger`: il registro. `load_claim`/`load_record` rileggono e verificano,
+  `audit_restart` controlla tutto il registro, `claim_stage` e `record_stage` scrivono;
+- `create_authorized_scientific_release_once`: crea il file della release, disattivata di
+  default (serve un opt-in di processo ESATTO e ulteriori approvazioni esterne).
+
+Per ogni stage si scrivono due file in sequenza: prima il "claim" (la richiesta di esecuzione,
+durabile PRIMA di qualsiasi chiamata futura) poi il "record" (il risultato). Un claim senza
+record e' un "orfano" e blocca ogni altro stage finche' non e' riconciliato a mano.
 """
 from __future__ import annotations
 
@@ -54,17 +70,25 @@ from evaluation.rq2_v2_unified_scientific_ledger_preflight import (
 )
 
 VERSION = "rq2_v2_unified_scientific_ledger_v0"
+# File di lock di scrittura, dentro il namespace dei dati scientifici.
 LOCK_FILE = NAMESPACE / ".writer.lock"
+# Stati ammessi per un record: completo, output non valido, errore del provider, oppure bloccato
+# perche' lo stage da cui dipende non e' completo. Errori e output non validi restano nel
+# denominatore della valutazione.
 STATUSES = frozenset((
     "RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR",
     "BLOCKED_DEPENDENCY",
 ))
+# Un hash SHA-256 valido: 64 caratteri esadecimali minuscoli.
 HEX = re.compile(r"[0-9a-f]{64}\Z")
+# Chiavi che non devono mai comparire in un artefatto (ground truth e punteggi): il registro
+# e' GT-free.
 FORBIDDEN = frozenset((
     "ground_truth", "ground_truth_reason", "scoring_points",
     "reference_fault_types", "true_fault_type", "true_label",
     "expected_fault_type", "fault_label", "ood_labels",
 ))
+# Dimensione massima, in byte, di un file del registro.
 MAX_RECORD_BYTES = 2_000_000
 
 
@@ -73,6 +97,11 @@ class UnifiedScientificLedgerBlocked(RuntimeError):
 
 
 def _canonical(obj: object) -> bytes:
+    """Forma canonica di `obj` in byte UTF-8 (JSON con chiavi ordinate, senza spazi, NaN vietato).
+
+    Solleva `UnifiedScientificLedgerBlocked` se non e' serializzabile o supera
+    `MAX_RECORD_BYTES`.
+    """
     try:
         raw = json.dumps(
             obj, sort_keys=True, ensure_ascii=False,
@@ -86,10 +115,16 @@ def _canonical(obj: object) -> bytes:
 
 
 def _sha(obj: object) -> str:
+    """SHA-256 (esadecimale) della forma canonica di `obj`."""
     return hashlib.sha256(_canonical(obj)).hexdigest()
 
 
 def _no_gt(obj: object) -> None:
+    """Controlla, ricorsivamente in dizionari e liste, che non compaia nessuna chiave di GT.
+
+    Le chiavi devono essere stringhe e non essere in `FORBIDDEN` (senza distinguere maiuscole).
+    Solleva `UnifiedScientificLedgerBlocked` al primo caso.
+    """
     if type(obj) is dict:
         for key, val in obj.items():
             if type(key) is not str or key.lower() in FORBIDDEN:
@@ -101,6 +136,11 @@ def _no_gt(obj: object) -> None:
 
 
 def _read(path: Path) -> dict | None:
+    """Legge un file JSON del registro; `None` se non esiste.
+
+    Il file deve essere regolare (non un link), entro `MAX_RECORD_BYTES`, JSON valido e GIA' in
+    forma canonica (rilegge e ricanonicalizza: se i byte differiscono, e' stato alterato).
+    """
     if not path.exists() and not path.is_symlink():
         return None
     if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_RECORD_BYTES:
@@ -116,6 +156,12 @@ def _read(path: Path) -> dict | None:
 
 
 def _write_once(path: Path, obj: dict) -> None:
+    """Scrive `obj` in `path` in modo create-only: se il file esiste gia', si blocca.
+
+    Passi: 1) la destinazione deve essere libera; 2) `os.open` con `O_EXCL` fallisce se il file
+    compare nel frattempo (nessuna sovrascrittura, nemmeno in concorrenza); 3) scrive i byte
+    canonici e li forza su disco con `fsync`.
+    """
     if path.is_symlink() or path.exists():
         raise UnifiedScientificLedgerBlocked("Create-only destination occupied")
     raw = _canonical(obj)
@@ -130,6 +176,12 @@ def _write_once(path: Path, obj: dict) -> None:
 
 
 def _meter(m: object, *, allow_zero_requests: bool) -> None:
+    """Valida la ricevuta del contatore di stage `m`; solleva `UnifiedScientificLedgerBlocked`.
+
+    Deve avere esattamente i sette campi del contatore (schema, richieste e token osservati,
+    completezza, costo stimato, nessun tetto di spesa garantito). `allow_zero_requests` e' True
+    solo per gli errori del provider, dove puo' non esserci stata alcuna richiesta.
+    """
     # Un HTTP fallito puo' avere token non misurati, MAI inventare 0
     # come totale fatturato certificato.
     if type(m) is not dict or set(m) != {
@@ -155,6 +207,7 @@ def _meter(m: object, *, allow_zero_requests: bool) -> None:
     # La completezza dei TOKEN non certifica il PREZZO applicato: il
     # costo puo' essere sconosciuto anche con usage_metadata completo.
     # Non registrare mai 0 USD per mascherare listini non verificati.
+    # Il costo e' "UNKNOWN" oppure un numero finito non negativo.
     if cost == "UNKNOWN":
         pass
     else:
@@ -168,6 +221,21 @@ def _meter(m: object, *, allow_zero_requests: bool) -> None:
 
 def _validate_artifact(row: dict, status: str, artifact: dict,
                        d_record: dict | None) -> None:
+    """Verifica che `artifact` sia coerente con lo `status` dichiarato per lo stage `row`.
+
+    Argomenti: `row` (riga del piano), `status` (uno di `STATUSES`), `artifact` (output dello
+    stage) e `d_record` (record D del genitore, serve per C e K). Solleva
+    `UnifiedScientificLedgerBlocked` se qualcosa non torna.
+
+    Regole per stato:
+    - BLOCKED_DEPENDENCY: l'artefatto deve essere vuoto;
+    - ogni altro stato: ricevuta del contatore valida;
+    - PROVIDER_ERROR: solo contatore e codice d'errore;
+    - D: esecuzione con provenienza verificata, JSON valido e contratto di output v2 valido;
+    - C/K: risposta grezza che rispetta il contratto (causa o regola) sulle evidenze del D
+      genitore, che deve essere completo.
+    Alla fine "RECORDED_COMPLETE" e' ammesso se e solo se il payload e' valido.
+    """
     if status == "BLOCKED_DEPENDENCY":
         if artifact:
             raise UnifiedScientificLedgerBlocked("Blocked stage has output")
@@ -189,10 +257,12 @@ def _validate_artifact(row: dict, status: str, artifact: dict,
         ):
             raise UnifiedScientificLedgerBlocked("D runner receipt missing")
         run = artifact["diagnostic_run"]
+        # Un errore del runner D va registrato come PROVIDER_ERROR, non come D.
         if run.get("error") is not None:
             raise UnifiedScientificLedgerBlocked(
                 "D run error must be preserved as PROVIDER_ERROR"
             )
+        # Provenienza: il run D deve risultare catturato davvero per quel caso, modello e harness.
         try:
             audit_captured_v2_d(
                 run=run, case_id=row["case_id"],
@@ -202,6 +272,8 @@ def _validate_artifact(row: dict, status: str, artifact: dict,
             prov = False
         else:
             prov = True
+        # Risposta del D: un JSON i cui elementi (chiavi numeriche) hanno data, componente e
+        # motivo della causa radice, con contratto di output v2 valido.
         raw = run.get("raw_response")
         try:
             parsed = json.loads(raw) if type(raw) is str else None
@@ -226,6 +298,8 @@ def _validate_artifact(row: dict, status: str, artifact: dict,
             and valid_task
         )
     else:
+        # C/K: solo contatore e risposta grezza; serve un D genitore completo, da cui si
+        # ricostruiscono le evidenze ammesse per il validatore del contratto.
         if set(artifact) != {"stage_meter", "raw_response"} or (
             type(artifact["raw_response"]) is not str
         ):
@@ -261,12 +335,18 @@ def _writer_lock(path: Path):
 
     In Colab Google Drive/FUSE NON considerarlo certificato senza
     test contemporanei sul filesystem di destinazione.
+
+    Uso: `with _writer_lock(percorso): ...`. Il lock e' non bloccante: se un altro processo lo
+    possiede si solleva `UnifiedScientificLedgerBlocked` invece di attendere.
     """
+    # 1. Il percorso del lock deve essere un file regolare (o assente), mai un link.
     if path.is_symlink() or (path.exists() and not path.is_file()):
         raise UnifiedScientificLedgerBlocked("Unsafe writer lock path")
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
+        # 2. Windows: si blocca il primo byte del file con `msvcrt` (il file deve avere almeno
+        # un byte, quindi se e' vuoto vi si scrive "0").
         if sys.platform == "win32":
             import msvcrt
             os.lseek(fd, 0, os.SEEK_SET)
@@ -282,6 +362,7 @@ def _writer_lock(path: Path):
             finally:
                 os.lseek(fd, 0, os.SEEK_SET)
                 msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        # 3. Linux/macOS: lock esclusivo non bloccante con `flock`.
         else:
             import fcntl
             try:
@@ -297,14 +378,25 @@ def _writer_lock(path: Path):
 
 
 class UnifiedScientificLedger:
-    """Create-only scientific D/C/K registry; NON dispatcher LLM.
+    """Registro scientifico D/C/K create-only; NON e' un dispatcher di LLM.
 
-    Requires pre-existing release file; cannot be constructed on a fresh
-    benchmark root lacking an externally authorized release.
+    Richiede un file di release gia' esistente: non si puo' costruire su una radice dati
+    nuova priva di una release autorizzata dall'esterno.
+
+    Per ogni stage del piano esistono al piu' un claim e un record, mai sovrascritti. Ogni
+    lettura verifica gli hash (stage, release, piano, genitori): un file alterato o fuori
+    posto blocca tutto.
     """
 
     def __init__(self, *, data_dir: Path, repo_dir: Path,
                  expected_commit: str, approved_release_sha256: str):
+        """Apre il registro dopo aver verificato release, sorgenti e contenuto gia' scritto.
+
+        Argomenti (per nome): `data_dir` (radice dei dati), `repo_dir` (radice del repository),
+        `expected_commit` (hash git atteso) e `approved_release_sha256` (SHA-256 della release
+        approvata dall'esterno). Passi: 1) cartelle sicure; 2) pin ben formati; 3) piano
+        offline e indice dei suoi stage; 4) `_gate()` e `audit_restart()`.
+        """
         self.data = _strict_absolute(data_dir, "data root")
         self.repo = _strict_absolute(repo_dir, "repo root")
         self.expected_commit = expected_commit
@@ -323,6 +415,10 @@ class UnifiedScientificLedger:
         self.audit_restart()
 
     def _dirs(self) -> None:
+        """Verifica che i percorsi del registro siano cartelle sicure e il namespace esista.
+
+        Nessun contenuto storico viene letto: si controlla solo che non siano link simbolici.
+        """
         # Non accedere ai contenuti storici; evitare collisioni e symlink.
         for path in (
             self.data / "data", self.root,
@@ -342,6 +438,12 @@ class UnifiedScientificLedger:
             raise UnifiedScientificLedgerBlocked("Scientific release namespace missing")
 
     def _gate(self) -> dict:
+        """Ripete tutti i controlli d'ingresso e restituisce preview, blueprint e ricevuta.
+
+        Passi: 1) checkout git pulito e uguale al commit atteso; 2) percorsi sicuri; 3) la
+        release esiste ed ha l'hash approvato; 4) sorgenti, blueprint e contratto della release
+        (`validate_future_release`); 5) la ricevuta non deve concedere nessuna autorita'.
+        """
         head, status = _repository_commit(self.repo)
         if head != self.expected_commit or status:
             raise UnifiedScientificLedgerBlocked("Dirty/drifted Git checkout")
@@ -368,6 +470,10 @@ class UnifiedScientificLedger:
         return {"source": source, "blueprint": blueprint, "receipt": receipt}
 
     def _row(self, sid: str, model_id: str | None = None) -> dict:
+        """Riga del piano per `sid`; se `model_id` e' dato deve coincidere con quello della riga.
+
+        Un identificativo sconosciuto (ad esempio un caso OOD) blocca.
+        """
         row = self.rows.get(sid) if type(sid) is str else None
         if row is None or (model_id is not None and (
             type(model_id) is not str or model_id != row["model_id"]
@@ -376,6 +482,10 @@ class UnifiedScientificLedger:
         return row
 
     def _path(self, sid: str, *, claim: bool) -> Path:
+        """Percorso del file di claim (`claim=True`) o di record dello stage `sid`.
+
+        Il nome e' un prefisso fisso piu' lo SHA-256 dell'identificativo dello stage.
+        """
         self._row(sid)
         folder = CLAIMS if claim else RECORDS
         prefix = "RQ2U_CLAIM_" if claim else "RQ2U_RECORD_"
@@ -384,6 +494,12 @@ class UnifiedScientificLedger:
         )
 
     def load_claim(self, *, stage_id: str, _memo: dict | None = None) -> dict | None:
+        """Legge e verifica il claim dello stage; `None` se non esiste.
+
+        Controlla campi esatti, schema, protocollo, hash di release e piano, stage e modello,
+        tentativo numero 1, dipendenze uguali a quelle del piano e hash del claim stesso.
+        `_memo` e' una cache interna per non rileggere gli stessi file durante un audit.
+        """
         row = self._row(stage_id)
         if _memo is not None and stage_id in _memo["claims"]:
             return _memo["claims"][stage_id]
@@ -417,6 +533,15 @@ class UnifiedScientificLedger:
         return obj
 
     def load_record(self, *, stage_id: str, _memo: dict | None = None) -> dict | None:
+        """Legge e verifica il record dello stage; `None` se non esiste.
+
+        Passi: 1) campi, schema, protocollo, release, piano, stage, modello, stato, hash
+        dell'artefatto e del record; 2) nessuna chiave di ground truth; 3) ogni record genitore
+        esiste, ha l'hash dichiarato e lo stesso modello; 4) lo stato BLOCKED_DEPENDENCY compare
+        se e solo se un genitore non e' completo; 5) il claim esiste (tranne per lo stato
+        bloccato) con hash e dipendenze coerenti; 6) l'artefatto e' coerente con lo stato
+        (`_validate_artifact`).
+        """
         row = self._row(stage_id)
         if _memo is not None and stage_id in _memo["records"]:
             return _memo["records"][stage_id]
@@ -445,6 +570,7 @@ class UnifiedScientificLedger:
             or obj["record_sha256"] != _sha(core)
         ):
             raise UnifiedScientificLedgerBlocked("Record identity or SHA mismatch")
+        # Nessuna ground truth nell'artefatto; poi i record genitori (ricorsione con cache).
         _no_gt(obj["artifact"])
         parents = {}
         for pid in row["depends_on"]:
@@ -461,6 +587,7 @@ class UnifiedScientificLedger:
         )
         if (obj["status"] == "BLOCKED_DEPENDENCY") != bad_parents:
             raise UnifiedScientificLedgerBlocked("Incorrect blocked dependency")
+        # Un record "bloccato" non ha claim; ogni altro stato ne richiede uno con lo stesso hash.
         claim = self.load_claim(stage_id=stage_id, _memo=_memo)
         if obj["status"] == "BLOCKED_DEPENDENCY":
             if claim is not None or obj["claim_sha256"] is not None:
@@ -469,6 +596,7 @@ class UnifiedScientificLedger:
             raise UnifiedScientificLedgerBlocked("Missing claim for attempted stage")
         if claim is not None and claim["dependencies"] != obj["dependencies"]:
             raise UnifiedScientificLedgerBlocked("Claim parent binding drift")
+        # Per C e K serve il record D dello stesso caso/harness/modello (stesso prefisso dell'id).
         stem = stage_id.rsplit(":", 1)[0]
         d = (obj if row["stage"] == "D" else
              self.load_record(stage_id=stem + ":D", _memo=_memo))
@@ -478,6 +606,13 @@ class UnifiedScientificLedger:
         return obj
 
     def audit_restart(self) -> dict:
+        """Rilegge e verifica TUTTO il registro; restituisce i conteggi (claim, record, orfani).
+
+        Passi: 1) `_gate()`; 2) ogni file in `claims/` e `records/` deve avere nome, contenuto
+        e posizione attesi; 3) ogni claim deve avere i genitori completi con l'hash dichiarato;
+        4) un claim senza record e' "orfano": si conta e richiede revisione manuale, senza
+        nessun ritento automatico.
+        """
         self._gate()
         memo = {"claims": {}, "records": {}}
         counts = {"claims": 0, "records": 0, "orphan_claims": 0}
@@ -529,25 +664,35 @@ class UnifiedScientificLedger:
         }
 
     def claim_stage(self, *, stage_id: str, model_id: str) -> dict:
-        """Claim create-only: NO MODEL CALL. Blocca ogni altro orphan."""
+        """Claim create-only: NO MODEL CALL. Blocca ogni altro orphan.
+
+        Scrive il claim dello stage (la richiesta di esecuzione durabile). Passi, sotto lock di
+        scrittura: 1) audit completo; 2) nessun claim orfano di altri stage; 3) lo stage non e'
+        gia' stato richiesto ne' registrato (nessun ritento); 4) tutti i genitori sono completi
+        e se ne registra l'hash; 5) scrittura create-only e rilettura di verifica.
+        """
         row = self._row(stage_id, model_id)
         self._gate()
         with _writer_lock(self.data / LOCK_FILE):
+            # 1-2. Audit completo e nessun claim orfano: un claim senza record blocca tutto.
             audit = self.audit_restart()
             if audit["orphan_claims"]:
                 raise UnifiedScientificLedgerBlocked(
                     "Unresolved claim: manual review, no new stage"
                 )
+            # 3. Un solo tentativo per stage: niente ritenti.
             if self.load_claim(stage_id=stage_id) is not None or (
                 self.load_record(stage_id=stage_id) is not None
             ):
                 raise UnifiedScientificLedgerBlocked("Already claimed, no retry")
+            # 4. Genitori completi; se ne registra l'hash nel claim.
             deps = {}
             for parent_id in row["depends_on"]:
                 parent = self.load_record(stage_id=parent_id)
                 if parent is None or parent["status"] != "RECORDED_COMPLETE":
                     raise UnifiedScientificLedgerBlocked("Parent not complete")
                 deps[parent_id] = parent["record_sha256"]
+            # 5. Contenuto del claim (senza il suo hash), poi hash, scrittura e rilettura.
             core = {
                 "schema": VERSION + "_claim",
                 "protocol": PROTOCOL,
@@ -562,6 +707,7 @@ class UnifiedScientificLedger:
             path = self._path(stage_id, claim=True)
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             _write_once(path, obj)
+            # Rilettura di verifica: il file su disco deve avere lo stesso hash.
             reread = self.load_claim(stage_id=stage_id)
             if reread is None or reread["claim_sha256"] != obj["claim_sha256"]:
                 raise UnifiedScientificLedgerBlocked("Claim readback failure")
@@ -572,17 +718,28 @@ class UnifiedScientificLedger:
 
     def record_stage(self, *, stage_id: str, model_id: str,
                      status: str, artifact: dict) -> dict:
-        """Fissa risultato/errore dopo claim. Nessun retry o overwrite."""
+        """Fissa risultato/errore dopo claim. Nessun retry o overwrite.
+
+        Argomenti (per nome): `stage_id`, `model_id`, `status` (uno di `STATUSES`) e `artifact`
+        (output dello stage). Passi, sotto lock: 1) audit completo; 2) il record non esiste
+        ancora; 3) i record genitori esistono e lo stato "bloccato" e' coerente con essi;
+        4) il claim esiste (non per lo stato bloccato) e le sue dipendenze coincidono;
+        5) nessuna ground truth e artefatto coerente con lo stato; 6) scrittura create-only
+        e rilettura di verifica.
+        """
         row = self._row(stage_id, model_id)
+        # Argomenti ben formati prima di prendere il lock.
         if type(status) is not str or status not in STATUSES:
             raise UnifiedScientificLedgerBlocked("Unknown result status")
         if type(artifact) is not dict:
             raise UnifiedScientificLedgerBlocked("Artifact must be dict")
         self._gate()
         with _writer_lock(self.data / LOCK_FILE):
+            # 1-2. Audit completo; il record non deve esistere gia'.
             self.audit_restart()
             if self.load_record(stage_id=stage_id) is not None:
                 raise UnifiedScientificLedgerBlocked("Record already exists")
+            # 3. Record dei genitori e coerenza dello stato "bloccato".
             parents = {}
             for pid in row["depends_on"]:
                 rec = self.load_record(stage_id=pid)
@@ -595,6 +752,7 @@ class UnifiedScientificLedger:
             )
             if (status == "BLOCKED_DEPENDENCY") != blocked:
                 raise UnifiedScientificLedgerBlocked("Blocked state inconsistent")
+            # 4. Claim: assente per lo stato bloccato, obbligatorio per gli altri.
             claim = self.load_claim(stage_id=stage_id)
             if status == "BLOCKED_DEPENDENCY":
                 if claim is not None:
@@ -607,11 +765,13 @@ class UnifiedScientificLedger:
             deps = {key: val["record_sha256"] for key, val in parents.items()}
             if claim is not None and claim["dependencies"] != deps:
                 raise UnifiedScientificLedgerBlocked("Claim dependency drift")
+            # 5. Nessuna ground truth; per C e K serve il D dello stesso caso/harness/modello.
             _no_gt(artifact)
             d_id = stage_id.rsplit(":", 1)[0] + ":D"
             d = (None if row["stage"] == "D" else
                  self.load_record(stage_id=d_id))
             _validate_artifact(row, status, artifact, d)
+            # 6. Contenuto del record (senza il suo hash), poi hash, scrittura e rilettura.
             core = {
                 "schema": VERSION + "_record",
                 "protocol": PROTOCOL,
@@ -629,6 +789,7 @@ class UnifiedScientificLedger:
             path = self._path(stage_id, claim=False)
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             _write_once(path, obj)
+            # Rilettura di verifica: il file su disco deve avere lo stesso hash.
             reread = self.load_record(stage_id=stage_id)
             if reread is None or reread["record_sha256"] != obj["record_sha256"]:
                 raise UnifiedScientificLedgerBlocked("Record readback failure")
@@ -644,6 +805,7 @@ class UnifiedScientificLedger:
 # alla firma/approvazione esterna della release e non abilita API LLM.
 # La gate rimane indipendente dal dispatcher pagato; non attivare
 # in nessun processo di preflight o test su dati reali GT-free.
+# Nome della variabile d'ambiente e valore ESATTO che la attiva (qualsiasi altro valore = no).
 RELEASE_WRITE_OPT_IN_ENV = "OPENRCA_RQ2_V2_ENABLE_RELEASE_CREATE"
 RELEASE_WRITE_OPT_IN_EXACT = "EXPLICIT_CREATE_ONLY_V1"
 
@@ -653,6 +815,7 @@ def runtime_release_write_optin() -> bool:
     return os.environ.get(RELEASE_WRITE_OPT_IN_ENV) == RELEASE_WRITE_OPT_IN_EXACT
 
 
+# Valutato UNA volta, all'import del modulo: attivarlo dopo non ha effetto.
 SCIENTIFIC_RELEASE_WRITE_ENABLED = runtime_release_write_optin()
 
 
@@ -673,11 +836,25 @@ def create_authorized_scientific_release_once(
     audit Colab 30 SOURCE_PATHS, digest esterno della release approvato,
     budget esplicito e reference non sintetica. Dopo errore di scrittura,
     fermarsi e auditare manualmente il namespace (nessun retry).
+
+    Argomenti (per nome): `data_dir`, `repo_dir`, `expected_commit` (hash git atteso),
+    `approved_release_sha256` (SHA-256 approvato dall'esterno), `external_approval_reference`
+    (riferimento non sintetico all'approvazione) e `release` (dizionario della release).
+    Restituisce un riepilogo "release creata, nessuna API, nessun claim".
+
+    Passi: 1) opt-in di processo attivo; 2) riferimento d'approvazione reale e uguale a quello
+    nella release; 3) preflight G4D (checkout pulito, namespace libero); 4) versioni di
+    runtime degli SDK uguali a quelle fissate nella release; 5) sorgenti, blueprint e contratto
+    della release; 6) creazione atomica del namespace e scrittura create-only della release,
+    con rilettura e confronto dell'hash.
     """
+    # 1. Senza l'opt-in esatto presente all'import non si legge ne' si scrive nulla.
     if SCIENTIFIC_RELEASE_WRITE_ENABLED is not True:
         raise UnifiedScientificLedgerBlocked(
             "Scientific release creation HARD-DISABLED"
         )
+    # 2. Serve un riferimento d'approvazione esplicito, non "SYNTHETIC_", presente anche nella
+    # release.
     if (
         type(release) is not dict
         or type(external_approval_reference) is not str
@@ -689,7 +866,7 @@ def create_authorized_scientific_release_once(
             "Explicit external non-synthetic release approval required"
         )
 
-    # G4D verifica HEAD clean e namespace assente; nessuna scrittura.
+    # 3. G4D verifica HEAD clean e namespace assente; nessuna scrittura.
     data = _strict_absolute(data_dir, "data root")
     repo = _strict_absolute(repo_dir, "repository root")
     gate = preview_scientific_ledger_gate(
@@ -705,7 +882,7 @@ def create_authorized_scientific_release_once(
     ):
         raise UnifiedScientificLedgerBlocked("Release preflight failed")
 
-    # Snapshot SDK verificato senza invocazioni di modelli.
+    # 4. Versioni degli SDK installate = versioni della release, verificate senza invocare modelli.
     import importlib.metadata as metadata
     from evaluation.rq2_provider_policy_source_audit import (
         EXPECTED_COLAB_VERSIONS,
@@ -729,6 +906,7 @@ def create_authorized_scientific_release_once(
             "Cannot verify pinned SDK runtime"
         ) from exc
 
+    # 5. Sorgenti, blueprint e contenuto della release; la ricevuta non deve concedere nulla.
     source = preview_unified_source_bound(
         data_dir=data, src_root=repo / "src",
     )
@@ -749,7 +927,7 @@ def create_authorized_scientific_release_once(
     ):
         raise UnifiedScientificLedgerBlocked("Release contract not verified")
 
-    # Create-only: il mkdir della root nuova e' il gate atomico contro
+    # 6. Create-only: il mkdir della root nuova e' il gate atomico contro
     # sessioni concorrenti. Non rimuovere eventuali file parziali a
     # seguito di errori: il successivo preflight deve fermarsi.
     root = data / NAMESPACE

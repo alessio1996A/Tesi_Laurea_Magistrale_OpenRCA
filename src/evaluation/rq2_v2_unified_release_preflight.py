@@ -8,6 +8,14 @@ mancano il journal scientifico live, una release firmata, budget e runtime.
 
 Questo modulo e' volutamente separato dagli store sintetici: i loro
 record di prova non diventeranno mai risultati della campagna reale.
+
+Contenuto
+---------
+- `SOURCE_PATHS`: elenco dei file sorgente di cui si registra l'hash SHA-256;
+- `UnifiedRQ2SourcePreflightError`: errore "le sorgenti non sono certificabili";
+- `_safe_root`, `_source_bytes`: lettura sicura di cartelle e file (niente `..`, niente link);
+- `preview_unified_source_bound`: la verifica completa; restituisce la preview G4A, che il
+  blueprint (`rq2_v2_unified_release_blueprint`) controlla campo per campo.
 """
 from __future__ import annotations
 
@@ -29,7 +37,7 @@ from evaluation.rq2_v2_unified_discovery_plan import (
 )
 
 VERSION = "rq2_v2_unified_release_source_preflight_v0"
-# File effettivamente usati dalla infrastruttura di diagnosi e dalla
+# File effettivamente usati dall'infrastruttura di diagnosi e dalla
 # preparazione C/K, NON un elenco di futuri componenti ancora da creare.
 SOURCE_PATHS = (
     "agent/graph_engine.py",
@@ -75,6 +83,7 @@ class UnifiedRQ2SourcePreflightError(ValueError):
 
 
 def _safe_root(root: Path) -> Path:
+    """Restituisce `root` solo se e' un `Path` assoluto, senza `..`, esistente e non un link."""
     if not isinstance(root, Path) or not root.is_absolute() or ".." in root.parts:
         raise UnifiedRQ2SourcePreflightError(
             "Expected absolute Path without traversal"
@@ -85,7 +94,12 @@ def _safe_root(root: Path) -> Path:
 
 
 def _source_bytes(root: Path, relative: str) -> bytes:
-    # Relative paths statici, non sono argomenti derivati da output del LLM.
+    """Contenuto del file `relative` sotto `root`, con gli a-capo Windows normalizzati.
+
+    `\\r\\n` diventa `\\n`, cosi' l'hash non cambia fra Windows e Linux. Solleva
+    `UnifiedRQ2SourcePreflightError` se il file manca, e' un link o non si legge.
+    """
+    # I percorsi relativi sono statici (`SOURCE_PATHS`), non derivano da output del LLM.
     p = root / relative
     if p.is_symlink() or not p.is_file():
         raise UnifiedRQ2SourcePreflightError("Missing/symlink source: " + relative)
@@ -100,10 +114,21 @@ def preview_unified_source_bound(*, data_dir: Path, src_root: Path) -> dict:
 
     src_root: directory `src` nel checkout locale, non la root del repo.
     data_dir: root che contiene i due CSV GT-free di split e manifest.
+
+    Restituisce la preview G4A (dizionario) con gli hash dei file sorgente e dei prompt C/K e
+    tutte le dichiarazioni "nessuna API, nessuna release". Al primo scostamento solleva
+    `UnifiedRQ2SourcePreflightError`.
+
+    Passi: 1) cartelle sicure; 2) il piano offline deve avere 180 stage e nessuna API;
+    3) split e manifest GT-free devono avere gli hash attesi; 4) l'identita' dei sorgenti RQ1
+    congelati, i prompt C/K, i modelli, gli harness e i limiti (6 round di tool, 2 verifiche,
+    limite di ricorsione 30) devono coincidere; 5) si assembla la preview.
     """
+    # 1. Cartelle sicure.
     source_root = _safe_root(src_root)
     data_root = _safe_root(data_dir)
 
+    # 2. Il piano offline non deve essere cambiato: 180 stage (60 D, 60 C, 60 K), nessuna API.
     plan = build_offline_discovery_plan()
     if (
         plan["logical_stages"] != 180
@@ -115,6 +140,7 @@ def preview_unified_source_bound(*, data_dir: Path, src_root: Path) -> dict:
     ):
         raise UnifiedRQ2SourcePreflightError("Unified plan drift")
 
+    # 3. Split e manifest GT-free: stessi hash attesi e nessuna lettura della ground truth.
     gt_free = preview_gt_free_sources(data_root)
     if (
         gt_free.get("split_manifest_source_verified") is not True
@@ -128,12 +154,14 @@ def preview_unified_source_bound(*, data_dir: Path, src_root: Path) -> dict:
     ):
         raise UnifiedRQ2SourcePreflightError("GT-free source check drift")
 
+    # 4. Identita' dei sorgenti RQ1 congelati (hash git dei blob) e parita' di protocollo.
     try:
         rq1 = preview_protocol_identity(src_root=source_root)
     except ProtocolIdentityError as exc:
         raise UnifiedRQ2SourcePreflightError(
             "Frozen RQ1 source identity cannot be established"
         ) from exc
+    # SHA-256 di ogni file sorgente elencato e dei due prompt di sistema (C = cause, K = regole).
     source_sha = {
         p: hashlib.sha256(_source_bytes(source_root, p)).hexdigest()
         for p in SOURCE_PATHS
@@ -142,6 +170,9 @@ def preview_unified_source_bound(*, data_dir: Path, src_root: Path) -> dict:
         "C": hashlib.sha256(CAUSE_SYSTEM.encode("utf-8")).hexdigest(),
         "K": hashlib.sha256(RULE_SYSTEM.encode("utf-8")).hexdigest(),
     }
+    # La preview RQ1 deve concordare con il piano e con i file letti qui: stesso blob RQ1,
+    # contratto di output D v2, nessun protocollo RQ2 gia' congelato ne' API/test abilitati,
+    # modelli e prompt uguali, hash dei due file chiave uguali, harness/stage/limiti fissi.
     if (
         rq1.get("rq1_source_blob_sha1_match") is not True
         or rq1.get("rq1_D_output_contract_mode_verified") != "v2_enforce"
@@ -170,6 +201,7 @@ def preview_unified_source_bound(*, data_dir: Path, src_root: Path) -> dict:
             "RQ1/LLM/prompt/source protocol parity mismatch"
         )
 
+    # 5. Preview: tutto cio' che e' "eseguibile" o "congelato" resta False o zero.
     return {
         "version": VERSION,
         "protocol": UNIFIED_PROTOCOL,
