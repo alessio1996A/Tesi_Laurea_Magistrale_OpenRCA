@@ -20,6 +20,10 @@ Ramo di lavoro: `refactor/commenti-it-2026-11-17` (da `feature/rq2a-offline-scor
 6. **Niente docstring su classi Pydantic (`BaseModel`) e su funzioni `@tool`**: la loro docstring viene inviata al modello
    (descrizione dello schema in `with_structured_output`, descrizione del tool). Per documentarle si usano solo commenti `#`.
    Il controllo AST ignora le docstring, quindi lo verifica un controllo apposito (punto 5 del controllore).
+7. **Se un modulo usa `__doc__` come descrizione di `--help`** (`argparse.ArgumentParser(description=__doc__)`), la sua docstring
+   resta identica all'originale e la guida alla lettura si scrive in un blocco di commenti `#` subito sotto; se il modulo usa solo
+   `__doc__.splitlines()[0]`, la prima riga resta identica e il resto si puo' ampliare. Il controllore avvisa se il testo di
+   `--help` cambia.
 
 ## Controlli (dalla radice del progetto)
 

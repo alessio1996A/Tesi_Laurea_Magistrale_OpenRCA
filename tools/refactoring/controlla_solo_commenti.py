@@ -10,7 +10,8 @@ Cosa verifica
 3. Per ogni file `.py` modificato di `src/`, l'albero sintattico (AST) e' IDENTICO a quello del riferimento una volta
    tolte le docstring. Quindi sono cambiati soltanto commenti `#`, docstring e spazi: nessuna istruzione, nome,
    stringa del codice, prompt, etichetta o costante.
-4. Avviso (non errore) se un modulo usa `__doc__` e la sua docstring e' cambiata: cambierebbe il testo di `--help`.
+4. Avviso (non errore) se un modulo usa `__doc__` e la parte di docstring che finisce in `--help` e' cambiata (tutta la
+   docstring, oppure la sola prima riga se il modulo usa `__doc__.splitlines()[0]`): cambierebbe il testo di `--help`.
 5. ERRORE se e' cambiata la docstring di un oggetto la cui docstring VIENE INVIATA AL MODELLO: una classe Pydantic
    (`BaseModel`, usata da `with_structured_output`) o una funzione decorata con `@tool` (LangChain ne fa la descrizione
    del tool). Il confronto AST ignora le docstring, quindi senza questo controllo una modifica cambierebbe la richiesta
@@ -129,8 +130,28 @@ def first_difference(a: str, b: str) -> str:
     return "lunghezze diverse"
 
 
-def uses_dunder_doc(source: str) -> bool:
-    return any(isinstance(n, ast.Name) and n.id == "__doc__" for n in ast.walk(ast.parse(source)))
+def doc_shown_in_help(source: str) -> str | None:
+    """Parte della docstring del modulo che finisce nel testo di `--help`.
+
+    None se il modulo non usa `__doc__`; la sola prima riga se ogni uso e' del tipo `__doc__.splitlines()[0]` o
+    `__doc__.split("\\n")[0]`; altrimenti la docstring intera (cosi' com'e', senza togliere l'indentazione).
+    """
+    tree = ast.parse(source)
+    uses = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == "__doc__"]
+    if not uses:
+        return None
+    first_line_only: set[int] = set()
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) and node.slice.value == 0
+                and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute)
+                and node.value.func.attr in ("splitlines", "split")
+                and isinstance(node.value.func.value, ast.Name) and node.value.func.value.id == "__doc__"):
+            first_line_only.add(id(node.value.func.value))
+    doc = ast.get_docstring(tree, clean=False) or ""
+    if all(id(use) in first_line_only for use in uses):
+        lines = doc.splitlines()
+        return lines[0] if lines else ""
+    return doc
 
 
 def _name_of(node: ast.AST) -> str:
@@ -255,8 +276,10 @@ def main(argv=None) -> int:
             if visible_changes:
                 continue
             ok_count += 1
-            if uses_dunder_doc(new) and ast.get_docstring(ast.parse(old)) != ast.get_docstring(ast.parse(new)):
-                warnings.append(f"{rel}: usa __doc__ e la docstring del modulo e' cambiata (cambia il testo di --help)")
+            shown_old, shown_new = doc_shown_in_help(old), doc_shown_in_help(new)
+            if shown_new is not None and shown_old != shown_new:
+                warnings.append(f"{rel}: usa __doc__ e la parte di docstring mostrata da --help e' cambiata "
+                                f"(cambia il testo di --help)")
         else:
             problems.append(f"CODICE CAMBIATO (non solo commenti): {rel}\n      {first_difference(canonical(old), canonical(new))}")
     print(f"[3] file con SOLO commenti/docstring cambiati: {ok_count}/{len(changed)}")

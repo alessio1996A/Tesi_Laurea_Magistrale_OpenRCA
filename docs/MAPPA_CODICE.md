@@ -13,6 +13,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
   restano com'erano, anche se i loro commenti sono in inglese o in italiano misto.
 - **Commenti**: "completo" = commenti e docstring in italiano e nessuna funzione senza docstring; "da fare" = c'e' ancora
   almeno un blocco probabilmente inglese o una funzione senza docstring (la lingua e' stimata con un'euristica).
+  Le classi Pydantic e le funzioni `@tool` non hanno docstring di proposito: la docstring verrebbe inviata al modello.
 - Verifica del refactoring: `python tools/refactoring/controlla_solo_commenti.py --base <riferimento git>` dimostra che, rispetto
   al riferimento, sono cambiati solo commenti e docstring (albero sintattico identico) e che nessun file protetto e' stato toccato.
 
@@ -20,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 29 | 44 |
+| A. Nucleo del codice finale | 98 | 25 | 36 | 37 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -46,7 +47,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
 | `output/openrca_contract.py` | 193 | Contratto canonico di diagnosi RCA, indipendente dal provider LLM. | - | completo |
-| `output/structured_finalizer.py` | 287 | Finalizzazione OpenRCA strutturata, indipendente dal provider. | - | da fare (EN 0, senza docstring 2) |
+| `output/structured_finalizer.py` | 287 | Finalizzazione OpenRCA strutturata, indipendente dal provider. | - | completo |
 | `output/v2_contract.py` | 210 | Contratto di output OpenRCA V2 — SOLO validazione, mai riparazione. | - | completo |
 | `output/v2_task_contract.py` | 235 | Validazione OpenRCA V2.4 task-aware, SENZA lettura di etichette. | hash git RQ1 | bloccato |
 
@@ -84,15 +85,15 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
 | `evaluation/evaluation20_campaign.py` | 479 | Safe evaluation20 campaign runner (300 planned runs). | hash git RQ1 | bloccato |
-| `evaluation/evaluation20_preflight.py` | 248 | OpenRCA Market: audit GT-free per 20 nuovi incidenti EVALUATION. | - | da fare (EN 0, senza docstring 2) |
+| `evaluation/evaluation20_preflight.py` | 338 | OpenRCA Market: audit GT-free per 20 nuovi incidenti EVALUATION. | - | completo |
 | `evaluation/evaluation20_preregister.py` | 266 | Preregistrazione create-only delle 300 run EVALUATION20, senza API. | hash git RQ1 | bloccato |
 | `evaluation/experiment_config.py` | 218 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
 | `evaluation/experiment_runner.py` | 1146 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
 | `evaluation/ood_class_inventory.py` | 257 | Controlled label inventory for phase-2 OOD cases. Evaluation-only, NOT agent code. | SHA-256 consolidamento | bloccato |
 | `evaluation/ood_holdout_preflight.py` | 170 | Inventario OOD preliminare, GT-free, in sola lettura. | SHA-256 consolidamento | bloccato |
 | `evaluation/v2_case_window_audit.py` | 219 | Audit in sola lettura delle finestre degli esperimenti V1. | SHA-256 consolidamento | bloccato |
-| `evaluation/v2_cohort_selector.py` | 330 | V2.5: proposta riproducibile di una NUOVA coorte GT-free, solo development. | - | da fare (EN 0, senza docstring 5) |
-| `evaluation/v2_preregister.py` | 191 | V2.6: prepara un piano preregistrato per 40 run, nessuna chiamata LLM. | - | da fare (EN 0, senza docstring 4) |
+| `evaluation/v2_cohort_selector.py` | 453 | V2.5: proposta riproducibile di una NUOVA coorte GT-free, solo development. | - | completo |
+| `evaluation/v2_preregister.py` | 267 | V2.6: prepara un piano preregistrato per 40 run, nessuna chiamata LLM. | - | completo |
 
 **RQ2 K (esecutore, L1/L2, audit)**
 
@@ -106,9 +107,9 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | `evaluation/rq2_k_records.py` | 93 | RQ2-K: lettura delle regole K dai record V5 (sola lettura, nessuna etichetta). | SHA-256 consolidamento | bloccato |
 | `evaluation/rq2_k_rule_evaluation.py` | 228 | RQ2-K: valutazione CON riferimento di una regola K gia' eseguita (processo GT-only). | SHA-256 consolidamento | bloccato |
 | `evaluation/rq2_k_rule_executor.py` | 302 | RQ2-K: esecutore deterministico delle regole candidate (GT-free). | SHA-256 consolidamento | bloccato |
-| `evaluation/rq2_k_rule_inventory.py` | 71 | RQ2-K: inventario delle regole candidate rispetto al catalogo dei KPI (solo lettura). | - | da fare (EN 0, senza docstring 4) |
-| `evaluation/rq2_k_run_audit.py` | 125 | RQ2: audit di sola lettura del run V5 (registro delle decisioni, riga 10). | - | da fare (EN 0, senza docstring 5) |
-| `evaluation/rq2_k_run_integrity.py` | 298 | RQ2: verifica di integrita' e provenance dei record del run V5 (SOLA LETTURA). | - | da fare (EN 0, senza docstring 5) |
+| `evaluation/rq2_k_rule_inventory.py` | 108 | RQ2-K: inventario delle regole candidate rispetto al catalogo dei KPI (solo lettura). | - | completo |
+| `evaluation/rq2_k_run_audit.py` | 175 | RQ2: audit di sola lettura del run V5 (registro delle decisioni, riga 10). | - | completo |
+| `evaluation/rq2_k_run_integrity.py` | 381 | RQ2: verifica di integrita' e provenance dei record del run V5 (SOLA LETTURA). | - | completo |
 
 **RQ2 V5 (run di discovery)**
 

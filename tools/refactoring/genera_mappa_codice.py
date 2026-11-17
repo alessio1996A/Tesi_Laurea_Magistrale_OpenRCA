@@ -86,6 +86,26 @@ def leggi_gruppi(radice: Path) -> OrderedDict:
     return OrderedDict((g, [(s, mods) for s, mods in lista if mods]) for g, lista in gruppi.items())
 
 
+def _docstring_vietata(nodo: ast.AST) -> bool:
+    """True per le classi Pydantic (`BaseModel`/`BaseSettings`) e le funzioni `@tool`.
+
+    La loro docstring viene inviata al modello (descrizione dello schema o del tool): non va aggiunta, si documentano con
+    commenti `#`, e quindi la sua assenza non conta come "funzione senza docstring".
+    """
+    def nome(n: ast.AST) -> str:
+        if isinstance(n, ast.Call):
+            return nome(n.func)
+        if isinstance(n, ast.Attribute):
+            return n.attr
+        return n.id if isinstance(n, ast.Name) else ""
+
+    if isinstance(nodo, ast.ClassDef):
+        return any(nome(b) in ("BaseModel", "BaseSettings") for b in nodo.bases)
+    if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return any(nome(d) in ("tool", "StructuredTool") for d in nodo.decorator_list)
+    return False
+
+
 def misura(percorso: Path) -> dict:
     """Righe, scopo, blocchi inglesi/incerti e funzioni senza docstring di un modulo."""
     testo = percorso.read_text(encoding="utf-8")
@@ -100,7 +120,7 @@ def misura(percorso: Path) -> dict:
             doc = ast.get_docstring(nodo, clean=False)
             if doc:
                 blocchi.append(doc)
-            elif not isinstance(nodo, ast.Module):
+            elif not isinstance(nodo, ast.Module) and not _docstring_vietata(nodo):
                 senza_doc += 1
     conteggio = Counter(lingua(b) or "?" for b in blocchi)
     doc_modulo = ast.get_docstring(albero) or ""
@@ -164,6 +184,7 @@ def costruisci(radice: Path) -> str:
         "  restano com'erano, anche se i loro commenti sono in inglese o in italiano misto.",
         "- **Commenti**: \"completo\" = commenti e docstring in italiano e nessuna funzione senza docstring; \"da fare\" = c'e' ancora",
         "  almeno un blocco probabilmente inglese o una funzione senza docstring (la lingua e' stimata con un'euristica).",
+        "  Le classi Pydantic e le funzioni `@tool` non hanno docstring di proposito: la docstring verrebbe inviata al modello.",
         "- Verifica del refactoring: `python tools/refactoring/controlla_solo_commenti.py --base <riferimento git>` dimostra che, rispetto",
         "  al riferimento, sono cambiati solo commenti e docstring (albero sintattico identico) e che nessun file protetto e' stato toccato.",
         "",
