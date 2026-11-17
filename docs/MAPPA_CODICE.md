@@ -21,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 65 | 8 |
+| A. Nucleo del codice finale | 98 | 25 | 73 | 0 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -167,15 +167,15 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | `evaluation/rq2_evidence_bundle.py` | 307 | Pacchetto (bundle) RQ2 in sola lettura delle osservazioni dei tool gia' catturate dai runner RQ1. | - | completo |
 | `evaluation/rq2_kpi_formalizability_preflight.py` | 229 | Inventario dei KPI e preflight di formalizzabilita' di RQ2-K: GT-free e solo offline. | - | completo |
 | `evaluation/rq2_model_factory.py` | 109 | Factory dei modelli candidata, solo per RQ2, con trasporto sincrono esplicito a versioni fissate. | - | completo |
-| `evaluation/rq2_output_contracts.py` | 240 | Strict RQ2 JSON contracts for offline validation of LLM-produced C/K output. | - | da fare (EN 4, senza docstring 10) |
-| `evaluation/rq2_probe_adapter.py` | 195 | OFFLINE-only assembly of RQ2 C (cause) and K (candidate rule) prompts. | - | da fare (EN 3, senza docstring 5) |
-| `evaluation/rq2_protocol_identity_preflight.py` | 182 | Offline RQ2 pre-freeze fingerprints with RQ1 frozen-source parity. | - | da fare (EN 8, senza docstring 4) |
-| `evaluation/rq2_provider_policy_source_audit.py` | 186 | RQ2 read-only provider retry/timeout *source* inventory, NOT network verification. | - | da fare (EN 4, senza docstring 4) |
+| `evaluation/rq2_output_contracts.py` | 298 | Contratti JSON rigorosi di RQ2 per la validazione offline dell'output C/K prodotto dal LLM. | - | completo |
+| `evaluation/rq2_probe_adapter.py` | 232 | Assemblaggio SOLO OFFLINE dei prompt RQ2 per C (cause) e K (regola candidata). | - | completo |
+| `evaluation/rq2_protocol_identity_preflight.py` | 224 | Impronte RQ2 offline prima del congelamento, con parita' rispetto ai sorgenti RQ1 congelati. | - | completo |
+| `evaluation/rq2_provider_policy_source_audit.py` | 237 | RQ2 read-only provider retry/timeout *source* inventory, NOT network verification. | - | completo |
 | `evaluation/rq2_rule_group_scorer.py` | 189 | RQ2-C offline-only GROUP-LEVEL rule outcome scorer (proposal V0). | SHA-256 consolidamento | bloccato |
-| `evaluation/rq2_sdk_retry_mock_probe.py` | 208 | RQ2: sandboxed SDK retry-behavior probe, no external HTTP, no model invocations. | - | da fare (EN 8, senza docstring 3) |
-| `evaluation/rq2_stage_artifact_store.py` | 388 | RQ2 source-bound, create-only STAGE ARTIFACT storage (no execution). | - | da fare (EN 10, senza docstring 11) |
-| `evaluation/rq2_stage_binding.py` | 261 | OFFLINE-only binding of RQ2 C/K prompt packages to draft workflow stages. | - | da fare (EN 6, senza docstring 5) |
-| `evaluation/rq2_toolfree_fake_transport.py` | 231 | RQ2 C/K LangChain messages, executed ONLY against a strict fake model. | - | da fare (EN 7, senza docstring 6) |
+| `evaluation/rq2_sdk_retry_mock_probe.py` | 276 | RQ2: sandboxed SDK retry-behavior probe, no external HTTP, no model invocations. | - | completo |
+| `evaluation/rq2_stage_artifact_store.py` | 463 | RQ2: archivio di ARTEFATTI DI STADIO legato al sorgente, a sola creazione (nessuna esecuzione). | - | completo |
+| `evaluation/rq2_stage_binding.py` | 326 | Collegamento (binding) SOLO OFFLINE dei pacchetti di prompt C/K di RQ2 agli stadi della bozza di workflow. | - | completo |
+| `evaluation/rq2_toolfree_fake_transport.py` | 283 | Messaggi LangChain di C/K di RQ2, eseguiti ESCLUSIVAMENTE contro un modello finto e rigoroso. | - | completo |
 
 ## B1. Campagne e audit RQ1 storici (conservare: hanno prodotto risultati citabili)
 

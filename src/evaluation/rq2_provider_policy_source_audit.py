@@ -5,6 +5,28 @@ RQ1 factory source and installed distribution metadata/known Python sources.
 A source-level assertion cannot prove actual HTTP retry behavior or timeouts.
 Scientific discovery and OOD test gates remain CLOSED.
 """
+# ---------------------------------------------------------------------------
+# GUIDA ALLA LETTURA (in italiano)
+#
+# La docstring qui sopra e' il testo mostrato da `--help` e per questo resta identica
+# all'originale. In sintesi: inventario in sola lettura, a livello di SORGENTE, della politica di
+# ritentativi e di timeout dei provider; NON e' una verifica di rete. Non istanzia mai client SDK
+# ne' chiama un provider: legge solo il sorgente della factory dei modelli di RQ1 (invariata) e i
+# metadati dei pacchetti installati con alcuni file Python noti. Un'affermazione sul sorgente non
+# puo' provare il comportamento HTTP reale. I gate scientifici di discovery e di test OOD restano
+# CHIUSI.
+#
+# Contenuto:
+# - `EXPECTED_COLAB_VERSIONS`: versioni dei pacchetti attese (quelle usate in Colab);
+# - `KNOWN_SOURCE_PATHS`: gli unici file di pacchetto che si possono leggere;
+# - `RQ2PolicySourceError`: errore "sorgente della factory inatteso o file fidati mancanti";
+# - `_hash_bytes`, `_git_blob`: SHA-256 e hash git di un contenuto;
+# - `_factory_call`: trova nell'albero sintattico la costruzione del client di un provider;
+# - `audit_factory_text`: quali parametri la factory RQ1 imposta ESPLICITAMENTE;
+# - `_package_evidence`: versione e SHA-256 del file noto di un pacchetto, senza importarlo;
+# - `preview_provider_policy`: il rapporto completo (il flag di release live e' SEMPRE falso);
+# - `main`: riga di comando `--repo-dir`.
+# ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -16,7 +38,9 @@ import platform
 from pathlib import Path
 
 VERSION = "rq2_provider_policy_source_audit_v0"
+# Hash git atteso della factory dei modelli di RQ1 congelata (agent/model_factory.py).
 FROZEN_RQ1_FACTORY_BLOB = "05308d5740763db0444556dcb7330d8fb4c308ec"
+# Versioni dei pacchetti usate nelle esecuzioni su Colab: il rapporto dice se coincidono.
 EXPECTED_COLAB_VERSIONS = {
     "langchain-core": "1.7.1",
     "langgraph": "1.2.18",
@@ -25,7 +49,8 @@ EXPECTED_COLAB_VERSIONS = {
     "anthropic": "2.6.0",
     "google-genai": "2.34.0",
 }
-# Only these known module files may be read. No config, credentials or project data.
+# Si possono leggere SOLO questi file noti dei pacchetti: nessuna configurazione, credenziale o
+# dato del progetto.
 KNOWN_SOURCE_PATHS = {
     "langchain-anthropic": "langchain_anthropic/chat_models.py",
     "langchain-google-genai": "langchain_google_genai/chat_models.py",
@@ -35,14 +60,16 @@ KNOWN_SOURCE_PATHS = {
 
 
 class RQ2PolicySourceError(ValueError):
-    """Unexpected factory source or missing trusted files."""
+    """Sorgente della factory inatteso, oppure file fidati mancanti."""
 
 
 def _hash_bytes(data: bytes) -> str:
+    """SHA-256 (esadecimale) dei byte `data`."""
     return hashlib.sha256(data).hexdigest()
 
 
 def _git_blob(data: bytes) -> str:
+    """Hash git (SHA-1) del contenuto `data` come blob, con a-capo CRLF normalizzati in LF."""
     normalized = data.replace(b"\r\n", b"\n")
     return hashlib.sha1(
         b"blob " + str(len(normalized)).encode("ascii") + b"\x00" + normalized
@@ -50,6 +77,11 @@ def _git_blob(data: bytes) -> str:
 
 
 def _factory_call(tree: ast.Module, function: str, constructor: str) -> ast.Call:
+    """Chiamata al costruttore `constructor` dentro la funzione `function` dell'albero `tree`.
+
+    Deve esserci UNA sola funzione con quel nome e UNA sola chiamata al costruttore, senza
+    `**kwargs` dinamici; altrimenti solleva `RQ2PolicySourceError`.
+    """
     defs = [
         node for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -71,7 +103,13 @@ def _factory_call(tree: ast.Module, function: str, constructor: str) -> ast.Call
 
 
 def audit_factory_text(source: bytes) -> dict:
-    """AST-only audit: records *explicit* configuration, not effective SDK defaults."""
+    """Audit solo sull'albero sintattico: registra la configurazione *esplicita*, non i default effettivi dell'SDK.
+
+    Argomento: `source`, byte del sorgente della factory RQ1. Restituisce quali parametri
+    (modello, ritentativi, timeout, token massimi) sono impostati esplicitamente per Google e
+    per Anthropic, se i ritentativi di Anthropic sono il valore zero letterale, hash git e
+    SHA-256 (con a-capo normalizzati) del sorgente e se coincide con il blob congelato.
+    """
     try:
         tree = ast.parse(source.decode("utf-8"))
     except (UnicodeError, SyntaxError) as exc:
@@ -101,7 +139,11 @@ def audit_factory_text(source: bytes) -> dict:
 
 
 def _package_evidence(package: str) -> dict:
-    """Metadata + SHA only; no import, HTTP request, SDK init or secret inspection."""
+    """Solo metadati e SHA-256; nessun import, richiesta HTTP, inizializzazione dell'SDK o lettura di segreti.
+
+    Restituisce versione installata e SHA-256 del file noto del pacchetto (o `None` se il
+    pacchetto manca, il file non c'e', e' un link o supera 4 MB).
+    """
     try:
         dist = metadata.distribution(package)
     except metadata.PackageNotFoundError:
@@ -122,7 +164,15 @@ def _package_evidence(package: str) -> dict:
 
 
 def preview_provider_policy(*, repo_dir: Path) -> dict:
-    """Run a provenance-only audit; the live release flag is ALWAYS false."""
+    """Esegue un audit di sola provenienza; il flag di release live e' SEMPRE falso.
+
+    Argomento (per nome): `repo_dir`, radice del repository. Restituisce il rapporto: audit della
+    factory RQ1, evidenze dei pacchetti, se le versioni coincidono con quelle di Colab e le
+    dichiarazioni "nessuna API, nessun gate aperto".
+
+    Passi: 1) la factory RQ1 esiste e non e' un link; 2) audit del suo sorgente; 3) evidenze dei
+    pacchetti attesi; 4) confronto delle versioni; 5) assemblaggio del rapporto.
+    """
     repo_dir = Path(repo_dir)
     factory = repo_dir / "src" / "agent" / "model_factory.py"
     if factory.is_symlink() or not factory.is_file():
@@ -172,6 +222,7 @@ def preview_provider_policy(*, repo_dir: Path) -> dict:
 
 
 def main() -> None:
+    """Riga di comando: stampa in JSON il rapporto per `--repo-dir`."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-dir", required=True, type=Path)
     args = parser.parse_args()

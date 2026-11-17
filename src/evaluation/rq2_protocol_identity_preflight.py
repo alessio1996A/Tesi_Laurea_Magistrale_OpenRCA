@@ -1,15 +1,25 @@
-"""Offline RQ2 pre-freeze fingerprints with RQ1 frozen-source parity.
+"""Impronte RQ2 offline prima del congelamento, con parita' rispetto ai sorgenti RQ1 congelati.
 
-Reads ONLY files under this repository's src/ tree, no benchmark, GT, tool
-telemetry, LLM, credentials, network, model SDK or experiment output.
+Legge SOLO file sotto l'albero `src/` di questo repository: nessun benchmark, ground truth,
+telemetria dei tool, LLM, credenziali, rete, SDK di modelli o output di esperimenti.
 
-The RQ1 Git blob SHA-1 references were checked against the source at frozen
-commit e4845e7fe9a399e10dd2db6f320dfeaeeddf3379. Git blob digests here
-are provenance checks, not protection against malicious repository tampering.
+I riferimenti SHA-1 dei blob Git di RQ1 sono stati controllati rispetto al sorgente al commit
+congelato e4845e7fe9a399e10dd2db6f320dfeaeeddf3379. I digest dei blob Git qui sono controlli di
+provenienza, non una protezione contro manomissioni malevole del repository.
 
-This report records the RQ1 D task-output mode 'v2_enforce', observed in its
-unchanged official preregistration and campaign enforcement code. It does NOT
-freeze any NEW RQ2 protocol or authorize API usage.
+Questo rapporto registra la modalita' di output dei task di D di RQ1, 'v2_enforce', osservata
+nel codice ufficiale di preregistrazione e di imposizione della campagna, rimasto invariato.
+NON congela nessun NUOVO protocollo RQ2 e non autorizza l'uso delle API.
+
+Contenuto
+---------
+- `RQ1_BLOB_SHA1`: i 13 file sorgente RQ1 congelati con il loro hash git (valori che NON vanno
+  mai cambiati: sono il motivo per cui quei file non si possono modificare);
+- `RQ2_FINGERPRINT_PATHS`: i file RQ2 di cui si registra l'impronta SHA-256 corrente;
+- `ProtocolIdentityError`: errore "sorgente, prompt o configurazione cambiati";
+- `git_blob_sha1`, `_sha256`, `_read_source`, `_check_frozen_blob`: hash e lettura dei sorgenti;
+- `preview_protocol_identity`: la verifica completa e il rapporto di anteprima;
+- `main`: stampa il rapporto in JSON.
 """
 from __future__ import annotations
 
@@ -32,8 +42,11 @@ from evaluation.rq2_probe_adapter import (
 )
 
 VERSION = "rq2_protocol_identity_preflight_v0"
+# Commit di RQ1 a cui si riferiscono gli hash sotto, e modalita' di output di D usata in RQ1.
 RQ1_FROZEN_REFERENCE_COMMIT = "e4845e7fe9a399e10dd2db6f320dfeaeeddf3379"
 RQ1_D_OUTPUT_MODE = "v2_enforce"
+# Hash git dei blob (SHA-1) dei file RQ1 congelati. Un file diverso da questi hash blocca il
+# preflight: per questo quei file non si modificano nemmeno con un commento.
 RQ1_BLOB_SHA1 = {
     "evaluation/evaluation20_preregister.py": "80bd3b0cac7150c76c2ba102329708e3ddb544ef",
     "evaluation/evaluation20_campaign.py": "e65603acc7fc26a62e7f5534af2fcf5d359eda9d",
@@ -49,6 +62,8 @@ RQ1_BLOB_SHA1 = {
     "harness/signal_catalog.py": "c1fec771c9d8876bc2e33eb49e7ddef067bb3963",
     "harness/rules/rule_container_cpu.py": "b7e560a4bd08dd5677c81774650205ff3b7ec8d7",
 }
+# File RQ2 non ancora congelati scientificamente: se ne registra l'impronta SHA-256 corrente, cosi'
+# un congelamento finale potra' fissarla.
 RQ2_FINGERPRINT_PATHS = (
     "evaluation/rq2_probe_adapter.py",
     "evaluation/rq2_output_contracts.py",
@@ -61,11 +76,14 @@ RQ2_FINGERPRINT_PATHS = (
 
 
 class ProtocolIdentityError(ValueError):
-    """An expected source, prompt or configuration has changed."""
+    """Un sorgente, un prompt o una configurazione attesi sono cambiati."""
 
 
 def git_blob_sha1(content: bytes) -> str:
-    """Git object SHA-1 exactly as reported by GitHub's Contents API."""
+    """SHA-1 dell'oggetto git, identico a quello riportato dalla Contents API di GitHub.
+
+    E' lo SHA-1 di `blob <lunghezza>\\0` seguito dai byte del contenuto.
+    """
     if type(content) is not bytes:
         raise ProtocolIdentityError("Source content must be bytes")
     header = b"blob " + str(len(content)).encode("ascii") + b"\x00"
@@ -73,11 +91,13 @@ def git_blob_sha1(content: bytes) -> str:
 
 
 def _sha256(content: bytes) -> str:
+    """SHA-256 (esadecimale) dei byte `content`."""
     return hashlib.sha256(content).hexdigest()
 
 
 def _read_source(src_root: Path, relative: str) -> bytes:
-    # Paths come from static file lists only, never from user model output.
+    """Byte del file `relative` sotto `src_root`; errore se manca, e' un link o non si legge."""
+    # I percorsi vengono solo da elenchi statici di file, mai dall'output di un modello.
     src = src_root / relative
     if src.is_symlink() or not src.is_file():
         raise ProtocolIdentityError("Missing/symlink source: " + relative)
@@ -88,9 +108,14 @@ def _read_source(src_root: Path, relative: str) -> bytes:
 
 
 def _check_frozen_blob(src_root: Path, relative: str, expected: str) -> str:
+    """Controlla che l'hash git del file `relative` sia `expected`; restituisce il suo SHA-256.
+
+    Gli a-capo `\\r\\n` vengono normalizzati in `\\n` prima del calcolo, quindi il risultato e'
+    lo stesso su Windows e su Linux.
+    """
     body = _read_source(src_root, relative)
-    # On Windows, Git may check out these Python sources with CRLF despite the
-    # repository Git blob being LF. Normalize ONLY for Git blob comparison.
+    # Su Windows, Git puo' estrarre questi sorgenti Python con a-capo CRLF anche se il blob nel
+    # repository e' con LF. Si normalizza SOLO per il confronto dell'hash del blob Git.
     normalized = body.replace(b"\r\n", b"\n")
     if git_blob_sha1(normalized) != expected:
         raise ProtocolIdentityError("Frozen RQ1 source changed: " + relative)
@@ -98,13 +123,26 @@ def _check_frozen_blob(src_root: Path, relative: str, expected: str) -> str:
 
 
 def preview_protocol_identity(*, src_root: Path | None = None) -> dict:
-    """Read-only, exact-source prefreeze preview. No API permission or writes."""
+    """Anteprima pre-congelamento in sola lettura, sui sorgenti esatti. Nessun permesso API ne' scritture.
+
+    Argomento (per nome): `src_root`, cartella `src` (di default quella di questo modulo).
+    Restituisce il rapporto: hash dei sorgenti RQ1, modalita' di output di D, modelli proposti,
+    hash dei prompt di C e K, impronte dei file RQ2 e le dichiarazioni "nessuna API, nessun
+    congelamento scientifico".
+
+    Passi: 1) i 13 sorgenti RQ1 hanno l'hash git congelato; 2) il codice di preregistrazione e
+    di campagna impone ancora la modalita' "v2_enforce"; 3) modelli, harness, turni di tool e
+    configurazione sono quelli di RQ1; 4) impronta SHA-256 dei file RQ2; 5) assemblaggio del
+    rapporto.
+    """
+    # 1. Sorgenti RQ1 congelati: l'hash git di ciascuno deve coincidere con quello atteso.
     root = Path(src_root) if src_root is not None else Path(__file__).resolve().parents[1]
     rq1_sha256 = {
         path: _check_frozen_blob(root, path, blob)
         for path, blob in RQ1_BLOB_SHA1.items()
     }
 
+    # 2. La modalita' di output di D "v2_enforce" e' presente nel codice di preregistrazione e di campagna.
     prereg = _read_source(root, "evaluation/evaluation20_preregister.py").decode("utf-8")
     campaign = _read_source(root, "evaluation/evaluation20_campaign.py").decode("utf-8")
     if (
@@ -114,6 +152,8 @@ def preview_protocol_identity(*, src_root: Path | None = None) -> dict:
     ):
         raise ProtocolIdentityError("RQ1 D contract mode cannot be established")
 
+    # 3. Parita' con RQ1: harness, modelli, turni di tool, modello Gemini predefinito, modelli
+    # Anthropic noti e token massimi in uscita.
     ids = {m: CANDIDATE_MODELS[m]["model_id"] for m in MODELS}
     if (
         set(HARNESSES) != {"A1", "A1_8R"}
@@ -124,12 +164,13 @@ def preview_protocol_identity(*, src_root: Path | None = None) -> dict:
         or ANTHROPIC_MAX_OUTPUT_TOKENS_PER_REQUEST != 4096
     ):
         raise ProtocolIdentityError("Existing RQ1 model/config parity broken")
-    # Unlike the RQ1 source, these new RQ2 files have not been SCIENTIFICALLY
-    # frozen yet. Record their current SHA-256 so a final freeze may pin them.
+    # 4. A differenza dei sorgenti RQ1, questi nuovi file RQ2 non sono ancora stati congelati
+    # SCIENTIFICAMENTE: se ne registra l'SHA-256 corrente cosi' che un congelamento finale possa fissarlo.
     rq2_sha256 = {
         path: _sha256(_read_source(root, path))
         for path in RQ2_FINGERPRINT_PATHS
     }
+    # 5. Rapporto: nulla e' congelato, abilitato o scritto.
     return {
         "version": VERSION,
         "status": "SOURCE_PROVENANCE_CAPTURE_NOT_SCIENTIFIC_FREEZE",
@@ -173,6 +214,7 @@ def preview_protocol_identity(*, src_root: Path | None = None) -> dict:
 
 
 def main() -> None:
+    """Riga di comando: stampa in JSON il rapporto di `preview_protocol_identity`."""
     report = preview_protocol_identity()
     print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
 

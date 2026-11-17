@@ -1,14 +1,28 @@
-"""OFFLINE-only binding of RQ2 C/K prompt packages to draft workflow stages.
+"""Collegamento (binding) SOLO OFFLINE dei pacchetti di prompt C/K di RQ2 agli stadi della bozza di workflow.
 
-No model clients, file I/O, scoring, telemetry or ground truth. This is an
-integrity *preflight* over a DRAFT_NOT_EXECUTABLE plan, NOT authorization to
-run any stage. It accepts only a recorded D run dict supplied by its caller;
-it never calls the historical run_experiment function.
+Nessun client di modelli, nessun I/O su file, nessuno scoring, nessuna telemetria e nessun ground
+truth. E' un *controllo preliminare* di integrita' su un piano BOZZA_NON_ESEGUIBILE
+(`DRAFT_NOT_EXECUTABLE`), NON l'autorizzazione a eseguire alcuno stadio. Accetta soltanto un
+dizionario di esecuzione D gia' registrata, fornito dal chiamante; non chiama mai la funzione
+storica `run_experiment`.
 
-A matching SHA of supplied bytes proves internal consistency only, not that
-the GT-free source manifest was actually read/verified. A future RQ2 runner
-MUST enforce frozen model IDs, source byte hashes, cost approval, create-only
-persistence, and a scientifically valid discovery-to-test rule freeze.
+Un SHA coincidente dei byte forniti prova solo la coerenza interna, non che il manifest sorgente
+senza ground truth sia stato davvero letto e verificato. Un futuro esecutore RQ2 DEVE imporre
+gli ID dei modelli congelati, gli hash dei byte sorgente, l'approvazione dei costi, la
+persistenza a sola creazione e una regola di congelamento da discovery a test scientificamente
+valida.
+
+Contenuto:
+- costanti: versione del binding, strumenti ammessi, fornitore di ogni modello, insiemi esatti
+  di chiavi richieste per esecuzione, piano, voce di stadio e partizione;
+- `StageBindingError`: errore "stadio, sorgente o provenienza non verificabili offline";
+- `_canonical`, `_sha`: JSON canonico e suo SHA-256;
+- `_validate_plan`: convalida rigorosa del piano bozza (204 voci: D 90, C 90, K 24) e
+  restituzione delle voci per `stage_id`;
+- `_run_identity`: coerenza fra l'esecuzione D fornita e lo stadio pianificato;
+- `_binding`: costruzione del record di binding con il suo hash;
+- `prepare_bound_c`, `prepare_bound_k`: preparano i pacchetti di prompt di C e di K collegati
+  allo stadio (K solo in discovery e solo con lo STESSO input D e il C corrispondente).
 """
 from __future__ import annotations
 
@@ -23,20 +37,24 @@ from evaluation.rq2_probe_adapter import (
 )
 
 VERSION_BIND = "rq2_offline_stage_binding_v0"
+# Gli unici strumenti ammessi nei pacchetti di prompt (stessi nomi dell'harness RQ1).
 ALLOWED_TOOLS = (
     "tool_get_service_metrics", "tool_get_container_metrics",
     "tool_get_node_metrics", "tool_get_logs", "tool_get_traces",
 )
+# Fornitore atteso per ciascun modello logico.
 MODEL_PROVIDERS = {
     "gemini": "google",
     "sonnet": "anthropic",
     "haiku": "anthropic",
 }
+# Chiavi obbligatorie in un dizionario di esecuzione D registrata.
 REQUIRED_RUN_KEYS = {
     "case_id", "variant", "variant_scheme", "model",
     "model_provider", "max_tool_rounds", "raw_response",
     "tool_trajectory", "error",
 }
+# Insieme ESATTO di chiavi del piano bozza (nessuna in piu', nessuna in meno).
 PLAN_KEYS = {
     "protocol", "status", "preview_only", "source_verified",
     "split_sha256", "manifest_sha256", "partition",
@@ -46,12 +64,14 @@ PLAN_KEYS = {
     "files_written", "reads_ground_truth", "reads_predictions",
     "reads_telemetry", "limitations", "preview_sha256", "entries",
 }
+# Insieme esatto di chiavi di ogni voce di stadio: solo campi senza ground truth.
 ENTRY_KEYS = {
     "stage_id", "case_id", "cloudbed", "task_index",
     "start_unix", "end_unix", "phase", "logical_model",
     "harness", "max_tool_rounds_for_D", "stage", "dependencies",
     "execution_status",
 }
+# Insieme esatto di chiavi della partizione discovery/test.
 PARTITION_KEYS = {
     "discovery_case_ids", "test_case_ids", "discovery_cases",
     "test_cases", "discovery_windows", "test_windows",
@@ -61,10 +81,11 @@ PARTITION_KEYS = {
 
 
 class StageBindingError(ValueError):
-    """Stage, source or prior-output provenance cannot be verified offline."""
+    """Stadio, sorgente o provenienza dell'output precedente non verificabili offline."""
 
 
 def _canonical(value: object) -> bytes:
+    """Serializza `value` in JSON canonico (chiavi ordinate, senza spazi, UTF-8); errore se non serializzabile."""
     try:
         return json.dumps(
             value, ensure_ascii=False, sort_keys=True,
@@ -75,10 +96,23 @@ def _canonical(value: object) -> bytes:
 
 
 def _sha(value: object) -> str:
+    """SHA-256 (esadecimale) del JSON canonico di `value`."""
     return hashlib.sha256(_canonical(value)).hexdigest()
 
 
 def _validate_plan(plan: dict) -> dict[str, dict]:
+    """Convalida in modo rigoroso il piano bozza `plan` e restituisce le sue voci indicizzate per `stage_id`.
+
+    Solleva `StageBindingError` se il piano non e' ESATTAMENTE la bozza bloccata e senza ground
+    truth attesa.
+
+    Passi: 1) insieme di chiavi esatto, protocollo, stato bozza, nessuna API/budget/chiamata/file
+    scritto/lettura di ground truth, 204 voci con la ripartizione D 90, C 90, K 24, modelli e
+    harness attesi, gate fra le fasi chiuso; 2) l'hash di anteprima coincide con quello ricalcolato;
+    3) partizione con 4 casi di discovery e 11 di test, tutti diversi; 4) per ogni voce: campi
+    ammessi, id e fase coerenti, nessun K nei test, stato "bloccato", id di stadio e dipendenze
+    attesi (D nessuna, C da D, K da C); 5) l'insieme degli stadi coincide con la coorte 4+11.
+    """
     if type(plan) is not dict or set(plan) != PLAN_KEYS or (
         plan.get("protocol") != VERSION
         or plan.get("status") != PLAN_STATUS
@@ -168,6 +202,11 @@ def _validate_plan(plan: dict) -> dict[str, dict]:
 
 
 def _run_identity(run: dict, entry: dict) -> None:
+    """Controlla che l'esecuzione D `run` sia coerente con lo stadio pianificato `entry`.
+
+    Verifica chiavi richieste, caso, harness, schema di variante, numero massimo di round,
+    fornitore e che il nome logico del modello compaia nell'identificativo registrato.
+    """
     if type(run) is not dict or REQUIRED_RUN_KEYS - set(run):
         raise StageBindingError("Incomplete D run metadata")
     model = run["model"]
@@ -182,11 +221,18 @@ def _run_identity(run: dict, entry: dict) -> None:
         or logical not in model.lower()
     ):
         raise StageBindingError("D identity inconsistent with planned stage")
-    # The exact model versions and temperature are NOT frozen at draft stage.
-    # Model substring matching is an early guard, not identity certification.
+    # Le versioni esatte dei modelli e la temperatura NON sono congelate nella fase di bozza.
+    # Il confronto per sottostringa sul nome del modello e' una guardia preliminare, non una
+    # certificazione dell'identita'.
 
 
 def _binding(plan: dict, entry: dict, package: dict) -> dict:
+    """Costruisce il record di binding fra `package` e lo stadio `entry`, con il proprio hash.
+
+    Il record dichiara esplicitamente: sorgente NON verificato qui, versioni dei modelli e regole
+    scientifiche NON congelate, nessuna API eseguibile, zero chiamate. Restituisce il record con
+    l'aggiunta di `binding_sha256`.
+    """
     bound = {
         "binding_version": VERSION_BIND,
         "stage_id": entry["stage_id"],
@@ -210,7 +256,16 @@ def prepare_bound_c(
     *, plan: dict, c_stage_id: str, original_instruction: str,
     diagnostic_run: dict,
 ) -> dict:
-    """Bind a C prompt to one approved *shape* of draft D/C stage pair."""
+    """Collega un prompt C a una *forma* approvata di coppia di stadi D/C della bozza.
+
+    Argomenti (per nome): `plan` (piano bozza), `c_stage_id` (stadio C richiesto),
+    `original_instruction` (istruzione originale della diagnosi), `diagnostic_run` (esecuzione D
+    registrata). Restituisce il record di binding con il pacchetto di prompt di C.
+
+    Passi: 1) convalida del piano; 2) lo stadio richiesto deve esistere ed essere di tipo C;
+    3) coerenza dell'esecuzione D con lo stadio; 4) preparazione del pacchetto di prompt (un
+    errore di input diventa `StageBindingError`); 5) costruzione del binding.
+    """
     entries = _validate_plan(plan)
     entry = entries.get(c_stage_id)
     if entry is None or entry["stage"] != "C":
@@ -231,7 +286,17 @@ def prepare_bound_k(
     *, plan: dict, k_stage_id: str, original_instruction: str,
     diagnostic_run: dict, prior_c_binding: dict, cause_raw_json: str,
 ) -> dict:
-    """K is allowed only for discovery, with SAME D input and matching C."""
+    """K e' ammesso solo in discovery, con lo STESSO input D e il C corrispondente.
+
+    Argomenti (per nome): `plan`, `k_stage_id`, `original_instruction`, `diagnostic_run`,
+    `prior_c_binding` (binding di C gia' ottenuto) e `cause_raw_json` (risposta grezza della
+    causa proposta in C). Restituisce il record di binding con il pacchetto di prompt di K.
+
+    Passi: 1) convalida del piano; 2) lo stadio deve essere un K di discovery; 3) coerenza
+    dell'esecuzione D; 4) ricostruisce il binding di C atteso e lo confronta con quello fornito
+    (devono essere identici); 5) prepara il pacchetto di prompt della regola candidata; 6)
+    costruisce il binding.
+    """
     entries = _validate_plan(plan)
     entry = entries.get(k_stage_id)
     if entry is None or entry["stage"] != "K" or entry["phase"] != "discovery":

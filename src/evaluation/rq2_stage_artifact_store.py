@@ -1,22 +1,31 @@
-"""RQ2 source-bound, create-only STAGE ARTIFACT storage (no execution).
+"""RQ2: archivio di ARTEFATTI DI STADIO legato al sorgente, a sola creazione (nessuna esecuzione).
 
-This module persists caller-supplied stage content, including errors, in a
-separate RQ2 directory. It does NOT invoke agents, providers, tools, scorers
-or model-produced pseudocode. Its input is a DRAFT_NOT_EXECUTABLE plan: NO
-write or audit here authorizes any model call or scientific freeze.
+Questo modulo salva su disco il contenuto di uno stadio fornito dal chiamante, errori inclusi,
+in una cartella RQ2 separata. NON invoca agenti, provider, strumenti, scorer ne' pseudocodice
+prodotto da un modello. L'input e' un piano BOZZA_NON_ESEGUIBILE (`DRAFT_NOT_EXECUTABLE`):
+NESSUNA scrittura o audit qui autorizza una chiamata a un modello o un congelamento scientifico.
 
-Only discovery D/C/K can be stored under this V0 contract. Test stages are
-blocked entirely until a separate, preregistered SCIENTIFIC freeze protocol
-is implemented; the synthetic mock-journal freeze is NEVER accepted.
+Sotto questo contratto V0 si possono salvare solo gli stadi di discovery D/C/K. Gli stadi di test
+sono bloccati del tutto finche' non sara' implementato un protocollo di congelamento SCIENTIFICO
+separato e preregistrato; il congelamento del giornale sintetico di prova NON viene MAI accettato.
 
-The plan is rebuilt using the frozen GT-free CSVs (preview_market) and hashes
-are checked again on each store operation. Result integrity is checked with
-canonical JSON and SHA-256; this detects accidental corruption, NOT malicious
-edits by an attacker who can rewrite bytes and recompute hashes.
+Il piano viene ricostruito dai CSV congelati senza ground truth (`preview_market`) e gli hash
+vengono ricontrollati a ogni operazione di salvataggio. L'integrita' del risultato e' verificata
+con JSON canonico e SHA-256: rileva corruzioni accidentali, NON modifiche malevole di chi puo'
+riscrivere i byte e ricalcolare gli hash.
 
-Never use this store in place of a claim/lease system for asynchronous runs.
-No retry or automatic overwrite is permitted. A partial/crashed write remains
-on disk for investigation and blocks that stage.
+Contenuto:
+- costanti: versione dell'archivio, sottocartella fissa, dimensione massima, stati ammessi e
+  nomi di chiave vietati (schemi propri della valutazione);
+- `RQ2ArtifactStoreError`: errore per violazione di integrita' o di fase;
+- funzioni di supporto: `_encoded` (JSON canonico), `_sha`, `_source_sha`, `_filename`,
+  `_check_no_gt_schema`, `_read_canonical`, `_create_exclusive`;
+- `RQ2StageArtifactStore`: verifica i sorgenti, controlla i record esistenti, rifa' l'audit al
+  riavvio, carica e salva gli artefatti di discovery.
+
+Non usare questo archivio al posto di un sistema di claim/lease per esecuzioni asincrone.
+Non e' ammesso alcun nuovo tentativo ne' sovrascrittura automatica. Una scrittura parziale o
+interrotta resta su disco per l'analisi e blocca quello stadio.
 """
 from __future__ import annotations
 
@@ -33,14 +42,17 @@ from evaluation.rq2_dryrun_plan import (
 from evaluation.rq2_stage_binding import StageBindingError, _validate_plan
 
 STORE_VERSION = "rq2_stage_artifact_store_v0"
+# Sottocartella FISSA di destinazione: il chiamante non puo' reindirizzare le scritture.
 STORE_SUBDIRECTORY = Path("data/rq2/stage_artifacts_v0")
+# Dimensione massima (in byte) di un artefatto serializzato.
 MAX_ARTIFACT_BYTES = 32_000_000
+# Stati ammessi per uno stadio registrato.
 _STATUSES = frozenset((
     "RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR",
     "BLOCKED_DEPENDENCY",
 ))
-# These refer to evaluation-only schema keys and cannot be silently stored
-# inside model-facing RQ2 artifacts. This is NOT a semantic GT scrubber.
+# Nomi di chiave dello schema riservato alla valutazione: non si possono salvare di nascosto
+# dentro artefatti RQ2 destinati al modello. NON e' un filtro semantico del ground truth.
 _FORBIDDEN_KEYS = frozenset((
     "ground_truth", "ground_truth_reason", "scoring_points",
     "reference_fault_types", "reference_complete", "true_fault_type",
@@ -50,10 +62,15 @@ _FORBIDDEN_KEYS = frozenset((
 
 
 class RQ2ArtifactStoreError(ValueError):
-    """Refuse a source-integrity, artifact-integrity or phase-gate violation."""
+    """Rifiuta una violazione di integrita' del sorgente, di integrita' dell'artefatto o del gate di fase."""
 
 
 def _encoded(value: object) -> bytes:
+    """Serializza `value` in JSON canonico (chiavi ordinate, senza spazi, UTF-8) e ne controlla la taglia.
+
+    Solleva `RQ2ArtifactStoreError` se il valore non e' serializzabile in modo canonico (anche per
+    valori non finiti) o supera `MAX_ARTIFACT_BYTES`.
+    """
     try:
         data = json.dumps(
             value, ensure_ascii=False, sort_keys=True,
@@ -67,10 +84,12 @@ def _encoded(value: object) -> bytes:
 
 
 def _sha(data: bytes) -> str:
+    """SHA-256 (esadecimale) dei byte `data`."""
     return hashlib.sha256(data).hexdigest()
 
 
 def _source_sha(path: Path) -> str:
+    """SHA-256 del file sorgente `path` (CSV congelato senza ground truth); errore se illeggibile."""
     try:
         return _sha(path.read_bytes())
     except OSError as exc:
@@ -78,11 +97,16 @@ def _source_sha(path: Path) -> str:
 
 
 def _filename(stage_id: str) -> str:
+    """Nome del file di uno stadio: `RQ2_STAGE_<sha256 dell'id>.json` (nome deterministico)."""
     return "RQ2_STAGE_" + _sha(stage_id.encode("utf-8")) + ".json"
 
 
 def _check_no_gt_schema(value: object) -> None:
-    """Reject known evaluation-only KEY names, not model text content."""
+    """Rifiuta i nomi di CHIAVE riservati alla valutazione (a ogni livello), non il testo prodotto dal modello.
+
+    Controlla ricorsivamente dizionari e liste; le chiavi devono essere stringhe e non comparire
+    (in minuscolo) in `_FORBIDDEN_KEYS`.
+    """
     if type(value) is dict:
         for name, item in value.items():
             if type(name) is not str or name.lower() in _FORBIDDEN_KEYS:
@@ -94,6 +118,12 @@ def _check_no_gt_schema(value: object) -> None:
 
 
 def _read_canonical(path: Path) -> dict:
+    """Legge un artefatto da `path` e verifica che sia un dizionario in JSON canonico.
+
+    Passi: 1) rifiuta link simbolici e percorsi che non sono file; 2) legge al massimo
+    `MAX_ARTIFACT_BYTES + 1` byte; 3) interpreta il JSON; 4) controlla che, ricodificato in forma
+    canonica, dia esattamente gli stessi byte letti.
+    """
     if path.is_symlink() or not path.is_file():
         raise RQ2ArtifactStoreError("Invalid/symlink artifact path")
     try:
@@ -113,6 +143,10 @@ def _read_canonical(path: Path) -> dict:
 
 
 def _create_exclusive(path: Path, content: bytes) -> None:
+    """Crea `path` in modo ESCLUSIVO (a sola creazione, permessi 0600) e vi scrive `content` con fsync.
+
+    Se il file esiste gia' (anche come link simbolico) solleva un errore: nessuna sovrascrittura.
+    """
     if path.is_symlink() or path.exists():
         raise RQ2ArtifactStoreError("Create-only: stage already exists")
     try:
@@ -128,13 +162,21 @@ def _create_exclusive(path: Path, content: bytes) -> None:
 
 
 class RQ2StageArtifactStore:
-    """Read-only source validation + persist immutable discovery artifacts.
+    """Validazione dei sorgenti in sola lettura + salvataggio di artefatti di discovery immutabili.
 
-    The destination is fixed under data_dir/data/rq2/stage_artifacts_v0.
-    A caller cannot redirect it into RQ1's data/results directory.
+    La destinazione e' fissa sotto `data_dir/data/rq2/stage_artifacts_v0`: il chiamante non puo'
+    reindirizzarla nella cartella `data/results` di RQ1.
     """
 
     def __init__(self, *, data_dir: Path):
+        """Prepara l'archivio senza scrivere nulla.
+
+        Argomento (per nome): `data_dir`, radice dei dati. Passi: 1) ricostruisce il piano dai CSV
+        congelati e ne valida le voci; 2) controlla che sia la bozza bloccata originale (sorgenti
+        verificati, nessuna API eseguibile o a budget, nessuna chiamata, hash di split e manifest
+        attesi); 3) memorizza hash del piano, voci e cartella radice; 4) ricontrolla i sorgenti e
+        la cartella di destinazione.
+        """
         self.data_dir = Path(data_dir)
         try:
             plan = preview_market(self.data_dir)
@@ -156,9 +198,10 @@ class RQ2StageArtifactStore:
         self.root = self.data_dir / STORE_SUBDIRECTORY
         self._verify_sources()
         self._guard_directory()
-        # No writes in constructor: a preflight cannot create output files.
+        # Nessuna scrittura nel costruttore: un controllo preliminare non puo' creare file di output.
 
     def _verify_sources(self) -> None:
+        """Ricalcola l'SHA-256 dei due CSV congelati (split e manifest) e li confronta con quelli attesi."""
         split = self.data_dir / "data/processed/split_market_v1.csv"
         manifest = self.data_dir / "data/processed/benchmark_inputs_market.csv"
         if (
@@ -168,7 +211,8 @@ class RQ2StageArtifactStore:
             raise RQ2ArtifactStoreError("Original GT-free sources changed")
 
     def _guard_directory(self) -> None:
-        # Only the new RQ2 subdirectory may be written.
+        """Controlla la cartella di destinazione: niente link simbolici e radice (se esiste) deve essere una cartella."""
+        # Si puo' scrivere solo nella nuova sottocartella RQ2.
         if any(p.is_symlink() for p in (
             self.data_dir / "data/rq2", self.root,
         )):
@@ -177,11 +221,20 @@ class RQ2StageArtifactStore:
             raise RQ2ArtifactStoreError("Artifact root is not a directory")
 
     def _path(self, stage_id: str) -> Path:
+        """Percorso del file di `stage_id`; errore se lo stadio non e' nel piano verificato."""
         if stage_id not in self.entries:
             raise RQ2ArtifactStoreError("Stage not in verified plan")
         return self.root / _filename(stage_id)
 
     def _check_record(self, stage_id: str) -> dict | None:
+        """Legge e verifica a fondo il record di `stage_id`; restituisce `None` se non esiste ancora.
+
+        Passi: 1) legge il JSON canonico; 2) controlla l'insieme esatto delle chiavi; 3) ricalcola
+        l'hash del record; 4) confronta identita' (stadio, caso, fase, modello, harness), hash di
+        piano/split/manifest, autorizzazione "nessuna API", stato ammesso, fase di discovery,
+        modello proposto, hash dell'artefatto e dipendenze; 5) coerenza di stato bloccato e
+        artefatto vuoto; 6) nessuna chiave riservata alla valutazione nell'artefatto.
+        """
         path = self._path(stage_id)
         if not path.exists() and not path.is_symlink():
             return None
@@ -231,7 +284,17 @@ class RQ2StageArtifactStore:
         return record
 
     def audit_restart(self) -> dict:
-        """Verify all existing receipts and ordered dependencies on resume."""
+        """Verifica tutte le ricevute esistenti e le dipendenze ordinate alla ripresa.
+
+        Restituisce il rapporto di audit: versione, stato (nessun artefatto oppure audit dei soli
+        artefatti di discovery), hash del piano, numero di stadi salvati, conteggio per stato e i
+        flag "nessuna lettura di ground truth, zero chiamate, API e fase di test bloccate".
+
+        Passi: 1) ricontrolla sorgenti e cartella; 2) se la radice non esiste, rapporto vuoto;
+        3) rifiuta file sconosciuti o non di discovery; 4) per ogni stadio salvato verifica il
+        record, le dipendenze (devono esistere e avere gli hash attesi), che il modello coincida
+        con quello dei genitori e che lo stato "bloccato" coincida con il fallimento di un genitore.
+        """
         self._verify_sources()
         self._guard_directory()
         if not self.root.exists():
@@ -296,10 +359,11 @@ class RQ2StageArtifactStore:
         }
 
     def load_discovery_stage(self, *, stage_id: str) -> dict | None:
-        """Load a verified discovery artifact, never release test or model calls.
+        """Carica un artefatto di discovery verificato, senza mai sbloccare test o chiamate ai modelli.
 
-        Re-audits the full journal first, then returns the canonical record.
-        This is for a separate offline D/C/K recorder, NOT a provider runner.
+        Argomento (per nome): `stage_id`. Rifa' prima l'audit dell'intero giornale, poi restituisce
+        il record canonico (o `None` se non c'e'). E' pensato per un registratore D/C/K offline
+        separato, NON per un esecutore di provider. Rifiuta stadi sconosciuti e stadi di test.
         """
         if type(stage_id) is not str or stage_id not in self.entries:
             raise RQ2ArtifactStoreError("Unknown discovery stage")
@@ -312,7 +376,18 @@ class RQ2StageArtifactStore:
         self, *, stage_id: str, model_id_proposed: str,
         status: str, artifact: dict,
     ) -> dict:
-        """Store one caller-provided result; NEVER dispatch an agent/provider."""
+        """Salva UN risultato fornito dal chiamante; NON avvia MAI un agente o un provider.
+
+        Argomenti (per nome): `stage_id`, `model_id_proposed`, `status`, `artifact`. Restituisce
+        un riepilogo (hash di record e di artefatto, zero chiamate, API e test bloccati).
+
+        Passi: 1) stadio pianificato e di discovery (i risultati di TEST sono bloccati); 2) metadati
+        validi (stato ammesso, artefatto dizionario, modello coerente e non vuoto); 3) coerenza
+        tra stato "bloccato" e artefatto vuoto; 4) niente chiavi riservate alla valutazione;
+        5) nuovo audit del giornale e controllo che lo stadio non sia gia' salvato; 6) le
+        dipendenze devono esistere, con lo stesso modello, e lo stato deve rispettarne l'esito;
+        7) costruzione del record con hash e scrittura esclusiva.
+        """
         if type(stage_id) is not str or stage_id not in self.entries:
             raise RQ2ArtifactStoreError("Unplanned stage")
         e = self.entries[stage_id]
@@ -335,7 +410,7 @@ class RQ2StageArtifactStore:
             raise RQ2ArtifactStoreError("Non-blocked artifact cannot be empty")
         _check_no_gt_schema(artifact)
         _encoded(artifact)
-        # All existing stored files, including failures, must survive re-audit.
+        # Tutti i file gia' salvati, fallimenti inclusi, devono superare il nuovo audit.
         self.audit_restart()
         if self._check_record(stage_id) is not None:
             raise RQ2ArtifactStoreError("Create-only: stage already stored")

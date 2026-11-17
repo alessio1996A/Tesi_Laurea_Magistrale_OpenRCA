@@ -1,13 +1,23 @@
-"""RQ2 C/K LangChain messages, executed ONLY against a strict fake model.
+"""Messaggi LangChain di C/K di RQ2, eseguiti ESCLUSIVAMENTE contro un modello finto e rigoroso.
 
-No real SDK / API, no user callback, no tools, no Market, GT, scorer,
-source reading, persistence, or scientific freeze. This adapter proves
-the *shape* and extraction of a single tool-free invoke, not permission
-to use an actual provider. Live adapter must be separate and preregistered.
+Nessun SDK o API reale, nessuna callback dell'utente, nessuno strumento, nessun Market, ground
+truth, scorer, lettura di sorgenti, persistenza o congelamento scientifico. Questo adattatore
+dimostra la *forma* e l'estrazione di una singola invocazione senza strumenti, NON il permesso di
+usare un provider vero. Un adattatore live dovra' essere separato e preregistrato.
 
-Bound packages must come from the existing stage-binding functions and
-must have internally valid canonical SHA256. This checks consistency,
-NOT authenticity of the original GT-free manifest or D run.
+I pacchetti collegati (bound) devono provenire dalle funzioni di stage-binding esistenti e devono
+avere un SHA-256 canonico internamente valido. Questo controlla la coerenza, NON l'autenticita'
+del manifest originale senza ground truth ne' dell'esecuzione D.
+
+Contenuto:
+- costanti: versione, hash SHA-256 dei prompt di sistema di C e di K "pre-congelati" e tabella
+  `_STAGES` (nome stadio, testo del prompt, hash atteso);
+- `ToolFreeFakeTransportError`: errore per input non valido o modello non finto;
+- `SimulatedProviderFailure`: errore sintetico che imita un guasto del provider;
+- `StrictToolFreeFake`: modello finto che accetta UNA sola invocazione e nessuno strumento;
+- `_digest`, `_check_package`: SHA-256 del testo e controllo completo del binding e del pacchetto;
+- `_usage`: lettura dei token dal messaggio sintetico;
+- `invoke_bound_probe_fake`: invoca il modello finto una volta e riporta l'esito.
 """
 from __future__ import annotations
 
@@ -27,14 +37,16 @@ from evaluation.rq2_stage_binding import (
 )
 
 VERSION = "rq2_toolfree_fake_transport_v0"
-# Captured from the user's verified 2026-11-12 local prefreeze readout.
-# Not a formal scientific freeze. Any future change must be explicit.
+# Hash dei prompt di sistema rilevati dalla lettura locale verificata dall'utente il 12/11/2026
+# ("pre-congelamento"). NON e' un congelamento scientifico formale: ogni modifica futura deve
+# essere esplicita.
 PREFREEZE_C_SYSTEM_SHA256 = (
     "81a5800500b3fafc23af4b7643e79a3d206c3ca6c80f6924514001ec85dc2a42"
 )
 PREFREEZE_K_SYSTEM_SHA256 = (
     "0935e2b7232715b623bb174f0a059387659f8d9bc7939804c8a372d8aa27ba71"
 )
+# Per ogni stadio: nome dello stadio, testo del prompt di sistema e SHA-256 atteso del prompt.
 _STAGES = {
     "C": ("C_cause_probe", CAUSE_SYSTEM, PREFREEZE_C_SYSTEM_SHA256),
     "K": ("K_candidate_rule", RULE_SYSTEM, PREFREEZE_K_SYSTEM_SHA256),
@@ -42,17 +54,23 @@ _STAGES = {
 
 
 class ToolFreeFakeTransportError(ValueError):
-    """Refuse malformed bound input or non-fake model before invocation."""
+    """Rifiuta, prima dell'invocazione, un input collegato malformato o un modello non finto."""
 
 
 class SimulatedProviderFailure(Exception):
-    """Synthetic stand-in for a provider error, never a real API failure."""
+    """Sostituto sintetico di un errore del provider: non e' mai un vero guasto di API."""
 
 
 class StrictToolFreeFake:
-    """Exactly one AIMessage or synthetic exception, never a provider client."""
+    """Esattamente un `AIMessage` oppure un'eccezione sintetica; mai un client di provider."""
 
     def __init__(self, *, outcome: AIMessage | SimulatedProviderFailure):
+        """Memorizza (copia profonda) l'esito che verra' restituito o sollevato all'invocazione.
+
+        Argomento (per nome): `outcome`, un `AIMessage` oppure un `SimulatedProviderFailure`
+        (qualunque altro tipo solleva `ToolFreeFakeTransportError`). Inizializza il contatore
+        delle chiamate e i messaggi ricevuti.
+        """
         if type(outcome) not in (AIMessage, SimulatedProviderFailure):
             raise ToolFreeFakeTransportError("A fake AIMessage or failure is required")
         self._outcome = deepcopy(outcome)
@@ -60,9 +78,16 @@ class StrictToolFreeFake:
         self.received_messages = None
 
     def bind_tools(self, *_args, **_kwargs):
+        """Vietato: C/K non devono mai collegare alcuno strumento al modello."""
         raise AssertionError("C/K must never bind any tools")
 
     def invoke(self, messages):
+        """Simula l'invocazione del modello: al massimo UNA volta, con la sola coppia sistema/utente.
+
+        Argomento: `messages`, lista di esattamente due messaggi (`SystemMessage` poi
+        `HumanMessage`). Registra la chiamata e una copia dei messaggi; poi solleva l'eccezione
+        sintetica oppure restituisce una copia del messaggio finto.
+        """
         if self.calls != 0:
             raise AssertionError("A C/K fake stage must invoke once at most")
         if (
@@ -79,10 +104,24 @@ class StrictToolFreeFake:
 
 
 def _digest(text: str) -> str:
+    """SHA-256 (esadecimale) del testo `text` codificato in UTF-8."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _check_package(binding: dict) -> tuple[str, str, list]:
+    """Controlla a fondo il binding `binding` e ne ricava lo stadio, il suo hash e i messaggi LangChain.
+
+    Restituisce `(stadio "C" o "K", binding_sha256, [SystemMessage, HumanMessage])`; solleva
+    `ToolFreeFakeTransportError` a ogni incoerenza.
+
+    Passi: 1) il binding e' un dizionario con versione, hash, fase di discovery, nessuna API e
+    zero chiamate; 2) l'id di stadio ha la forma attesa (versione, caso, modello, harness, C/K)
+    e coincide con i campi del binding, con la dipendenza giusta (C da D, K da C) e con sorgente
+    non verificato e regole non congelate; 3) il pacchetto sottostante ha versione, nome di
+    stadio, hash di pacchetto, hash del prompt di sistema e "non pronto per le API" coerenti con
+    quelli attesi; 4) i due messaggi sono esattamente sistema + utente, con il prompt di sistema
+    atteso e il testo utente che inizia con l'avviso "dati osservati NON fidati".
+    """
     if type(binding) is not dict:
         raise ToolFreeFakeTransportError("Binding must be a dict")
     core = {key: val for key, val in binding.items()
@@ -152,6 +191,12 @@ def _check_package(binding: dict) -> tuple[str, str, list]:
 
 
 def _usage(message: AIMessage) -> dict:
+    """Legge i token dal messaggio sintetico `message` (campo `usage_metadata`).
+
+    Restituisce `complete` vero solo se input, output e totale sono interi non negativi e il
+    totale non e' inferiore a input e output; altrimenti i valori restano `None`. La sorgente e'
+    sempre "messaggio sintetico, non fatturato".
+    """
     raw = getattr(message, "usage_metadata", None)
     keys = ("input_tokens", "output_tokens", "total_tokens")
     complete = (
@@ -170,11 +215,18 @@ def _usage(message: AIMessage) -> dict:
 
 
 def invoke_bound_probe_fake(*, binding: dict, fake_model: StrictToolFreeFake) -> dict:
-    """Invoke exactly one fake C/K message pair and report the outcome.
+    """Invoca UNA sola coppia di messaggi C/K sul modello finto e riporta l'esito.
 
-    Return fields raw_response/provider_error are usable by the existing
-    source-bound recorder *in synthetic tests only*. Output is NOT a
-    scientific result, and the module has no real-provider dispatch.
+    Argomenti (per nome): `binding` (record di stage-binding) e `fake_model` (deve essere un
+    `StrictToolFreeFake`). I campi restituiti `raw_response` e `provider_error` sono utilizzabili
+    dal registratore esistente legato al sorgente *solo in test sintetici*. L'output NON e' un
+    risultato scientifico e il modulo non ha alcun invio verso provider reali.
+
+    Passi: 1) accetta solo un modello finto rigoroso; 2) controlla binding e pacchetto; 3)
+    verifica che il modello logico sia fra i candidati e ne ricava l'id proposto; 4) invoca il
+    modello finto: un guasto sintetico diventa "errore del provider finto"; 5) altrimenti rifiuta
+    tipi di messaggio inattesi e richieste di strumenti, legge i token e il testo; 6) un testo
+    vuoto diventa "risposta vuota finta"; 7) assembla il rapporto con tutti i flag a falso.
     """
     if type(fake_model) is not StrictToolFreeFake:
         raise ToolFreeFakeTransportError("Only StrictToolFreeFake is allowed")
@@ -196,7 +248,7 @@ def invoke_bound_probe_fake(*, binding: dict, fake_model: StrictToolFreeFake) ->
         status = "FAKE_PROVIDER_ERROR"
         error = "SimulatedProviderFailure: " + str(exc)
     else:
-        # No follow-up invokes or tool execution, including on protocol failure.
+        # Nessuna invocazione successiva ne' esecuzione di strumenti, nemmeno dopo un errore di protocollo.
         if type(response) is not AIMessage:
             status = "FAKE_PROTOCOL_ERROR"
             error = "Unexpected fake message type"
@@ -210,7 +262,7 @@ def invoke_bound_probe_fake(*, binding: dict, fake_model: StrictToolFreeFake) ->
             raw = testo_messaggio(response.content, solo_testo=True)
             if not raw.strip():
                 status = "FAKE_EMPTY_RESPONSE"
-                raw = ""  # Recorder will mark INVALID_OUTPUT, not a fake diagnosis
+                raw = ""  # il registratore lo segnera' INVALID_OUTPUT, non una diagnosi finta
     return {
         "version": VERSION,
         "stage": stage,
