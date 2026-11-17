@@ -16,10 +16,12 @@ import math
 
 import pandas as pd
 
-# Explicit allowlist: held-out Market fault classes are deliberately absent.
+# Elenco ESPLICITO delle regole ammesse: le quattro classi di guasto escluse dalle regole di RQ1
+# (quelle studiate in RQ2) sono assenti di proposito.
 
 # Catalogo delle otto classi diagnostiche attualmente coperte.
 # Ogni voce indica ID, livello di telemetria, modulo, funzione e nome della classe.
+# I moduli sono caricati per nome con `import_module` (vedi `costruisci_evidenze_regole`).
 RULE_SPECS = (
     ("R01", "container", "harness.rules.rule_container_cpu",
      "valuta_r01_container_cpu", "container CPU load"),
@@ -50,9 +52,12 @@ RULE_SPECS = (
 )
 
 
+# I tre esiti possibili di una regola su un componente.
 STATUSES = ("candidato_da_verificare", "nessun_candidato", "evidenza_insufficiente")
+# Colonne obbligatorie della telemetria.
 FIELDS = ("timestamp", "cmdb_id", "kpi_name", "value")
-# An explicit evidence whitelist makes the prompt small and avoids copying full raw telemetry.
+# Elenco esplicito delle evidenze da riportare: tiene corto il prompt dell'agente ed evita di copiarvi
+# la telemetria grezza. Le chiavi sono quelle prodotte dai rilevatori delle regole.
 EVIDENCE_KEYS = (
     "kpi_principale", "baseline_mediana", "baseline_mad", "soglia_esplorativa",
     "massimo_ricerca", "campioni_oltre_soglia", "campioni_baseline", "campioni_ricerca",
@@ -66,21 +71,30 @@ EVIDENCE_KEYS = (
 
 
 def _clean(value: Any) -> Any:
-    """Convert pandas/numpy numeric scalars to portable, strict JSON primitives."""
+    """Converte ricorsivamente i valori in tipi JSON "rigorosi" (str, bool, int, float finiti, liste, dizionari).
+
+    Gli scalari numerici di pandas/numpy diventano numeri Python; NaN e infiniti diventano None (il JSON
+    rigoroso non li ammette). Un tipo non convertibile solleva TypeError.
+    """
+    # Tipi già validi: restano come sono.
     if value is None or isinstance(value, (str, bool, int)):
         return value
+    # I numeri decimali non finiti (NaN, infinito) non sono JSON valido: si sostituiscono con None.
     if isinstance(value, float):
         return value if math.isfinite(value) else None
+    # Contenitori: si puliscono gli elementi (le chiavi dei dizionari diventano stringhe).
     if isinstance(value, dict):
         return {str(k): _clean(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_clean(v) for v in value]
+    # Scalari numpy/pandas: `.item()` li converte nel tipo Python equivalente.
     if hasattr(value, "item"):
         return _clean(value.item())
     raise TypeError(f"Tipo non serializzabile nel report regole: {type(value).__name__}")
 
 
 def _components(df: pd.DataFrame, start: int, end: int) -> list[str]:
+    """Nomi dei componenti (`cmdb_id`) che hanno almeno un campione in [start, end), in ordine alfabetico."""
     if not set(FIELDS).issubset(df.columns):
         raise ValueError(f"Telemetria mancante colonne: {set(FIELDS) - set(df.columns)}")
     timestamps = pd.to_numeric(df["timestamp"], errors="coerce")
@@ -103,7 +117,18 @@ def costruisci_evidenze_regole(
     rigoroso, senza consultare risposte ufficiali o ground truth.
     max_candidati_report limita i candidati MOSTRATI, non quelli valutati:
     tutti i componenti disponibili vengono analizzati.
+
+    Argomenti:
+      df_nodi, df_container  telemetria dei nodi e dei container, già limitata alla finestra del caso.
+      start_unix, end_unix   finestra del caso, in secondi unix (interi, start < end).
+      quota_baseline         frazione iniziale della finestra usata come baseline (default 0.4 = 40%).
+      max_candidati_report   quanti candidati inserire al massimo nel report (gli altri sono solo contati).
+
+    Passi: (1) controlla gli argomenti; (2) fissa la fine della baseline; (3) per ognuna delle otto regole la
+    esegue su tutti i componenti del suo livello (nodo o container); (4) verifica che ogni esito sia ben
+    formato; (5) raccoglie i candidati e i conteggi per regola; (6) ordina e costruisce il report.
     """
+    # --- 1. Controllo degli argomenti.
     if not isinstance(df_nodi, pd.DataFrame) or not isinstance(df_container, pd.DataFrame):
         raise TypeError("df_nodi e df_container devono essere DataFrame")
     if not (isinstance(start_unix, int) and isinstance(end_unix, int)
@@ -114,20 +139,22 @@ def costruisci_evidenze_regole(
     if not isinstance(max_candidati_report, int) or max_candidati_report < 1:
         raise ValueError("max_candidati_report deve essere un intero positivo")
 
-    # La baseline e' una porzione iniziale DELLA finestra del caso:
+    # --- 2. Fine della baseline. La baseline e' una porzione iniziale DELLA finestra del caso:
     # potrebbe contenere un'anomalia e non costituisce ground truth.
     baseline_end = start_unix + int((end_unix - start_unix) * quota_baseline)
     if not start_unix < baseline_end < end_unix:
         raise ValueError("Finestra troppo corta per la baseline")
 
+    # Telemetria per livello e componenti presenti nella finestra per ciascun livello.
     datasets = {"node": df_nodi, "container": df_container}
     comp = {kind: _components(df, start_unix, end_unix) for kind, df in datasets.items()}
     candidates: list[dict[str, Any]] = []
     per_rule: list[dict[str, Any]] = []
 
-    # Eseguiamo ogni regola su tutti i componenti osservati nel suo livello.
+    # --- 3. Eseguiamo ogni regola su tutti i componenti osservati nel suo livello.
     # Produciamo ipotesi candidate, mai una root cause gia' confermata.
     for rule_id, kind, module_name, func_name, expected_class in RULE_SPECS:
+        # Si carica la funzione della regola dal modulo indicato nel catalogo.
         function = getattr(import_module(module_name), func_name)
         counters = Counter()
         for component in comp[kind]:
@@ -138,6 +165,8 @@ def costruisci_evidenze_regole(
                 baseline_end_unix=baseline_end,
                 end_unix=end_unix,
             )
+            # --- 4. Verifica dell'esito: forma, stato ammesso e identità coerente con la regola
+            # e con il componente richiesti. Qualunque incoerenza interrompe tutto (nessun esito parziale).
             if not isinstance(result, dict):
                 raise ValueError(f"{rule_id}: il detector non ha restituito un dizionario")
             status = result.get("status")
@@ -147,6 +176,8 @@ def costruisci_evidenze_regole(
                     result.get("classe_candidata") != expected_class or
                     result.get("componente_telemetria") != component):
                 raise ValueError(f"{rule_id}: identita' della regola o del componente incoerente")
+            # --- 5. Conteggio dell'esito e, se c'è un candidato, controllo dell'ipotesi: i due istanti devono
+            # cadere nella parte di ricerca della finestra (dopo la baseline, prima della fine).
             counters[status] += 1
             if status == "candidato_da_verificare":
                 hypothesis = result.get("ipotesi")
@@ -158,6 +189,7 @@ def costruisci_evidenze_regole(
                         and baseline_end <= first <= last < end_unix):
                     raise ValueError(f"{rule_id}: timestamp non valido")
                 evidence = result.get("evidenze", {})
+                # Nel report finiscono solo le evidenze dell'elenco EVIDENCE_KEYS.
                 candidates.append({
                     "regola": rule_id,
                     "classe_candidata": expected_class,
@@ -167,6 +199,7 @@ def costruisci_evidenze_regole(
                     "campioni_consecutivi": hypothesis.get("campioni_consecutivi"),
                     "evidenze": {key: evidence[key] for key in EVIDENCE_KEYS if key in evidence},
                 })
+        # Riepilogo della regola: quanti componenti valutati e come sono andati.
         per_rule.append({
             "regola": rule_id,
             "classe": expected_class,
@@ -177,9 +210,10 @@ def costruisci_evidenze_regole(
             "evidenza_insufficiente": counters["evidenza_insufficiente"],
         })
 
-    # Stable ordering; no implied causal ranking, no time-based preference.
-    # Ordinamento stabile: NON rappresenta una graduatoria causale.
+    # --- 6. Ordinamento stabile per regola e componente: NON rappresenta una graduatoria causale
+    # e non privilegia i candidati più precoci nel tempo.
     candidates.sort(key=lambda c: (c["regola"], c["componente_telemetria"]))
+    # Report finale: i candidati oltre il limite sono solo contati ("omessi per budget").
     output = {
         "versione": "rule_based_A1_R_v1",
         "tipo": "ipotesi_osservative_non_causali",

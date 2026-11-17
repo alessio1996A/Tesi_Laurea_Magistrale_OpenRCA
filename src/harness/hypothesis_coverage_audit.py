@@ -22,10 +22,12 @@ from harness.rule_batch import RULE_SPECS
 from output.openrca_contract import Diagnosis
 
 
+# Per ogni regola: (livello di telemetria, nome della classe candidata), ricavati dal catalogo di `rule_batch`.
 _RULE_CATALOG = {
     rule_id: (scope, category)
     for rule_id, scope, _, _, category in RULE_SPECS
 }
+# Il tool dell'agente che legge le metriche di ciascun livello: serve a riconoscere le chiamate mirate.
 _SCOPE_TO_TOOL = {
     "node": "tool_get_node_metrics",
     "container": "tool_get_container_metrics",
@@ -33,10 +35,17 @@ _SCOPE_TO_TOOL = {
 
 
 def _qualifying_aliases(candidates: list[dict]) -> Counter:
-    """Contare gli host per suffisso, evitando deduzioni su alias ambigui."""
+    """Contare gli host per suffisso, evitando deduzioni su alias ambigui.
+
+    Un componente "container" ha la forma `nodo.nome` (per esempio `node-5.frontend-0`). Per ogni suffisso
+    (`frontend-0`) si conta su quanti nodi diversi compare tra i candidati: se è uno solo, il suffisso
+    identifica senza ambiguità un container; se sono due o più, no.
+    """
+    # Per ogni suffisso, l'insieme dei nodi (host) in cui compare.
     suffix_hosts = {}
     for item in candidates:
         comp = item["componente_telemetria"]
+        # I nodi puri (senza punto) non hanno un suffisso e si saltano.
         if "." in comp:
             host, suffix = comp.split(".", 1)
             suffix_hosts.setdefault(suffix, set()).add(host)
@@ -44,8 +53,16 @@ def _qualifying_aliases(candidates: list[dict]) -> Counter:
 
 
 def _matches_component(predicted: str, observed: str, aliases: Counter) -> bool:
+    """True se il componente predetto dal modello corrisponde a quello osservato dalla regola.
+
+    Corrispondono: (1) nomi identici; (2) il modello ha scritto solo il suffisso del container
+    (`frontend-0`) e quel suffisso individua un unico container tra i candidati (`aliases[suffix] == 1`).
+    Un nodo non è mai un alias di un suo container.
+    """
+    # Caso 1: stesso identico nome.
     if predicted == observed:
         return True
+    # Caso 2: ammesso solo se il componente osservato è un container (ha il punto).
     if "." not in observed:
         return False
     _, suffix = observed.split(".", 1)
@@ -57,7 +74,21 @@ def verifica_copertura_ipotesi(
     evidence_report: dict,
     tool_trajectory: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Restituisce un audit descrittivo, deterministico e senza effetti."""
+    """Restituisce un audit descrittivo, deterministico e senza effetti.
+
+    Argomenti:
+      diagnosis        diagnosi finale dell'agente (contiene l'elenco `root_causes`).
+      evidence_report  report unificato delle evidenze ("unified_evidence_v2") con la sezione delle regole.
+      tool_trajectory  chiamate ai tool fatte dall'agente, in ordine.
+
+    Per ogni candidato delle regole riporta se la diagnosi lo riprende (stesso componente, stessa classe) e
+    se l'agente ha chiamato il tool delle metriche proprio su quel componente. Non giudica se il candidato
+    sia la vera causa.
+
+    Passi: (1) validazione del report; (2) controllo dei candidati; (3) estrazione delle chiamate ai tool
+    di metriche; (4) audit di ogni candidato; (5) riepilogo con i conteggi.
+    """
+    # --- 1. Validazione degli argomenti e del report delle regole.
     if not isinstance(diagnosis, Diagnosis):
         raise TypeError("Diagnosis richiesta")
     if not isinstance(evidence_report, dict):
@@ -70,6 +101,7 @@ def verifica_copertura_ipotesi(
     if not isinstance(tool_trajectory, list):
         raise TypeError("La traiettoria dei tool deve essere una lista")
 
+    # I conteggi devono tornare: candidati riportati + omessi per budget = totale.
     candidates = rules.get("candidati_riportati")
     count = rules.get("totale_candidati")
     omitted = rules.get("candidati_omessi_per_budget")
@@ -81,6 +113,7 @@ def verifica_copertura_ipotesi(
     ):
         raise ValueError("Conteggi candidati e budget incoerenti")
 
+    # --- 2. Ogni candidato deve avere regola nota, componente non vuoto e classe coerente con la regola.
     for i, candidate in enumerate(candidates):
         if not isinstance(candidate, dict):
             raise ValueError(f"Candidato {i} non valido")
@@ -94,6 +127,8 @@ def verifica_copertura_ipotesi(
         ):
             raise ValueError(f"Candidato {i}: identita' o classe incoerente")
 
+    # --- 3. Chiamate ai tool di metriche, divise in due gruppi: "mirate" (con un `cmdb_id` preciso) e
+    # "generiche" (senza componente). Gli altri tipi di evento e gli altri tool non interessano.
     aliases = _qualifying_aliases(candidates)
     metric_calls = []
     metric_calls_without_id = []
@@ -119,15 +154,20 @@ def verifica_copertura_ipotesi(
         else:
             metric_calls_without_id.append(info)
 
+    # --- 4. Audit di ogni candidato. Gli indici dei guasti della diagnosi partono da 1 (come li numera
+    # chi legge la risposta); gli indici della traiettoria partono da 0.
     output = []
     for i, candidate in enumerate(candidates):
         rule_id = candidate["regola"]
         scope, canonical_reason = _RULE_CATALOG[rule_id]
         component = candidate["componente_telemetria"]
+        # Guasti della diagnosi che indicano lo stesso componente del candidato.
         same_component = [
             j for j, fault in enumerate(diagnosis.root_causes, 1)
             if _matches_component(fault.component, component, aliases)
         ]
+        # Tra questi, quelli la cui motivazione coincide con la classe del candidato (confronto
+        # senza differenze di spazi e di maiuscole/minuscole).
         same_canonical_hypothesis = [
             j for j in same_component
             if (
@@ -135,7 +175,9 @@ def verifica_copertura_ipotesi(
                 == canonical_reason.casefold()
             )
         ]
+        # Il tool da cui ci si aspetta un controllo dipende dal livello della regola (nodo o container).
         expected_tool = _SCOPE_TO_TOOL[scope]
+        # Chiamate mirate: stesso tool e stesso componente. Generiche: stesso tool ma senza componente.
         targeted = [
             m["indice_traiettoria"] for m in metric_calls
             if m["tool"] == expected_tool and m["cmdb_id"] == component
@@ -145,6 +187,7 @@ def verifica_copertura_ipotesi(
             if m["tool"] == expected_tool
         ]
 
+        # Stato del candidato nella diagnosi, dal più forte al più debole.
         if same_canonical_hypothesis:
             diagnosis_status = "componente_e_classe_canonica_ripresi"
         elif same_component:
@@ -167,6 +210,8 @@ def verifica_copertura_ipotesi(
             "verifica_causale": False,
         })
 
+    # --- 5. Riepilogo: conteggi complessivi e dettaglio dei candidati. I campi `ground_truth_consultata` e
+    # `causa_verificata` restano False: l'audit descrive la traccia, non valuta la causa.
     return {
         "versione": "hypothesis_investigation_coverage_v1",
         "candidati_riportati": len(candidates),

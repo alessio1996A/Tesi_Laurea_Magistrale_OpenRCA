@@ -14,10 +14,12 @@ from typing import Any
 
 from harness.rule_batch import RULE_SPECS
 
+# Per ogni regola: (livello di telemetria, nome della classe), ricavati dal catalogo di `rule_batch`.
 RULE_INFO = {
     rule_id: (scope, label)
     for rule_id, scope, _, _, label in RULE_SPECS
 }
+# Il tool dell'agente che legge le metriche di ciascun livello.
 METRICS_TOOL = {
     "container": "tool_get_container_metrics",
     "node": "tool_get_node_metrics",
@@ -25,17 +27,25 @@ METRICS_TOOL = {
 
 
 def _integer(value: Any) -> bool:
+    """True solo per un intero vero: `type(...) is int` esclude i booleani, che in Python sono sottoclasse di int."""
     return type(value) is int
 
 
 def _checked_calls(
     trajectory: list[dict[str, Any]], start: int, end: int
 ) -> list[tuple[str, str, str | None, int, int]]:
-    """Riconosce solo chiamate mirate e valide: una ricerca generica non basta."""
+    """Riconosce solo chiamate mirate e valide: una ricerca generica non basta.
+
+    Scorre la traiettoria dei tool già chiamati dall'agente e restituisce, per ogni chiamata ai tool di
+    metriche con parametri validi e dentro la finestra [start, end], la tupla
+    (nome del tool, componente, KPI oppure None, inizio, fine). Le chiamate non valide si ignorano;
+    un evento di traiettoria malformato solleva ValueError.
+    """
     checked = []
     for index, item in enumerate(trajectory):
         if not isinstance(item, dict):
             raise ValueError(f"Evento traiettoria {index} malformato")
+        # Si considerano solo le chiamate ai due tool di metriche; gli altri eventi non interessano.
         if item.get("tipo") != "tool_call":
             continue
         tool_name = item.get("nome")
@@ -47,6 +57,8 @@ def _checked_calls(
         component = args.get("cmdb_id")
         begin = args.get("start_unix")
         finish = args.get("end_unix")
+        # Una chiamata senza componente preciso, senza intervallo intero o fuori dalla finestra del caso
+        # è "generica": non copre nessun candidato.
         if (
             not isinstance(component, str) or not component.strip()
             or not _integer(begin) or not _integer(finish)
@@ -75,7 +87,21 @@ def pianifica_verifiche_mirate(
     disponibili, ed evita richieste duplicate sullo stesso componente.
     L'ordine e' una politica di *copertura investigativa*, non una stima
     della gravita' o della probabilita' causale dei guasti.
+
+    Argomenti:
+      evidence_report  report unificato delle evidenze (versione "unified_evidence_v2"), che contiene
+                       il report delle regole con i candidati.
+      tool_trajectory  chiamate ai tool già fatte dall'agente (servono a non ripetere controlli).
+      start_unix, end_unix  finestra del caso, in secondi unix; deve coincidere con quella del report.
+      max_checks       numero massimo di verifiche da proporre.
+      remaining_rounds cicli di tool ancora disponibili; il piano non supera il minimo tra i due budget.
+
+    Passi: (1) controlla argomenti e coerenza del report; (2) distingue i candidati già verificati da
+    quelli da verificare; (3) toglie le richieste duplicate; (4) mette in coda i candidati in modo
+    equilibrato tra i componenti; (5) alterna container e nodi fino a esaurire il budget.
+    Non esegue nessun tool: restituisce solo proposte.
     """
+    # --- 1. Controllo degli argomenti e della coerenza del report con la finestra del caso.
     if (
         not _integer(start_unix) or not _integer(end_unix)
         or start_unix >= end_unix
@@ -119,8 +145,11 @@ def pianifica_verifiche_mirate(
     if not isinstance(tool_trajectory, list):
         raise TypeError("Traiettoria tool non valida")
 
+    # Chiamate mirate già fatte dall'agente.
     checked = _checked_calls(tool_trajectory, start_unix, end_unix)
 
+    # --- 2. Per ogni candidato si controlla che sia ben formato e si decide se è già coperto da una
+    # chiamata precedente (`already_covered`) oppure ancora da verificare (`pending`).
     pending = []
     already_covered = []
     for index, item in enumerate(candidates):
@@ -144,10 +173,12 @@ def pianifica_verifiche_mirate(
         evidence = item.get("evidenze") or {}
         if not isinstance(evidence, dict):
             raise ValueError(f"Candidato {index}: evidenze malformate")
+        # KPI principale su cui la regola ha visto il segnale (None se non indicato).
         kpi = evidence.get("kpi_principale")
         if not isinstance(kpi, str) or not kpi.strip():
             kpi = None
 
+        # Il tool da chiamare dipende dal livello: container o nodo.
         tool_name = METRICS_TOOL[scope]
         # Una chiamata precedente copre il candidato solo se include
         # l'intervallo del segnale. Non significa che il controllo
@@ -158,6 +189,8 @@ def pianifica_verifiche_mirate(
             and begin <= first and finish > last
             for name, comp, prior_kpi, begin, finish in checked
         )
+        # Proposta di verifica per questo candidato: stesso tool, stesso componente, intera finestra del
+        # caso e, se noto, lo stesso KPI. `provenance` indica da quale candidato del report deriva.
         proposed = {
             "candidate_index": index,
             "rule_id": rule_id,
@@ -178,8 +211,10 @@ def pianifica_verifiche_mirate(
         }
         (already_covered if was_queried else pending).append(proposed)
 
-    # Evitiamo controlli duplicati: due regole possono proporre
+    # --- 3. Evitiamo controlli duplicati: due regole possono proporre
     # la stessa interrogazione senza richiedere due chiamate ai tool.
+    # Si ordina prima in modo deterministico (livello, componente, KPI, regola) e si tiene la prima
+    # proposta per ogni terna (tool, componente, KPI).
     unique = {}
     for candidate in sorted(
         pending,
@@ -195,12 +230,14 @@ def pianifica_verifiche_mirate(
         )
         unique.setdefault(key, candidate)
 
+    # --- 4. Due code, una per livello (container e nodo).
     scope_queues = {"container": [], "node": []}
     for candidate in unique.values():
         scope_queues[candidate["scope"]].append(candidate)
 
     # Copertura equilibrata dei componenti di uno stesso livello:
     # una verifica per componente prima di riproporne un'altra con KPI diverso.
+    # Si procede a giri: a ogni giro si prende una proposta da ciascun componente (in ordine alfabetico).
     queues = {}
     for scope, items in scope_queues.items():
         groups = defaultdict(list)
@@ -213,6 +250,8 @@ def pianifica_verifiche_mirate(
                     fair.append(groups[component].pop(0))
         queues[scope] = fair
 
+    # --- 5. Piano finale: si alternano container e nodo (prima un container, poi un nodo, e così via)
+    # finché c'è budget e ci sono proposte. Il budget è il minore tra controlli richiesti e cicli rimasti.
     limit = min(max_checks, remaining_rounds)
     plan = []
     while len(plan) < limit and any(queues.values()):
@@ -223,9 +262,12 @@ def pianifica_verifiche_mirate(
             if queues[scope]:
                 plan.append(queues[scope].pop(0))
                 made_progress = True
+        # Se in un giro non si è aggiunto nulla, le code sono vuote: ci si ferma.
         if not made_progress:
             break
 
+    # Risultato: il piano e i conteggi per ricostruire come è stato ottenuto. I campi
+    # `strumenti_chiamati`, `llm_chiamato` e `causa_verificata` restano False: il planner propone soltanto.
     return {
         "versione": "investigation_planner_v0",
         "stato": "proposte_non_eseguite",

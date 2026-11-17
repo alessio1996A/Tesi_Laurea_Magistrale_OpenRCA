@@ -16,13 +16,19 @@ from zoneinfo import ZoneInfo
 from output.openrca_contract import DATETIME_FORMAT, RootCause
 
 
+# Versioni dei report accettate: una versione diversa significa che il formato non è quello atteso.
 _RULE_REPORT_VERSION = "rule_based_A1_R_v1"
 _UNIFIED_REPORT_VERSION = "unified_evidence_v2"
+# Fuso orario in cui OpenRCA Market scrive gli istanti dei guasti.
 _LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 
 
 def _timestamp_unix(root_cause: RootCause) -> int:
-    """OpenRCA Market usa timestamp in ora locale Asia/Shanghai."""
+    """OpenRCA Market usa timestamp in ora locale Asia/Shanghai.
+
+    Converte la data/ora scritta nella causa radice predetta in secondi unix (UTC).
+    """
+    # Si legge la stringa con il formato del contratto e si dichiara il fuso locale, poi si converte.
     observed = datetime.strptime(
         root_cause.occurrence_datetime, DATETIME_FORMAT
     )
@@ -35,8 +41,10 @@ def _componente_equivalente(predetto: str, candidato: str) -> bool:
     node-5.frontend-0 puo' identificare il container frontend-0.
     node-5 NON e' equivalente a node-5.frontend-0.
     """
+    # Stesso nome esatto.
     if predetto == candidato:
         return True
+    # Altrimenti il candidato deve essere un container (`nodo.nome`) e il predetto coincidere col suo suffisso.
     return "." in candidato and predetto == candidato.split(".", 1)[1]
 
 
@@ -68,7 +76,22 @@ def verifica_coerenza_osservativa(
 
     Nessuno di questi stati certifica la root cause o ne dimostra l'assenza.
     L'assenza di candidati puo' dipendere da classi non coperte o da budget.
+
+    Argomenti:
+      root_cause          causa radice predetta dal modello (componente, classe, istante).
+      evidence_report     report unificato ("unified_evidence_v2") oppure None se non disponibile.
+      start_unix, end_unix  finestra del caso, in secondi unix; deve coincidere con quella dei report.
+      tolleranza_secondi  margine in secondi attorno al periodo del segnale entro cui l'istante predetto
+                          si considera vicino.
+
+    Restituisce un dizionario con lo stato, i candidati corrispondenti (`matches`), i conteggi e una nota.
+    `causa_verificata` è sempre False.
+
+    Passi: (1) controllo degli argomenti; (2) l'istante predetto è nella finestra?; (3) il report c'è
+    ed è coerente con il caso?; (4) esame dei candidati (componente, classe, vicinanza nel tempo);
+    (5) scelta dello stato finale.
     """
+    # --- 1. Controllo degli argomenti.
     if not isinstance(root_cause, RootCause):
         raise TypeError("RootCause richiesto")
     if (
@@ -79,6 +102,8 @@ def verifica_coerenza_osservativa(
     if type(tolleranza_secondi) is not int or tolleranza_secondi < 0:
         raise ValueError("Tolleranza temporale non valida")
 
+    # Istante predetto in secondi unix e parte comune di tutte le risposte (`base`): ogni esito la
+    # riprende e vi aggiunge stato, nota ed eventuali candidati.
     predicted_time = _timestamp_unix(root_cause)
     base = {
         "versione": "observational_verification_v0",
@@ -91,6 +116,7 @@ def verifica_coerenza_osservativa(
         "causa_verificata": False,
     }
 
+    # --- 2. Un istante predetto fuori dalla finestra osservabile non si può verificare.
     if not start_unix <= predicted_time < end_unix:
         return {
             **base,
@@ -98,6 +124,8 @@ def verifica_coerenza_osservativa(
             "nota": "Timestamp fuori dalla finestra osservabile; nessuna conclusione causale.",
         }
 
+    # --- 3. Il report: se manca non si può valutare; se esiste deve avere la versione e la finestra
+    # del caso, altrimenti si solleva un errore (dati incoerenti, non un semplice "non valutabile").
     if evidence_report is None:
         return {
             **base,
@@ -116,6 +144,7 @@ def verifica_coerenza_osservativa(
             case.get("end_unix") != end_unix):
         raise ValueError("Finestra del report non coincide con il caso")
 
+    # Sezione delle regole: assente = variante dell'esperimento senza regole (non valutabile).
     rules = evidence_report.get("regole_diagnostiche_v0")
     if rules is None:
         return {
@@ -140,6 +169,8 @@ def verifica_coerenza_osservativa(
     ):
         raise ValueError("Conteggi o lista candidati non validi")
 
+    # --- 4. Esame dei candidati riportati. `components_matching` conta quelli con lo stesso componente
+    # predetto; `matches` raccoglie quelli che hanno anche la stessa classe.
     matches = []
     components_matching = 0
     for index, candidate in enumerate(candidates):
@@ -165,6 +196,7 @@ def verifica_coerenza_osservativa(
         if not _classe_equivalente(root_cause.reason, category):
             continue
 
+        # Vicinanza temporale: l'istante predetto cade nel periodo del segnale, allargato della tolleranza.
         temporal_match = (
             first - tolleranza_secondi <= predicted_time <=
             last + tolleranza_secondi
@@ -179,6 +211,8 @@ def verifica_coerenza_osservativa(
             "provenienza": f"regole_diagnostiche_v0.candidati_riportati[{index}]",
         })
 
+    # --- 5. Stato finale: coerente se almeno un candidato corrisponde anche nel tempo; altrimenti
+    # "tempo non corroborato" se corrisponde solo per componente e classe; altrimenti nessuna corrispondenza.
     if matches and any(item["vicinanza_temporale"] for item in matches):
         status = "coerente_con_segnale"
     elif matches:

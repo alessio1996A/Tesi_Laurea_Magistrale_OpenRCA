@@ -1,3 +1,15 @@
+"""Rilevatori deterministici di anomalie sulle serie temporali delle metriche (mediana e MAD).
+
+Contiene due rilevatori, entrambi basati su statistiche robuste (mediana e MAD, cioè la mediana delle
+distanze dalla mediana), che resistono ai picchi isolati:
+- `rileva_anomalie`: cerca aumenti persistenti di un KPI rispetto alla mediana della sua stessa serie;
+- `rileva_anomalie_direzionali`: usa il catalogo dei segnali (`signal_catalog`) per sapere se per un KPI
+  è anomalo un aumento o una diminuzione, e raggruppa i campioni sospetti in "episodi".
+
+Entrambi lavorano solo sui dati della finestra indicata, senza ground truth e senza LLM, e non stabiliscono
+la causa del guasto. Usati da `harness/evidence_builder.py`.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -16,6 +28,16 @@ def rileva_anomalie(
     Non identifica automaticamente la causa del guasto.
 
     Da utilizzare inizialmente su KPI istantanei, non cumulativi.
+
+    Argomenti:
+      df               tabella con le colonne timestamp, cmdb_id, kpi_name, value.
+      start_unix, end_unix  finestra [start, end) da analizzare, in secondi unix.
+      soglia           di quante "dispersioni robuste" il valore deve superare la mediana per essere sospetto.
+      min_consecutivi  quanti campioni consecutivi sospetti servono per registrare un'anomalia (almeno 2).
+
+    Restituisce una lista con al più una anomalia per coppia componente/KPI (la prima trovata), con
+    `timestamp_inizio` dell'aumento, mediana, MAD, soglia superata e valore massimo della serie.
+    Le serie con meno di 10 campioni nella finestra non vengono valutate.
     """
 
     if start_unix >= end_unix:
@@ -32,6 +54,7 @@ def rileva_anomalie(
     # Copiamo i dati senza modificare il DataFrame originale.
     dati = df[colonne].copy()
 
+    # Conversione numerica tollerante: i valori non convertibili diventano NaN e vengono scartati sotto.
     dati["timestamp"] = pd.to_numeric(
         dati["timestamp"], errors="coerce"
     )
@@ -40,7 +63,7 @@ def rileva_anomalie(
         dati["value"], errors="coerce"
     )
 
-    # Manteniamo soltanto i campioni validi nella finestra.
+    # Manteniamo soltanto i campioni validi nella finestra [start, end): numeri finiti e nomi presenti.
     mask = (
         dati["timestamp"].ge(start_unix)
         & dati["timestamp"].lt(end_unix)
@@ -59,6 +82,7 @@ def rileva_anomalie(
         ["cmdb_id", "kpi_name"]
     ):
 
+        # Ordine cronologico ("stable" mantiene l'ordine originale dei campioni con lo stesso istante).
         gruppo = gruppo.sort_values(
             "timestamp", kind="stable"
         )
@@ -71,22 +95,25 @@ def rileva_anomalie(
 
         mediana = float(np.median(valori))
 
-        # Median Absolute Deviation.
+        # MAD (deviazione assoluta mediana): mediana delle distanze dei valori dalla mediana.
         mad = float(np.median(np.abs(valori - mediana)))
 
-        # Stima robusta della dispersione.
-        # Il minimo relativo evita soglie nulle.
+        # Stima robusta della dispersione: 1.4826 * MAD equivale a una deviazione standard per dati
+        # normali. Il minimo relativo (5% della mediana) e il minimo assoluto evitano soglie nulle
+        # quando la serie è quasi costante.
         dispersione = max(
             1.4826 * mad,
             0.05 * abs(mediana),
             1e-9
         )
 
+        # Limite oltre il quale un valore è sospetto: mediana + soglia volte la dispersione robusta.
         limite = mediana + soglia * dispersione
 
         # Cerchiamo aumenti superiori alla soglia.
         supera = valori > limite
 
+        # `consecutivi` conta i campioni sospetti di fila; `inizio_anomalia` è la posizione del primo.
         consecutivi = 0
         inizio_anomalia = None
 
@@ -99,6 +126,7 @@ def rileva_anomalie(
                     inizio_anomalia = i
 
             else:
+                # Un campione normale interrompe la sequenza.
                 consecutivi = 0
                 inizio_anomalia = None
 
@@ -124,6 +152,7 @@ def rileva_anomalie(
 
     return anomalie
 
+
 def rileva_anomalie_direzionali(
     df,
     sorgente: str,
@@ -148,6 +177,18 @@ def rileva_anomalie_direzionali(
 
     Non utilizza ground truth.
     Non stabilisce quale sia la root cause.
+
+    Argomenti:
+      df               tabella con le colonne timestamp, cmdb_id, kpi_name, value.
+      sorgente         "node_metrics" oppure "container_metrics": serve a consultare il catalogo dei segnali.
+      start_unix, end_unix  finestra [start, end) da analizzare, in secondi unix.
+      soglia           score robusto minimo (distanza dalla mediana in unità di 1.4826 * MAD) per un campione sospetto.
+      min_consecutivi  campioni sospetti consecutivi necessari per registrare un episodio.
+      min_campioni     campioni minimi per valutare una serie.
+      max_gap_secondi  salto temporale massimo tra due campioni sospetti dello stesso episodio.
+
+    Restituisce gli episodi trovati, ordinati per istante d'inizio, componente e KPI. Ogni episodio riporta
+    inizio, fine, istante e valore del picco, mediana della serie e score del picco.
     """
 
     import pandas as pd

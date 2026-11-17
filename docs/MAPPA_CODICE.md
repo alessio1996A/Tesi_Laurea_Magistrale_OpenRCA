@@ -20,8 +20,8 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 16 | 57 |
-| B1. Campagne e audit RQ1 storici | 9 | 0 | 0 | 9 |
+| A. Nucleo del codice finale | 98 | 25 | 27 | 46 |
+| B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
 | C2. RQ2 pre-V5: ledger, dispatcher, pilot, sonde, prototipi | 32 | 0 | 3 | 29 |
@@ -54,16 +54,16 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `harness/anomaly_detector.py` | 385 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
+| `harness/anomaly_detector.py` | 426 | Rilevatori deterministici di anomalie sulle serie temporali delle metriche (mediana e MAD). | - | completo |
 | `harness/evidence_builder.py` | 803 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
-| `harness/evidence_selector.py` | 347 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
-| `harness/evidence_summarizer.py` | 496 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 3) |
-| `harness/investigation_planner.py` | 252 | Pianificatore deterministico delle verifiche mirate prima della diagnosi. | - | da fare (EN 0, senza docstring 1) |
-| `harness/mesh_runtime_detector.py` | 972 | Rilevatore preliminare di evidenze Mesh/Runtime per A1. | - | completo |
-| `harness/metric_quality.py` | 84 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
-| `harness/observational_verifier.py` | 202 | Primo gate osservativo per la verifica PAVE-inspired. | - | completo |
-| `harness/preprocessor.py` | 101 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
-| `harness/rule_batch.py` | 205 | Adattatore delle otto regole diagnostiche deterministiche R01–R11. | - | da fare (EN 2, senza docstring 1) |
+| `harness/evidence_selector.py` | 387 | Annotazione della qualità delle evidenze A1-v2 (passo intermedio tra rilevatori e riepilogo). | - | completo |
+| `harness/evidence_summarizer.py` | 536 | Riepilogo compatto delle evidenze annotate: aggregazione e selezione con un budget massimo. | - | completo |
+| `harness/investigation_planner.py` | 294 | Pianificatore deterministico delle verifiche mirate prima della diagnosi. | - | completo |
+| `harness/mesh_runtime_detector.py` | 1115 | Rilevatore preliminare di evidenze Mesh/Runtime per A1. | - | completo |
+| `harness/metric_quality.py` | 109 | Controllo di qualità delle serie temporali (metriche) di OpenRCA. | - | completo |
+| `harness/observational_verifier.py` | 236 | Primo gate osservativo per la verifica PAVE-inspired. | - | completo |
+| `harness/preprocessor.py` | 123 | Statistiche descrittive delle metriche OpenRCA in una finestra temporale. | - | completo |
+| `harness/rule_batch.py` | 239 | Adattatore delle otto regole diagnostiche deterministiche R01–R11. | - | completo |
 | `harness/rules/_node_rule_common.py` | 199 | Rilevatore comune, deterministico e offline, di anomalie sulla telemetria dei NODI (OpenRCA Market). | - | completo |
 | `harness/rules/rule_container_cpu.py` | 188 | R01 - ipotesi preliminare di 'container CPU load' (OpenRCA Market). | hash git RQ1 | bloccato |
 | `harness/rules/rule_container_memory.py` | 253 | R02 - ipotesi esplorativa di 'container memory load' (OpenRCA Market). | - | completo |
@@ -74,10 +74,10 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | `harness/rules/rule_node_read_io.py` | 64 | R09 - Consumo di I/O di lettura del disco di un nodo (classe "node disk read I/O consumption"). | - | completo |
 | `harness/rules/rule_node_write_io.py` | 61 | R10 - Consumo di I/O di scrittura del disco di un nodo (classe "node disk write I/O consumption"). | - | completo |
 | `harness/signal_catalog.py` | 522 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
-| `harness/structural_patterns.py` | 99 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
-| `harness/structural_temporal_verifier.py` | 355 | Controlli strutturali e temporali sulle evidenze RCA (PAVE-inspired v1). | - | da fare (EN 4, senza docstring 1) |
-| `harness/topology.py` | 67 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 1) |
-| `harness/unified_report.py` | 806 | (nessuna docstring di modulo) | - | da fare (EN 0, senza docstring 2) |
+| `harness/structural_patterns.py` | 125 | Raggruppamento di anomalie vicine nel tempo sullo stesso componente. | - | completo |
+| `harness/structural_temporal_verifier.py` | 406 | Controlli strutturali e temporali sulle evidenze RCA (PAVE-inspired v1). | - | completo |
+| `harness/topology.py` | 89 | Topologia nodo -> container ricavata dai nomi dei componenti ('cmdb_id') di OpenRCA. | - | completo |
+| `harness/unified_report.py` | 887 | Report unificato delle evidenze: un unico elenco compatto, con un budget globale, da dare all'agente. | - | completo |
 
 **RQ1 e EVALUATION20 (runner, preregistrazione, coorti, audit finestre, OOD)**
 
@@ -188,7 +188,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | `evaluation/paired_st_runner.py` | 429 | Safe paired-run orchestration for the frozen GT-free development cohort. | - | da fare (EN 12, senza docstring 4) |
 | `evaluation/v2_campaign_runner.py` | 417 | V2.6: campagna di 40 run. DEFAULT: preflight offline in sola lettura. | - | da fare (EN 0, senza docstring 6) |
 | `evaluation/v2_frozen_prediction_audit.py` | 344 | Audit V2 in sola lettura delle 32 risposte storiche congelate. | - | da fare (EN 0, senza docstring 3) |
-| `harness/hypothesis_coverage_audit.py` | 191 | Audit offline della copertura investigativa dei candidati A1-R8. | - | da fare (EN 0, senza docstring 1) |
+| `harness/hypothesis_coverage_audit.py` | 236 | Audit offline della copertura investigativa dei candidati A1-R8. | - | completo |
 
 ## B2. Audit e preflight in sola lettura (conservare: documentano le decisioni di protocollo)
 

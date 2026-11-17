@@ -1,6 +1,19 @@
+"""Riepilogo compatto delle evidenze annotate: aggregazione e selezione con un budget massimo.
+
+Riceve il report `quality_annotations_v1` (prodotto da `harness/evidence_selector.py`) e lo riduce a poche
+"unità investigative" da mostrare all'agente: prima aggrega i gruppi che descrivono lo stesso fenomeno
+(repliche sincronizzate, avvisi sulla capacità disco dello stesso nodo), poi ne sceglie al massimo
+`max_evidenze` con criteri deterministici (correlazioni multi-replica, conferma sul nodo ospitante,
+varietà di famiglie di metriche e di componenti).
+
+Le priorità sono euristiche per decidere cosa guardare per prime, non una stima di causalità. Le unità non
+selezionate restano tracciabili nel report. Nessun LLM e nessuna ground truth.
+"""
+
 from collections import Counter
 
 
+# Ordine di priorità investigativa: numero più basso = da guardare per prima. Sono etichette provvisorie.
 PRIORITA = {
     "correlazione_multi_replica": 0,
     "da_approfondire": 1,
@@ -26,6 +39,18 @@ def sintetizza_evidenze(
 
     Le evidenze escluse dal riepilogo restano disponibili
     nel report originale.
+
+    Argomenti:
+      annotazioni         report `quality_annotations_v1` (gruppi già annotati con priorità e repliche).
+      max_evidenze        numero massimo di unità da selezionare (è un tetto: può non essere raggiunto).
+      tolleranza_secondi  distanza massima tra gli inizi di due unità per aggregarle o corroborarle.
+
+    Restituisce un report `evidence_summary_v1` con le unità selezionate, le metainformazioni di quelle
+    non selezionate, i conteggi e la distribuzione delle priorità.
+
+    Passi: (1) ogni gruppo diventa un'unità investigativa; (2) si cerca un'unità con cui aggregarlo;
+    (3) si aggrega; (4) si selezionano le unità per il riepilogo (4A–4F); (5) si registrano quelle
+    omesse; (6) si costruisce il report.
     """
 
     if annotazioni.get("versione") != "quality_annotations_v1":
@@ -39,6 +64,7 @@ def sintetizza_evidenze(
 
     gruppi = annotazioni["gruppi"]
 
+    # Elenco delle unità investigative (gruppi eventualmente già aggregati tra loro).
     unita = []
 
     # =====================================================
@@ -54,6 +80,8 @@ def sintetizza_evidenze(
 
         repliche = gruppo["repliche_sincronizzate"]
 
+        # Tipo dell'unità: anomalia che coinvolge almeno due repliche, avviso di coerenza della misura
+        # del disco, oppure anomalia singola.
         multi_replica = (
             priorita == "correlazione_multi_replica"
             and len(repliche) >= 2
@@ -71,6 +99,8 @@ def sintetizza_evidenze(
         else:
             tipo = "anomalia_singola"
 
+        # Nuova unità costruita da un solo gruppo; `gruppi_origine` conserva l'indice del gruppo
+        # originale per poter risalire al report completo.
         nuova = {
             "tipo": tipo,
             "sorgente": gruppo["sorgente"],
@@ -100,6 +130,8 @@ def sintetizza_evidenze(
         # 2. RICERCA DI EVIDENZE DA AGGREGARE
         # =================================================
 
+        # `destinazione` sarà la prima unità già presente con cui la nuova può fondersi (None = nessuna).
+        # Condizioni comuni: stesso tipo, stessa sorgente, stessa famiglia, inizi vicini nel tempo.
         destinazione = None
 
         for esistente in unita:
@@ -157,10 +189,13 @@ def sintetizza_evidenze(
         # 3. AGGREGAZIONE
         # =================================================
 
+        # Nessuna unità compatibile: la nuova unità resta separata.
         if destinazione is None:
             unita.append(nuova)
             continue
 
+        # Fusione: si uniscono gli elenchi (senza duplicati), si estende l'intervallo osservato e si tiene
+        # la variazione percentuale massima.
         for campo in ("componenti", "direzioni", "kpi"):
             destinazione[campo] = sorted(
                 set(destinazione[campo])
@@ -227,6 +262,7 @@ def sintetizza_evidenze(
     max_modeste = min(2, max_evidenze)
 
     def gia_selezionata(evidenza):
+        """True se questa stessa unità (confronto per identità, non per valore) è già tra le selezionate."""
         return any(
             evidenza is scelta
             for scelta in selezionate
@@ -236,6 +272,9 @@ def sintetizza_evidenze(
         """
         Aggiunge una unità se il budget e i vincoli
         di selezione lo permettono.
+
+        Restituisce True se l'unità è stata aggiunta, False se il tetto `max_evidenze` è raggiunto,
+        se è già presente o se supererebbe il limite delle unità a variazione modesta.
         """
 
         if len(selezionate) >= max_evidenze:
@@ -379,6 +418,7 @@ def sintetizza_evidenze(
     # che non sono ancora rappresentate.
 
     def firma_componente(evidenza):
+        """Chiave "famiglia + componenti" di un'unità: due unità con la stessa chiave sono considerate ridondanti."""
         return (
             evidenza["famiglia"],
             tuple(evidenza["componenti"])

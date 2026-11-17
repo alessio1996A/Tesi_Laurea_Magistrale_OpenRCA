@@ -8,6 +8,17 @@ Obiettivo:
 - Limitare il numero di evidenze da inviare all'LLM.
 
 Non usa ground truth e non chiama Gemini.
+
+Struttura del modulo:
+- `_prepara`: filtra e pulisce la telemetria nella finestra del caso;
+- `_rileva_aumento`: cerca in una serie l'episodio di aumento persistente più intenso (mediana + MAD);
+- `_analizza_mesh`: applica il rilevatore alle durate delle richieste del service mesh (Istio);
+- `_analizza_runtime`: lo applica ai KPI della JVM (memoria heap e contatori del garbage collector);
+- `_seleziona`: ordina le segnalazioni per intensità e applica il budget;
+- `rileva_evidenze_mesh_runtime`: funzione pubblica che costruisce il report completo;
+- `aggrega_evidenze_mesh`: raggruppa le evidenze Mesh delle repliche dello stesso servizio.
+
+Le segnalazioni sono ipotesi osservative (`causa_verificata` è sempre False), non cause radice.
 """
 
 import numpy as np
@@ -22,12 +33,16 @@ from harness.signal_catalog import (
 # 1. CONFIGURAZIONE
 # ============================================================
 
+# KPI della JVM analizzati: memoria heap in uso, numero di raccolte del garbage collector (contatore
+# cumulativo) e tempo totale speso in raccolta (contatore cumulativo).
 KPI_RUNTIME = (
     "java_lang_Memory_HeapMemoryUsage_used",
     "java_lang_GarbageCollector_CollectionCount.Copy",
     "java_lang_GarbageCollector_CollectionTime.Copy",
 )
 
+# Prefissi dei KPI Istio: la durata delle richieste e il loro conteggio. Dopo il prefisso c'è lo stesso
+# suffisso (la coppia sorgente/destinazione), che permette di accoppiare le due serie.
 PREFISSO_DURATA = (
     "istio_request_duration_milliseconds."
 )
@@ -43,8 +58,15 @@ def _prepara(df, start_unix, end_unix):
     """
     Filtra e normalizza i campioni, senza
     modificare il DataFrame originale.
+
+    Argomenti:
+      df                   tabella con le colonne timestamp, cmdb_id, kpi_name, value.
+      start_unix, end_unix finestra [start, end) da mantenere, in secondi unix.
+
+    Restituisce una copia con soli numeri finiti, nessun campo mancante e solo i campioni della finestra.
     """
 
+    # Colonne obbligatorie: senza di esse la telemetria non è utilizzabile.
     colonne = {
         "timestamp", "cmdb_id",
         "kpi_name", "value"
@@ -57,6 +79,7 @@ def _prepara(df, start_unix, end_unix):
         ["timestamp", "cmdb_id", "kpi_name", "value"]
     ].copy()
 
+    # Conversione numerica tollerante: i valori non convertibili diventano NaN e vengono scartati sotto.
     dati["timestamp"] = pd.to_numeric(
         dati["timestamp"], errors="coerce"
     )
@@ -65,6 +88,7 @@ def _prepara(df, start_unix, end_unix):
         dati["value"], errors="coerce"
     )
 
+    # Gli infiniti non sono misure valide: li trattiamo come valori mancanti.
     dati["value"] = dati["value"].replace(
         [np.inf, -np.inf], np.nan
     )
@@ -74,6 +98,7 @@ def _prepara(df, start_unix, end_unix):
                 "cmdb_id", "kpi_name"]
     )
 
+    # Teniamo solo la finestra del caso: start incluso, end escluso.
     return dati.loc[
         (dati["timestamp"] >= start_unix)
         & (dati["timestamp"] < end_unix)
@@ -100,8 +125,19 @@ def _rileva_aumento(
                     30% della mediana)
 
     Restituisce None se non trova episodi idonei.
+
+    Argomenti:
+      serie                DataFrame con le colonne `timestamp` e `value` (anche più campioni per istante).
+      min_campioni         campioni minimi (dopo il consolidamento per istante) per valutare la serie.
+      consecutivi          campioni sopra soglia di fila necessari per formare un episodio.
+      max_gap_secondi      distanza massima tra due campioni successivi dello stesso episodio.
+      scostamento_minimo   frazione minima della mediana che l'aumento deve superare (0.30 = 30%).
+
+    Restituisce un dizionario con inizio, fine, durata in campioni, mediana, MAD, soglia, valore massimo,
+    aumento percentuale e intensità relativa dell'episodio scelto.
     """
 
+    # Più campioni con lo stesso istante vengono consolidati con la mediana; poi ordine cronologico.
     serie = (
         serie.groupby("timestamp", as_index=False)["value"]
         .median()
@@ -109,6 +145,7 @@ def _rileva_aumento(
         .reset_index(drop=True)
     )
 
+    # Evitiamo decisioni su serie troppo brevi.
     if len(serie) < min_campioni:
         return None
 
@@ -117,10 +154,13 @@ def _rileva_aumento(
 
     mediana = float(np.median(valori))
 
+    # MAD (deviazione assoluta mediana): mediana delle distanze dei valori dalla mediana.
     mad = float(
         np.median(np.abs(valori - mediana))
     )
 
+    # Soglia: la mediana più il maggiore tra tre margini: quattro dispersioni robuste (1.4826 * MAD),
+    # la frazione minima della mediana e un minimo assoluto che evita una soglia coincidente con la mediana.
     soglia = mediana + max(
         4.0 * 1.4826 * mad,
         scostamento_minimo * abs(mediana),
@@ -129,6 +169,9 @@ def _rileva_aumento(
 
     sopra_soglia = valori > soglia
 
+    # `episodi` conterrà coppie (posizione iniziale, posizione finale) dei tratti sopra soglia.
+    # `inizio` è la posizione di apertura dell'episodio in corso (None = nessuno aperto);
+    # `precedente` è la posizione dell'ultimo campione sopra soglia incluso nell'episodio.
     episodi = []
     inizio = None
     precedente = None
@@ -137,6 +180,7 @@ def _rileva_aumento(
     # sopra soglia, senza attraversare buchi temporali.
     for i, anomalo in enumerate(sopra_soglia):
 
+        # Il campione è "consecutivo" se segue il precedente sopra soglia entro il salto temporale massimo.
         consecutivo = (
             precedente is not None
             and tempi[i] - tempi[precedente]
@@ -145,6 +189,8 @@ def _rileva_aumento(
 
         if anomalo:
 
+            # Si apre un nuovo episodio se non ce n'è uno in corso o se c'è un salto temporale:
+            # l'eventuale episodio precedente viene chiuso e registrato.
             if inizio is None or not consecutivo:
 
                 if inizio is not None:
@@ -156,16 +202,18 @@ def _rileva_aumento(
 
         else:
 
+            # Un campione sotto soglia chiude l'episodio in corso.
             if inizio is not None:
                 episodi.append((inizio, precedente))
 
             inizio = None
             precedente = None
 
+    # Registriamo l'eventuale ultimo episodio ancora aperto alla fine della serie.
     if inizio is not None:
         episodi.append((inizio, precedente))
 
-    # Almeno tre campioni anomali consecutivi.
+    # Almeno tre campioni anomali consecutivi (valore di default del parametro `consecutivi`).
     episodi = [
         (a, b)
         for a, b in episodi
@@ -184,10 +232,14 @@ def _rileva_aumento(
         )
     )
 
+    # Valore massimo raggiunto dall'episodio scelto.
     massimo = float(
         np.max(valori[inizio:fine + 1])
     )
 
+    # Descrizione dell'episodio: `aumento_pct` è None quando la mediana è quasi nulla (la percentuale
+    # non sarebbe significativa); `intensita_relativa` è il superamento della soglia rapportato alla mediana
+    # e serve a ordinare le segnalazioni in `_seleziona`.
     return {
         "timestamp_inizio": int(tempi[inizio]),
         "timestamp_fine": int(tempi[fine]),
@@ -224,6 +276,12 @@ def _analizza_mesh(df):
 
     Non interpreta i valori come medie,
     contatori cumulativi o tassi.
+
+    Argomenti:
+      df  telemetria Mesh già ripulita da `_prepara` (colonne timestamp, cmdb_id, kpi_name, value).
+
+    Restituisce una tupla: (segnalazioni, coppie durata/richieste esaminate, serie escluse perché con
+    mediana della durata nulla).
     """
 
     segnalazioni = []
@@ -234,6 +292,7 @@ def _analizza_mesh(df):
     # basato sullo scostamento relativo.
     baseline_zero_escluse = 0
 
+    # Separiamo le serie del conteggio delle richieste da quelle della durata.
     richieste = df.loc[
         df["kpi_name"].str.startswith(
             PREFISSO_RICHIESTE
@@ -258,9 +317,11 @@ def _analizza_mesh(df):
         ["cmdb_id", "kpi_name"]
     ):
 
+        # Consideriamo solo i componenti Mesh lato destinazione ("...destination...").
         if ".destination." not in str(componente):
             continue
 
+        # Il KPI delle richieste ha lo stesso suffisso del KPI della durata: ricaviamo il nome accoppiato.
         suffisso = kpi[len(PREFISSO_DURATA):]
 
         kpi_richieste = PREFISSO_RICHIESTE + suffisso
@@ -269,6 +330,7 @@ def _analizza_mesh(df):
             (componente, kpi_richieste)
         )
 
+        # Senza la serie delle richieste accoppiata la durata non si può contestualizzare: si salta.
         if gruppo_richieste is None:
             continue
 
@@ -292,6 +354,7 @@ def _analizza_mesh(df):
             how="inner"
         ).sort_values("timestamp")
 
+        # Servono almeno 10 istanti in comune; le coppie troppo corte non si valutano.
         if len(coppia) < 10:
             continue
 
@@ -329,6 +392,8 @@ def _analizza_mesh(df):
         if episodio is None:
             continue
 
+        # Campioni accoppiati che cadono dentro l'episodio: servono a riportare il livello di richieste
+        # osservato mentre la durata era alta (contesto, non spiegazione).
         durante = coppia.loc[
             coppia["timestamp"].between(
                 episodio["timestamp_inizio"],
@@ -357,10 +422,10 @@ def _analizza_mesh(df):
         })
 
     return (
-    segnalazioni,
-    coppie_esaminate,
-    baseline_zero_escluse
-)
+        segnalazioni,
+        coppie_esaminate,
+        baseline_zero_escluse
+    )
 
 
 # ============================================================
@@ -376,12 +441,19 @@ def _analizza_runtime(df, start_unix, end_unix):
 
     I reset dei contatori vengono registrati,
     ma non generano un normale tasso negativo.
+
+    Argomenti:
+      df                    telemetria Runtime già ripulita da `_prepara`.
+      start_unix, end_unix  finestra del caso, in secondi unix (serve al calcolo degli incrementi).
+
+    Restituisce una tupla: (segnalazioni, serie esaminate, numero di reset sospetti dei contatori).
     """
 
     segnalazioni = []
     serie_esaminate = 0
     reset_sospetti = 0
 
+    # Teniamo soltanto i KPI della JVM previsti.
     df = df.loc[
         df["kpi_name"].isin(KPI_RUNTIME)
     ]
@@ -390,6 +462,7 @@ def _analizza_runtime(df, start_unix, end_unix):
         ["cmdb_id", "kpi_name"]
     ):
 
+        # La memoria heap è un livello: si analizza il valore così com'è.
         if kpi == "java_lang_Memory_HeapMemoryUsage_used":
 
             serie = gruppo[["timestamp", "value"]]
@@ -399,6 +472,8 @@ def _analizza_runtime(df, start_unix, end_unix):
 
         else:
 
+            # I contatori del garbage collector sono cumulativi: si converte la serie in incremento al
+            # minuto (calcolo condiviso con `signal_catalog`) e si analizza quello.
             trasformata = calcola_incrementi_runtime(
                 df=gruppo,
                 componente=componente,
@@ -407,6 +482,8 @@ def _analizza_runtime(df, start_unix, end_unix):
                 end_unix=end_unix
             )
 
+            # Contiamo i punti in cui il contatore sembra essersi azzerato (riavvio del processo):
+            # non producono un incremento negativo ma vengono segnalati nel report.
             reset_sospetti += int(
                 trasformata["reset_sospetto"].sum()
             )
@@ -423,6 +500,7 @@ def _analizza_runtime(df, start_unix, end_unix):
                 .dropna(subset=["value"])
             )
 
+            # Famiglia: frequenza delle raccolte (conteggio) o tempo speso in raccolta.
             famiglia = (
                 "frequenza_gc"
                 if "CollectionCount" in kpi
@@ -431,6 +509,7 @@ def _analizza_runtime(df, start_unix, end_unix):
 
             trasformazione = "incremento_per_minuto"
 
+        # Servono almeno 10 campioni per valutare la serie.
         if len(serie) < 10:
             continue
 
@@ -469,8 +548,16 @@ def _seleziona(segnalazioni, limite):
     rispetto alla mediana della stessa serie.
 
     Il punteggio NON è una probabilità di guasto.
+
+    Argomenti:
+      segnalazioni  elenco di segnalazioni, ciascuna con `evidenza.intensita_relativa`.
+      limite        numero massimo di segnalazioni da restituire (budget).
+
+    Restituisce le prime `limite` segnalazioni: prima la più intensa, a parità la più precoce, poi per
+    componente e KPI in ordine alfabetico (ordinamento deterministico).
     """
 
+    # Il segno meno su `intensita_relativa` ordina dal valore più alto al più basso.
     ordinate = sorted(
         segnalazioni,
         key=lambda s: (
@@ -502,14 +589,29 @@ def rileva_evidenze_mesh_runtime(
     Nessuna ground truth.
     Nessuna chiamata all'LLM.
     Nessuna diagnosi causale.
+
+    Argomenti:
+      df_mesh, df_runtime       telemetria Mesh (Istio) e Runtime (JVM), con le colonne timestamp,
+                                cmdb_id, kpi_name, value.
+      start_unix, end_unix      finestra del caso, in secondi unix (start < end).
+      max_evidenze_mesh         budget di evidenze Mesh da riportare (>= 0).
+      max_evidenze_runtime      budget di evidenze Runtime da riportare (>= 0).
+
+    Restituisce un report "mesh_runtime_evidence_v1" con finestra, copertura (cosa è stato esaminato ed
+    escluso), conteggi (rilevate, selezionate, omesse per budget), le evidenze scelte e le limitazioni.
+
+    Passi: (1) controllo degli argomenti; (2) pulizia della telemetria; (3) rilevamento Mesh e Runtime
+    su tutte le serie; (4) selezione entro il budget; (5) costruzione del report.
     """
 
+    # --- 1. Controllo degli argomenti.
     if start_unix >= end_unix:
         raise ValueError("Finestra temporale non valida.")
 
     if max_evidenze_mesh < 0 or max_evidenze_runtime < 0:
         raise ValueError("Budget negativo.")
 
+    # --- 2. Pulizia: solo campioni validi nella finestra del caso.
     mesh = _prepara(
         df_mesh, start_unix, end_unix
     )
@@ -518,6 +620,8 @@ def rileva_evidenze_mesh_runtime(
         df_runtime, start_unix, end_unix
     )
 
+    # --- 3. Rilevamento su TUTTE le serie: il budget si applica solo dopo, così i conteggi
+    # (rilevate, omesse) restano completi.
     (
         evidenze_mesh,
         coppie_mesh,
@@ -532,6 +636,7 @@ def rileva_evidenze_mesh_runtime(
         runtime, start_unix, end_unix
     )
 
+    # --- 4. Selezione entro il budget, separatamente per Mesh e Runtime (le più intense per prime).
     selezionate_mesh = _seleziona(
         evidenze_mesh,
         max_evidenze_mesh
@@ -546,6 +651,7 @@ def rileva_evidenze_mesh_runtime(
         selezionate_mesh + selezionate_runtime
     )
 
+    # --- 5. Report: `omesse_per_budget` = evidenze rilevate meno quelle riportate.
     return {
         "versione": "mesh_runtime_evidence_v1",
         "finestra": {
@@ -586,6 +692,8 @@ def rileva_evidenze_mesh_runtime(
             "La baseline usa la finestra analizzata."
         ]
     }
+
+
 # ============================================================
 # 8. AGGREGAZIONE DELLE EVIDENZE MESH MULTI-REPLICA
 # ============================================================
@@ -611,6 +719,18 @@ def aggrega_evidenze_mesh(
     Non modifica il report originale.
     Non utilizza ground truth.
     Non attribuisce cause.
+
+    Argomenti:
+      report              report "mesh_runtime_evidence_v1" NON troncato dal budget.
+      tolleranza_secondi  distanza massima tra l'inizio del primo episodio di un gruppo e quello dei successivi.
+
+    Restituisce un report "mesh_aggregation_v1" con le unità aggregate (multi-replica o singole), i
+    conteggi e le limitazioni. Nessuna evidenza viene persa: l'insieme degli indici di origine prima e dopo
+    l'aggregazione è controllato.
+
+    Passi: (1) validazione; (2) estrazione delle evidenze Mesh con servizio e replica; (3) raggruppamento per
+    servizio, rotta e KPI; (4) aggregazione temporale; (5) costruzione delle unità; (6) ordinamento;
+    (7) controllo della provenienza; (8) report.
     """
 
     import re
@@ -647,10 +767,13 @@ def aggrega_evidenze_mesh(
     # 2. ESTRAZIONE DELLE EVIDENZE MESH
     # =====================================================
 
+    # Elenco semplificato delle sole evidenze Mesh; `indice_origine` è la posizione nel report originale,
+    # che permette di verificare alla fine che nessuna evidenza sia andata persa.
     elementi = []
 
     for indice, evidenza in enumerate(report["evidenze"]):
 
+        # Le evidenze Runtime non partecipano all'aggregazione.
         if evidenza["sorgente"] != "mesh":
             continue
 
@@ -681,6 +804,7 @@ def aggrega_evidenze_mesh(
             replica = match.group(2)
             comunicazione = match.group(3)
 
+        # Dati dell'episodio rilevato (inizio, fine, mediana, massimo...) riportati nell'elemento.
         episodio = evidenza["evidenza"]
 
         elementi.append({
@@ -717,6 +841,8 @@ def aggrega_evidenze_mesh(
     # 3. RAGGRUPPAMENTO PER SERVIZIO, ROTTA E KPI
     # =====================================================
 
+    # `raggruppabili`: elementi raccolti per chiave (servizio, comunicazione, KPI).
+    # `singole_non_identificabili`: elementi di cui non si è riconosciuto il servizio, ciascuno gruppo a sé.
     raggruppabili = {}
     singole_non_identificabili = []
 
@@ -739,12 +865,15 @@ def aggrega_evidenze_mesh(
             chiave, []
         ).append(elemento)
 
+    # Elenco finale dei gruppi: si parte dalle evidenze singole non identificabili.
     gruppi = list(singole_non_identificabili)
 
     # =====================================================
     # 4. AGGREGAZIONE TEMPORALE
     # =====================================================
 
+    # Per ogni chiave (in ordine alfabetico, per un risultato deterministico) si ordinano gli episodi per
+    # istante d'inizio e li si raccoglie in gruppi di repliche vicine nel tempo.
     for chiave in sorted(raggruppabili):
 
         candidati = sorted(
@@ -774,11 +903,14 @@ def aggrega_evidenze_mesh(
                 elemento["inizio"] - primo_inizio
             )
 
+            # Componenti già presenti nel gruppo: la stessa replica non può comparire due volte.
             repliche_presenti = {
                 e["componente"]
                 for e in gruppo_corrente
             }
 
+            # Stesso gruppo se è abbastanza vicino al primo episodio e porta una replica nuova;
+            # altrimenti si chiude il gruppo e se ne apre uno nuovo.
             if (
                 distanza <= tolleranza_secondi
                 and elemento["componente"]
@@ -792,6 +924,7 @@ def aggrega_evidenze_mesh(
                 gruppi.append(gruppo_corrente)
                 gruppo_corrente = [elemento]
 
+        # L'ultimo gruppo non viene chiuso dal ciclo: lo aggiungiamo qui.
         if gruppo_corrente:
             gruppi.append(gruppo_corrente)
 
@@ -799,10 +932,12 @@ def aggrega_evidenze_mesh(
     # 5. COSTRUZIONE DELLE UNITÀ AGGREGATE
     # =====================================================
 
+    # Ogni gruppo diventa un'unità del report, con il dettaglio di ciascuna replica coinvolta.
     unita = []
 
     for gruppo in gruppi:
 
+        # Ordine cronologico interno al gruppo (a parità: nome del componente).
         gruppo = sorted(
             gruppo,
             key=lambda x: (
@@ -811,6 +946,7 @@ def aggrega_evidenze_mesh(
             )
         )
 
+        # Il primo episodio del gruppo fornisce servizio, rotta e KPI (uguali per tutti, per costruzione).
         primo = gruppo[0]
 
         componenti = sorted({
@@ -832,6 +968,7 @@ def aggrega_evidenze_mesh(
             and len(componenti) >= 2
         )
 
+        # Dettaglio per replica: tempi, valori e livello di richieste durante l'episodio.
         dettagli = []
 
         for elemento in gruppo:
@@ -854,6 +991,8 @@ def aggrega_evidenze_mesh(
                 ]
             })
 
+        # Incremento assoluto di ogni replica rispetto alla propria mediana (mai negativo); il massimo
+        # del gruppo serve a ordinare le unità.
         incrementi_assoluti = [
             max(
                 0.0,
@@ -904,6 +1043,7 @@ def aggrega_evidenze_mesh(
     # assoluto osservato nella stessa famiglia KPI.
     #
     # Non è una probabilità di causalità.
+    # (Il segno meno ordina dal valore più alto al più basso.)
 
     unita.sort(
         key=lambda u: (
@@ -920,6 +1060,8 @@ def aggrega_evidenze_mesh(
     # 7. CONTROLLO DELLA PROVENIENZA
     # =====================================================
 
+    # Ogni evidenza Mesh originale deve comparire in una e una sola unità aggregata: si confrontano
+    # gli indici di origine prima e dopo l'aggregazione.
     indici_originali = sorted(
         e["indice_origine"]
         for e in elementi
@@ -941,6 +1083,7 @@ def aggrega_evidenze_mesh(
     # 8. REPORT
     # =====================================================
 
+    # Numero di unità multi-replica (le altre sono singole).
     multi = sum(
         u["tipo"] == "mesh_multi_replica"
         for u in unita

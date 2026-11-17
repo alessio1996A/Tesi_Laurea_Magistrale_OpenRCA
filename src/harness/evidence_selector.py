@@ -1,3 +1,14 @@
+"""Annotazione della qualità delle evidenze A1-v2 (passo intermedio tra rilevatori e riepilogo).
+
+Prende i gruppi di anomalie del report A1-v2 e, per ciascuno, aggiunge informazioni descrittive che
+aiutano a decidere cosa approfondire: di quanto cambia ogni KPI rispetto alla sua mediana, se la capacità
+del disco sembra "saltare" all'inizio della finestra (possibile problema della misura), se più repliche dello
+stesso servizio mostrano l'anomalia quasi nello stesso momento, e una priorità di indagine provvisoria.
+
+Nessun gruppo viene scartato e nessuna root cause viene stabilita; non si usa la ground truth né l'LLM.
+Il risultato (`quality_annotations_v1`) è l'ingresso di `harness/evidence_summarizer.py`.
+"""
+
 import re
 from copy import deepcopy
 from collections import Counter
@@ -25,6 +36,20 @@ def annota_qualita_evidenze(
     NON elimina nessun gruppo.
     NON determina la root cause.
     NON utilizza ground truth.
+
+    Argomenti:
+      report_v2                    report A1-v2 con i gruppi di anomalie (`estensione_multi_risorsa.gruppi`).
+      df_nodi, df_container        telemetria dei nodi e dei container (colonne timestamp, cmdb_id, kpi_name, value).
+      soglia_salto_capacita_pct    salto percentuale (primo vs secondo campione di `system.disk.total`) da cui la
+                                   capacità del disco è segnalata "da verificare".
+      tolleranza_repliche_secondi  distanza massima tra gli inizi di due anomalie per considerarle sincronizzate.
+
+    Restituisce un report `quality_annotations_v1` con i gruppi arricchiti (variazioni percentuali, salto di
+    capacità, repliche sincronizzate, priorità di indagine) e la distribuzione delle priorità.
+
+    Passi: (1) riconoscimento delle repliche dal nome del componente; (2) variazione percentuale di ogni KPI
+    rispetto alla sua mediana; (3) controllo della capacità disco; (4) correlazione tra repliche;
+    (5) assegnazione della priorità; (6) report riassuntivo.
     """
 
     if report_v2.get("versione") != "A1-v2":
@@ -36,13 +61,14 @@ def annota_qualita_evidenze(
     if tolleranza_repliche_secondi < 0:
         raise ValueError("Tolleranza temporale non valida.")
 
+    # Lavoriamo su una copia profonda: il report originale non viene modificato.
     gruppi = deepcopy(
         report_v2["estensione_multi_risorsa"]["gruppi"]
     )
 
     sorgenti = {}
 
-    # Normalizziamo le due sorgenti una sola volta.
+    # Normalizziamo le due sorgenti una sola volta: valori numerici, senza NaN né infiniti.
     for nome, originale in (
         ("node_metrics", df_nodi),
         ("container_metrics", df_container)
@@ -77,6 +103,8 @@ def annota_qualita_evidenze(
 
         Restituisce:
           ("paymentservice", "2")
+
+        Per un componente che non ha questa forma (per esempio un nodo) restituisce None.
         """
 
         match = re.fullmatch(
@@ -101,6 +129,9 @@ def annota_qualita_evidenze(
 
         df = sorgenti[sorgente]
 
+        # Variazione percentuale di ogni KPI del gruppo: quanto il valore estremo osservato durante
+        # l'episodio (massimo se la direzione è "alto", minimo se "basso") si discosta dalla mediana
+        # dell'intera serie di quel componente.
         variazioni = {}
 
         for kpi in gruppo["kpi"]:
@@ -117,6 +148,7 @@ def annota_qualita_evidenze(
 
             mediana = float(valori.median())
 
+            # Campioni che cadono dentro l'episodio osservato dal rilevatore.
             episodio = serie.loc[
                 serie["timestamp"].between(
                     gruppo["inizio_osservato_unix"],
@@ -155,6 +187,7 @@ def annota_qualita_evidenze(
 
         gruppo["variazioni_percentuali"] = variazioni
 
+        # Le variazioni calcolabili (None = mediana quasi nulla); servono per massimo e indicatore sotto.
         percentuali_valide = [
             valore
             for valore in variazioni.values()
@@ -188,6 +221,7 @@ def annota_qualita_evidenze(
             and gruppo["vicino_inizio_finestra"]
         ):
 
+            # Serie della capacità totale del disco dello stesso nodo (un valore per istante: la mediana).
             serie_totale = sorgenti["node_metrics"].loc[
                 (
                     sorgenti["node_metrics"]["cmdb_id"]
@@ -227,6 +261,8 @@ def annota_qualita_evidenze(
                         serie_totale.iloc[1]
                     )
 
+                    # Salto percentuale tra i primi due campioni: se è grande, la "capacità" è cambiata
+                    # bruscamente all'inizio e l'anomalia del disco potrebbe essere un artefatto di misura.
                     if abs(secondo) > 1e-9:
 
                         salto_pct = (
@@ -258,6 +294,8 @@ def annota_qualita_evidenze(
 
             servizio, _ = replica
 
+            # Cerchiamo gli altri gruppi dello stesso servizio, sulla stessa sorgente, famiglia e direzione,
+            # che iniziano entro la tolleranza: il gruppo corrente stesso rientra nell'insieme (distanza 0).
             for altro in gruppi:
 
                 altra_replica = servizio_replica(
@@ -303,6 +341,8 @@ def annota_qualita_evidenze(
 
         # Queste etichette sono provvisorie:
         # non equivalgono a diagnosi o probabilità.
+        # Ordine di precedenza: telemetria disco sospetta, poi correlazione tra repliche, poi variazioni
+        # tutte modeste, altrimenti "da approfondire".
 
         if gruppo["capacita_disco_da_verificare"]:
 

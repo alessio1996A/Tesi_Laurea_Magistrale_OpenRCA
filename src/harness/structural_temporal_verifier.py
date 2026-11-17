@@ -21,6 +21,8 @@ from harness.observational_verifier import verifica_coerenza_osservativa
 
 # Classi ammesse dalle otto regole esistenti, che rimangono invariate.
 # Il confronto fra node e container riguarda solo famiglie misurate a entrambi i livelli.
+# Per ogni regola: (livello, famiglia di risorsa, nome della classe candidata).
+# "Famiglia" = tipo di risorsa monitorata (cpu, memory, ...) e permette di confrontare nodo e container.
 _RULES = {
     "R01": ("container", "cpu", "container CPU load"),
     "R02": ("container", "memory", "container memory load"),
@@ -32,12 +34,20 @@ _RULES = {
     "R11": ("node", "disk_space", "node disk space consumption"),
 }
 
+# Forme dei nomi di componente: "node-5" è un nodo; "node-5.frontend-0" è un container del nodo node-5
+# (il primo gruppo è il nodo, il secondo il nome del container).
 _NODE = re.compile(r"^node-\d+$")
 _CONTAINER = re.compile(r"^(node-\d+)\.(.+)$")
 
 
 def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
-    """Rifiuta metadati o finestre incoerenti, senza correggerli silenziosamente."""
+    """Rifiuta metadati o finestre incoerenti, senza correggerli silenziosamente.
+
+    Legge i candidati del report delle regole, controlla uno per uno che regola, classe, componente e
+    istanti siano coerenti con la finestra [start, end) e restituisce una versione normalizzata
+    (regola, livello, famiglia, nodo ospitante, container, primo e ultimo istante del segnale).
+    Qualunque incoerenza solleva ValueError.
+    """
     rules = report["regole_diagnostiche_v0"]
     source = rules["candidati_riportati"]
     if not isinstance(source, list):
@@ -54,6 +64,8 @@ def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
         if not isinstance(component, str):
             raise ValueError(f"Candidato {index}: componente mancante")
 
+        # Nodo ospitante e container: per una regola sui nodi il componente è il nodo stesso; per una regola
+        # sui container il nome deve essere qualificato (`node-N.container`) per sapere su quale nodo gira.
         if scope == "node":
             if _NODE.fullmatch(component) is None:
                 raise ValueError(f"Candidato {index}: nodo malformato")
@@ -65,6 +77,8 @@ def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
                 raise ValueError(f"Candidato {index}: container non qualificato")
             host, container = match.groups()
 
+        # La classe riportata deve essere quella della regola e i due istanti devono stare, in ordine,
+        # dentro la finestra del caso (`type(...) is not int` esclude anche i booleani).
         first = candidate.get("timestamp_primo_segnale_unix")
         last = candidate.get("timestamp_ultimo_segnale_unix")
         if (
@@ -89,7 +103,13 @@ def _normalize_candidates(report: dict, start: int, end: int) -> list[dict]:
 
 
 def _target_hosts(component: str, candidates: list[dict]) -> tuple[list[str], str]:
-    """Se un nome breve corrisponde a piu' host, non ne scegliamo uno arbitrariamente."""
+    """Se un nome breve corrisponde a piu' host, non ne scegliamo uno arbitrariamente.
+
+    Dato il componente indicato dalla diagnosi, restituisce la lista dei nodi candidati e l'origine di
+    questa informazione: "nodo_esplicito" (è già un nodo), "container_qualificato" (il nome contiene il
+    nodo), "host_da_identificativo_telemetria" (nome breve che nei candidati compare su un solo nodo),
+    "host_ambiguo" (compare su più nodi) oppure "host_non_osservato" (non compare).
+    """
     if _NODE.fullmatch(component):
         return [component], "nodo_esplicito"
 
@@ -109,6 +129,11 @@ def _target_hosts(component: str, candidates: list[dict]) -> tuple[list[str], st
 
 
 def _classe_ipotesi(reason: str) -> tuple[str, str] | None:
+    """(livello, famiglia) della classe di guasto indicata nel motivo della diagnosi, oppure None.
+
+    Il confronto è con i nomi delle otto classi coperte dalle regole, ignorando maiuscole e spazi ripetuti.
+    Un motivo che non coincide con nessuna classe (per esempio una delle quattro non coperte) dà None.
+    """
     normalized = " ".join(reason.split()).casefold()
     for scope, family, label in _RULES.values():
         if normalized == label.casefold():
@@ -124,13 +149,20 @@ def verifica_relazioni_strutturali_temporali(
     end_unix: int,
     tolleranza_secondi: int = 60,
 ) -> dict[str, Any]:
-    """Observe cross-layer candidate relations without claiming causation.
+    """Osserva le relazioni nodo/container tra i candidati, senza affermare causalità.
 
-    First delegates validation and hypothesis-level matching to v0.
-    Then compares explicit host/container candidate pairs of the *same
-    monitored resource family*. Signal-order labels describe observations,
-    not confirmed propagation or the occurrence time of the root cause.
+    Prima delega la validazione e il confronto a livello di ipotesi alla versione v0
+    (`verifica_coerenza_osservativa`). Poi confronta le coppie esplicite nodo/container di candidati della
+    *stessa famiglia di risorsa monitorata*. Le etichette sull'ordine dei segnali descrivono osservazioni:
+    non sono propagazione confermata né l'istante in cui è avvenuta la causa radice.
+
+    Argomenti: la causa radice proposta dall'agente (`root_cause`), il report delle evidenze, la finestra del
+    caso e la tolleranza (in secondi) entro cui due segnali si considerano quasi contemporanei.
+    Restituisce un dizionario con `stato`: "relazioni_osservate", "nessuna_relazione_osservata" oppure
+    uno stato che spiega perché la verifica non è possibile (fuori finestra, classe non coperta, livello
+    non verificabile, host ambiguo o non osservato, non valutabile).
     """
+    # --- 1. Verifica di base (v0): se la diagnosi è fuori finestra o non valutabile ci si ferma subito.
     base = verifica_coerenza_osservativa(
         root_cause,
         evidence_report,
@@ -160,15 +192,18 @@ def verifica_relazioni_strutturali_temporali(
     if base["stato"] == "non_valutabile":
         return result
 
+    # --- 2. Candidati normalizzati e nodo (o nodi) a cui si riferisce la diagnosi.
     candidates = _normalize_candidates(evidence_report, start_unix, end_unix)
     hosts, origin = _target_hosts(root_cause.component, candidates)
     result["host_candidati"] = hosts
     result["origine_host"] = origin
 
+    # --- 3. Classe di guasto dichiarata nella diagnosi: se non è una delle otto coperte non si può verificare.
     predicted_class = _classe_ipotesi(root_cause.reason)
     if predicted_class is None:
         return {**result, "stato": "classe_non_coperta"}
 
+    # --- 4. Il livello del componente (nodo/container) deve coincidere con quello della classe dichiarata.
     claimed_scope, claimed_family = predicted_class
     component_scope = (
         "node" if _NODE.fullmatch(root_cause.component)
@@ -183,11 +218,13 @@ def verifica_relazioni_strutturali_temporali(
     if component_scope != claimed_scope:
         return {**result, "stato": "livello_non_verificabile"}
 
+    # --- 5. Serve esattamente un nodo: zero o più di uno non permettono un confronto senza arbitrarietà.
     if not hosts:
         return {**result, "stato": "host_non_osservato"}
     if len(hosts) > 1:
         return {**result, "stato": "host_ambiguo"}
 
+    # --- 6. Candidati del nodo e dei suoi container.
     host = hosts[0]
     nodes = [c for c in candidates if c["scope"] == "node" and c["host"] == host]
     containers = [
@@ -195,8 +232,8 @@ def verifica_relazioni_strutturali_temporali(
         if c["scope"] == "container" and c["host"] == host
     ]
 
-    # For a container hypothesis inspect only that container; a host-level
-    # hypothesis may inspect all candidate containers on the host.
+    # Per un'ipotesi su un container si esamina solo quel container; un'ipotesi a livello di nodo
+    # può esaminare tutti i container candidati dello stesso nodo.
     if not _NODE.fullmatch(root_cause.component):
         container_name = (
             root_cause.component.split(".", 1)[1]
@@ -205,6 +242,9 @@ def verifica_relazioni_strutturali_temporali(
         )
         containers = [c for c in containers if c["container"] == container_name]
 
+    # --- 7. Coppie nodo/container della stessa famiglia della classe dichiarata. `delta` è la differenza
+    # tra il primo segnale del container e quello del nodo: positiva = il nodo ha segnalato prima.
+    # Entro la tolleranza i due segnali sono "quasi contemporanei".
     pairs = []
     for node in nodes:
         for container in containers:
@@ -234,7 +274,7 @@ def verifica_relazioni_strutturali_temporali(
                 ],
             })
 
-    # Independent of report ordering; no causal ranking is implied.
+    # --- 8. Ordine indipendente da come sono ordinati i candidati nel report; non implica una graduatoria causale.
     pairs.sort(key=lambda p: (
         p["famiglia"], p["container"], p["primo_segnale_nodo_unix"],
         p["primo_segnale_container_unix"], p["regola_nodo"],
@@ -261,7 +301,12 @@ def costruisci_contesto_strutturale_temporale(
     segnali KPI della stessa famiglia sui due livelli. La precedenza
     temporale di un segnale non dimostra propagazione o causalita'.
     Nessuna ground truth e nessun modello LLM vengono consultati.
+
+    Argomenti: il report delle evidenze (oppure None), la finestra del caso, la tolleranza (secondi) per
+    considerare quasi contemporanei due segnali e `max_relazioni`, il numero massimo di relazioni da
+    riportare (le altre sono solo contate).
     """
+    # --- 1. Controllo degli argomenti. `type(...) is int` esclude anche i booleani.
     if type(start_unix) is not int or type(end_unix) is not int or start_unix >= end_unix:
         raise ValueError("Finestra temporale non valida")
     if type(tolleranza_secondi) is not int or tolleranza_secondi < 0:
@@ -269,6 +314,7 @@ def costruisci_contesto_strutturale_temporale(
     if type(max_relazioni) is not int or max_relazioni < 1:
         raise ValueError("Limite relazioni non valido")
 
+    # Risultato "vuoto" di partenza: è anche quello restituito se il report o le regole non ci sono.
     base = {
         "versione": "structural_temporal_context_v1",
         "stato": "non_valutabile",
@@ -284,6 +330,7 @@ def costruisci_contesto_strutturale_temporale(
             "L'assenza di una coppia non esclude un guasto."
         ),
     }
+    # --- 2. Controllo del report: versione, finestra del caso e report delle regole devono essere coerenti.
     if evidence_report is None:
         return base
     if not isinstance(evidence_report, dict):
@@ -306,12 +353,15 @@ def costruisci_contesto_strutturale_temporale(
     if type(omitted) is not int or omitted < 0:
         raise ValueError("Numero candidati omessi non valido")
 
+    # --- 3. Candidati normalizzati, divisi per livello.
     # Validazione riutilizzata dal verificatore offline esistente.
     # Le anomalie non vengono ordinate per gravita' o causalita'.
     candidates = _normalize_candidates(evidence_report, start_unix, end_unix)
     nodes = [item for item in candidates if item["scope"] == "node"]
     containers = [item for item in candidates if item["scope"] == "container"]
 
+    # --- 4. Coppie nodo/container sullo stesso nodo e nella stessa famiglia di risorsa. `delta` positivo
+    # = il nodo ha segnalato prima del container (stessa convenzione di `verifica_relazioni_strutturali_temporali`).
     pairs = []
     for node in nodes:
         for container in containers:
@@ -339,6 +389,7 @@ def costruisci_contesto_strutturale_temporale(
                     f"regole_diagnostiche_v0.candidati_riportati[{container['source_index']}]",
                 ],
             })
+    # --- 5. Ordine deterministico; nel risultato restano al massimo `max_relazioni` coppie e le altre sono contate.
     pairs.sort(key=lambda x: (
         x["host"], x["container"], x["famiglia"], x["regola_nodo"],
         x["regola_container"], x["delta_secondi_container_meno_nodo"],

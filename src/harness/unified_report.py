@@ -1,3 +1,17 @@
+"""Report unificato delle evidenze: un unico elenco compatto, con un budget globale, da dare all'agente.
+
+Due funzioni, una per versione del report:
+- `costruisci_report_unificato` (`unified_evidence_v1`): unisce le anomalie CPU/load e i pattern strutturali
+  del report A1-v1 con le evidenze multi-risorsa già riassunte, scegliendo a rotazione tra le tre categorie;
+- `costruisci_report_unificato_v2` (`unified_evidence_v2`): parte dal precedente e aggiunge le unità Mesh e le
+  evidenze Runtime, scegliendo con criteri investigativi (correlazioni multi-replica, conferma sul nodo
+  ospitante, varietà di categorie e famiglie).
+
+La selezione è euristica e non causale: tiene traccia della provenienza di ogni evidenza e di quante ne ha
+omesse. Nessun LLM e nessuna ground truth.
+"""
+
+
 def costruisci_report_unificato(
     report_v2: dict,
     sintesi: dict,
@@ -22,6 +36,17 @@ def costruisci_report_unificato(
     Non utilizza ground truth.
     Non identifica la root cause.
     Non chiama l'LLM.
+
+    Argomenti:
+      report_v2            report A1-v2 (versione "A1-v2"); contiene il report A1-v1 in `evidenze_v1`.
+      sintesi              riepilogo multi-risorsa ("evidence_summary_v1").
+      max_evidenze_totali  budget globale: numero massimo di evidenze nel report finale (>= 1).
+
+    Restituisce un report "unified_evidence_v1" con le evidenze scelte, i conteggi (disponibili, inclusi,
+    omessi per budget, omessi in precedenza) e le limitazioni da riportare all'agente.
+
+    Passi: (1) validazione; (2) anomalie CPU/load; (3) pattern strutturali; (4) evidenze multi-risorsa;
+    (5) selezione a rotazione entro il budget; (6) conteggi e omissioni; (7) report finale.
     """
 
     # =====================================================
@@ -43,6 +68,7 @@ def costruisci_report_unificato(
             "max_evidenze_totali deve essere >= 1."
         )
 
+    # Il report A1-v1 è annidato dentro l'A1-v2: ne controlliamo la versione prima di leggerne i campi.
     report_v1 = report_v2["evidenze_v1"]
 
     if report_v1.get("versione") != "A1-v1":
@@ -54,6 +80,8 @@ def costruisci_report_unificato(
     # 2. EVIDENZE CPU/LOAD ORIGINALI
     # =====================================================
 
+    # Ogni anomalia A1-v1 diventa un'evidenza di categoria "cpu_load"; `provenienza` registra da quale
+    # posizione del report originale proviene.
     cpu_load = []
 
     anomalie_v1 = report_v1["anomalie"]
@@ -94,6 +122,7 @@ def costruisci_report_unificato(
     # 3. PATTERN STRUTTURALI ORIGINALI
     # =====================================================
 
+    # Stessa trasformazione per i pattern strutturali (anomalie vicine nel tempo sullo stesso componente).
     patterns = []
 
     patterns_v1 = report_v1["patterns"]
@@ -141,6 +170,8 @@ def costruisci_report_unificato(
     # 4. EVIDENZE MULTI-RISORSA
     # =====================================================
 
+    # Le unità già selezionate dal riepilogo multi-risorsa diventano evidenze di categoria "multi_risorsa".
+    # `gruppi_origine` permette di risalire ai gruppi del report A1-v2 da cui derivano.
     multi_risorsa = []
 
     for indice, evidenza in enumerate(
@@ -210,10 +241,12 @@ def costruisci_report_unificato(
         multi_risorsa
     ]
 
+    # `posizioni[i]` = prossima evidenza ancora da prendere dalla coda i.
     posizioni = [0, 0, 0]
 
     evidenze_finali = []
 
+    # A ogni giro si prende al più un'evidenza da ciascuna coda, finché c'è budget.
     while len(evidenze_finali) < max_evidenze_totali:
 
         aggiunte_nel_giro = 0
@@ -223,6 +256,7 @@ def costruisci_report_unificato(
             if len(evidenze_finali) >= max_evidenze_totali:
                 break
 
+            # Coda esaurita: si passa alla successiva.
             if posizioni[i] >= len(coda):
                 continue
 
@@ -233,6 +267,7 @@ def costruisci_report_unificato(
             posizioni[i] += 1
             aggiunte_nel_giro += 1
 
+        # Un giro senza aggiunte significa che tutte le code sono finite: ci si ferma anche se resta budget.
         if aggiunte_nel_giro == 0:
             break
 
@@ -240,6 +275,7 @@ def costruisci_report_unificato(
     # 6. CONTEGGI E OMISSIONI
     # =====================================================
 
+    # Quante evidenze esistono per categoria, quante ne sono entrate e quante sono rimaste fuori per budget.
     disponibili = {
         "patterns": len(patterns),
         "cpu_load": len(cpu_load),
@@ -318,6 +354,8 @@ def costruisci_report_unificato(
             "Un KPI anomalo non prova un guasto del componente."
         ]
     }
+
+
 def costruisci_report_unificato_v2(
     report_v2: dict,
     sintesi: dict,
@@ -338,6 +376,20 @@ def costruisci_report_unificato_v2(
 
     La selezione è euristica, non causale.
     Non usa ground truth e non chiama Gemini.
+
+    Argomenti:
+      report_v2            report A1-v2 ("A1-v2") con il report A1-v1 annidato.
+      sintesi              riepilogo multi-risorsa ("evidence_summary_v1").
+      aggregazione_mesh    unità Mesh aggregate ("mesh_aggregation_v1").
+      report_mesh_runtime  evidenze Mesh/Runtime ("mesh_runtime_evidence_v1"), NON ancora troncate.
+      max_evidenze_totali  budget globale: numero massimo di evidenze nel report finale (>= 1).
+
+    Restituisce un report "unified_evidence_v2" con le evidenze scelte, i conteggi per categoria
+    (pattern, cpu_load, multi_risorsa, mesh, runtime), le omissioni precedenti e le limitazioni.
+
+    Passi: (1) validazione; (2) recupero di tutte le evidenze originali; (3) unità Mesh; (4) evidenze
+    Runtime; (5) controllo che siano nella finestra del caso; (6) selezione investigativa in quattro
+    fasi (6A–6D); (7) conteggi; (8) report finale.
     """
 
     from collections import Counter
@@ -369,6 +421,7 @@ def costruisci_report_unificato_v2(
     # evidenze prima della selezione globale.
     conteggi_mr = report_mesh_runtime["conteggi"]
 
+    # Per ciascuna sorgente le evidenze rilevate devono coincidere con quelle selezionate.
     for sorgente in ("mesh", "runtime"):
         if (
             conteggi_mr[f"{sorgente}_rilevate"]
@@ -386,9 +439,11 @@ def costruisci_report_unificato_v2(
 
     caso = report_v1["caso"]
 
+    # Finestra del caso: tutte le evidenze devono cadere in [start, end).
     start = int(caso["start_unix"])
     end = int(caso["end_unix"])
 
+    # Il report Mesh/Runtime deve riferirsi alla stessa finestra del caso.
     finestra_mr = report_mesh_runtime["finestra"]
 
     if (
@@ -402,6 +457,8 @@ def costruisci_report_unificato_v2(
     # Riutilizziamo la trasformazione A1-v1
     # già verificata, senza perdere evidenze
     # a causa del precedente limite globale.
+    # Come budget si usa il numero totale di evidenze originali: così `base` le contiene tutte
+    # (anomalie CPU/load, pattern, multi-risorsa) e la scelta vera avviene più sotto, nella sezione 6.
     numero_originali = (
         len(report_v1["anomalie"]["segnalazioni"])
         + len(report_v1["patterns"]["segnalazioni"])
@@ -414,12 +471,15 @@ def costruisci_report_unificato_v2(
         max_evidenze_totali=max(1, numero_originali)
     )
 
+    # `candidati` è l'insieme di tutte le evidenze tra cui scegliere; a quelle di `base` si aggiungono sotto
+    # le unità Mesh e le evidenze Runtime.
     candidati = list(base["evidenze"])
 
     # =====================================================
     # 3. AGGIUNTA DELLE UNITÀ MESH
     # =====================================================
 
+    # Ogni unità Mesh aggregata (più repliche dello stesso servizio) diventa un'evidenza di categoria "mesh".
     for indice, unita in enumerate(
         aggregazione_mesh["unita"]
     ):
@@ -461,6 +521,7 @@ def costruisci_report_unificato_v2(
         report_mesh_runtime["evidenze"]
     ):
 
+        # Qui si prendono solo le evidenze Runtime: quelle Mesh entrano già come unità aggregate (sezione 3).
         if evidenza["sorgente"] != "runtime":
             continue
 
@@ -500,6 +561,8 @@ def costruisci_report_unificato_v2(
     # 5. CONTROLLO TEMPORALE
     # =====================================================
 
+    # Ogni candidato deve iniziare dentro la finestra del caso; altrimenti i dati sono incoerenti
+    # e il report non viene costruito.
     for evidenza in candidati:
 
         timestamp = int(evidenza["timestamp_inizio"])
@@ -513,6 +576,8 @@ def costruisci_report_unificato_v2(
     # 6. SELEZIONE INVESTIGATIVA
     # =====================================================
 
+    # `identita_selezionate` contiene gli `id()` degli oggetti già scelti: si confronta l'identità, non il
+    # contenuto, perché due evidenze diverse potrebbero avere gli stessi valori.
     selezionate = []
     identita_selezionate = set()
 
@@ -520,6 +585,8 @@ def costruisci_report_unificato_v2(
         """
         Aggiunge un'evidenza una sola volta
         rispettando il budget globale.
+
+        Restituisce True se l'evidenza è stata aggiunta, False se il budget è esaurito o è già presente.
         """
 
         if len(selezionate) >= max_evidenze_totali:
@@ -539,6 +606,7 @@ def costruisci_report_unificato_v2(
     # 6A. CORRELAZIONI NODE/CONTAINER
     # -----------------------------------------------------
 
+    # Candidate: le unità multi-risorsa in cui più repliche mostrano l'anomalia quasi insieme.
     correlazioni_container = [
         e for e in candidati
         if (
@@ -547,6 +615,7 @@ def costruisci_report_unificato_v2(
         )
     ]
 
+    # Ordine deterministico: prima le più precoci, a parità il nome dei componenti.
     correlazioni_container.sort(
         key=lambda e: (
             e["timestamp_inizio"],
@@ -563,12 +632,15 @@ def costruisci_report_unificato_v2(
 
         componenti = correlazione["componenti"]
 
+        # Nodi che ospitano i container della correlazione: la parte prima del punto in "node-6.servizio-2".
         nodi_ospitanti = {
             componente.split(".")[0]
             for componente in componenti
             if "." in componente
         }
 
+        # Corroborazione: evidenze multi-risorsa non multi-replica (cioè sul nodo), della stessa famiglia
+        # di metriche, che coinvolgono uno dei nodi ospitanti e iniziano entro 60 secondi.
         corroborazioni = [
             e for e in candidati
             if (
@@ -587,6 +659,7 @@ def costruisci_report_unificato_v2(
             )
         ]
 
+        # Si tiene la corroborazione più vicina nel tempo (a parità: componenti e KPI in ordine alfabetico).
         corroborazioni.sort(
             key=lambda e: (
                 abs(
@@ -615,6 +688,8 @@ def costruisci_report_unificato_v2(
         )
     ]
 
+    # Ordine: più repliche coinvolte, poi incremento massimo più alto (il segno meno inverte l'ordine
+    # crescente), poi più precoce, poi nome del servizio.
     correlazioni_mesh.sort(
         key=lambda e: (
             -e["numero_repliche"],
@@ -633,6 +708,7 @@ def costruisci_report_unificato_v2(
 
     # Garantiamo rappresentanza alle evidenze
     # infrastrutturali originali, se presenti.
+    # Per ciascuna categoria si sceglie l'evidenza più precoce (a parità: componente e KPI).
     for categoria in ("pattern", "cpu_load"):
 
         categoria_candidati = [
@@ -656,6 +732,7 @@ def costruisci_report_unificato_v2(
     # -----------------------------------------------------
 
     def chiave_famiglia(evidenza):
+        """Chiave (categoria, famiglia) di un'evidenza; se la famiglia manca si usa il tipo."""
         return (
             evidenza["categoria"],
             evidenza.get(
@@ -664,6 +741,7 @@ def costruisci_report_unificato_v2(
             )
         )
 
+    # Combinazioni (categoria, famiglia) già presenti tra le evidenze scelte nelle fasi 6A–6C.
     famiglie_rappresentate = {
         chiave_famiglia(e)
         for e in selezionate
@@ -671,6 +749,7 @@ def costruisci_report_unificato_v2(
 
     # Se esiste un'anomalia Runtime, proviamo
     # a conservarne almeno una entro il budget.
+    # Priorità tra categorie (numero più basso = prima); una categoria sconosciuta va in fondo (99).
     priorita_categorie = {
         "runtime": 0,
         "multi_risorsa": 1,
@@ -679,6 +758,7 @@ def costruisci_report_unificato_v2(
         "pattern": 4
     }
 
+    # Tutti i candidati in ordine deterministico: priorità della categoria, istante d'inizio, componente, tipo.
     rimanenti = sorted(
         candidati,
         key=lambda e: (
@@ -716,6 +796,7 @@ def costruisci_report_unificato_v2(
     # 7. CONTEGGI E OMISSIONI
     # =====================================================
 
+    # Conteggi per categoria: candidate, scelte e rimaste fuori per il budget globale.
     disponibili = Counter(
         e["categoria"]
         for e in candidati
