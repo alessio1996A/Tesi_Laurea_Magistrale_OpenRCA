@@ -48,3 +48,15 @@ Punteggio di dettaglio K = somma 0-5. Le astensioni (`insufficient_evidence`) si
 - limite dichiarato: il lettore è un modello della famiglia Claude e potrebbe favorire il proprio stile;
   per questo Alessio rilegge un campione di 12 testi (20%) e si riporta l'accordo;
 - la griglia non cambia dopo aver visto i testi; se un criterio si rivela ambiguo si dichiara, non si corregge.
+
+## Dichiarazioni aggiunte il 17 novembre, DOPO il congelamento (non cambiano i criteri)
+
+1. **Dove si applica C1-C5.** Letti i testi estratti, il passo C contiene solo una breve etichetta della causa
+   e il componente; la spiegazione estesa e' nel testo libero del passo D. I criteri C1-C5 si applicano quindi
+   al **testo libero del passo D** (e l'etichetta del passo C si riporta a parte). I criteri non cambiano; cambia
+   l'oggetto a cui si applicano, per errore di individuazione dell'oggetto nella proposta.
+2. **La passata 1 non e' del tutto cieca.** Per i due incidenti di cloudbed-1 (q032, q050) la classe vera
+   l'ho ricavata io da `record.csv` in questa sessione, e in precedenza ho fatto una lettura non cieca. Si
+   dichiara. Mitigazione: il campione di 12 testi riletto da Alessio con la classe nascosta deve includere
+   testi di tutti e quattro gli incidenti.
+3. **K non letto.** Al momento della dichiarazione i record K non erano ancora stati letti.
