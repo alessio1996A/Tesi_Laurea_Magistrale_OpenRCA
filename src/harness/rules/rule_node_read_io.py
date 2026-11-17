@@ -1,6 +1,6 @@
 
 """
-R09 - Node Disk Read I/O Consumption.
+R09 - Consumo di I/O di lettura del disco di un nodo (classe "node disk read I/O consumption").
 
 Rileva aumenti persistenti delle operazioni di lettura
 rispetto alla baseline del nodo.
@@ -9,6 +9,8 @@ Il risultato e' un'ipotesi osservativa, NON una root cause
 confermata.
 
 Non utilizza ground truth, Gemini o etichette Market.
+
+Involucro sottile: la logica e' in `_node_rule_common.evaluate_node_signal`.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from __future__ import annotations
 from ._node_rule_common import evaluate_node_signal
 
 
-# KPI principali del detector
+# KPI principali del detector: letture al secondo (segnale che decide) e kB/s letti (solo accessorio).
 READ_RATE = "system.io.r_s"
 READ_THROUGHPUT = "system.io.rkb_s"
 
@@ -39,8 +41,13 @@ def valuta_r09_node_disk_read_io(
 
     Le soglie sono provvisorie e non calibrate
     sulla ground truth.
+
+    Argomenti come in R07. Qui le due soglie si possono ridefinire (default: +50% sulla
+    mediana di baseline e +5 letture/s assolute); i parametri di campionamento restano
+    quelli di default del rilevatore comune (3 campioni consecutivi, minimo 8 in baseline).
     """
 
+    # Si passano gli argomenti per nome al rilevatore comune, che fa tutto il calcolo.
     return evaluate_node_signal(
         telemetry=telemetria,
         component=componente,

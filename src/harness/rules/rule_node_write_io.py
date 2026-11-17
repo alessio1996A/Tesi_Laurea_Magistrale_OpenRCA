@@ -1,12 +1,14 @@
 
 """
-R10 - Node Disk Write I/O Consumption.
+R10 - Consumo di I/O di scrittura del disco di un nodo (classe "node disk write I/O consumption").
 
 Rileva incrementi persistenti delle operazioni di
 scrittura del disco rispetto alla baseline.
 
 Le anomalie osservate non sono root cause confermate.
 Nessun utilizzo di Gemini o della ground truth.
+
+Involucro sottile: la logica e' in `_node_rule_common.evaluate_node_signal`.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 from ._node_rule_common import evaluate_node_signal
 
 
+# KPI del detector: scritture al secondo (segnale che decide) e latenza media di scrittura (solo accessorio).
 WRITE_RATE = "system.io.w_s"
 WRITE_AWAIT = "system.io.w_await"
 
@@ -35,8 +38,13 @@ def valuta_r10_node_disk_write_io(
     WRITE_AWAIT: informazione accessoria sulla latenza.
 
     Soglie esplorative, non validate sulla ground truth.
+
+    Argomenti come in R07. Qui le due soglie si possono ridefinire (default: +50% sulla
+    mediana di baseline e +5 scritture/s assolute); i parametri di campionamento restano
+    quelli di default del rilevatore comune (3 campioni consecutivi, minimo 8 in baseline).
     """
 
+    # Si passano gli argomenti per nome al rilevatore comune, che fa tutto il calcolo.
     return evaluate_node_signal(
         telemetry=telemetria,
         component=componente,
