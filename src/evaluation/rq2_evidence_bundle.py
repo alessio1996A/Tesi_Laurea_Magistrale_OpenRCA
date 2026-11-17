@@ -1,17 +1,28 @@
-"""Read-only RQ2 bundle of tool observations already captured by RQ1 runners.
+"""Pacchetto (bundle) RQ2 in sola lettura delle osservazioni dei tool gia' catturate dai runner RQ1.
 
-Consumes ONLY the in-memory tool_trajectory returned by graph_engine.py or
-verify_graph.py. Never reads a dataset, file, query.csv, record.csv, scoring,
-prompt template, provider, network or any ground-truth source.
+Consuma SOLO la `tool_trajectory` in memoria restituita da `graph_engine.py` o da
+`verify_graph.py`. Non legge mai un dataset, un file, `query.csv`, `record.csv`, punteggi,
+template di prompt, provider, rete o qualsiasi fonte di ground truth.
 
-For graph_engine legacy trajectories WITHOUT tool_call_id, association by tool
-name is accepted only when EXACTLY ONE unmatched call has that name. Parallel
-calls of the same tool name without IDs are ambiguous and fail CLOSED rather
-than inventing parameter-to-result provenance. verify_graph IDs pair exactly.
+Per le traiettorie "legacy" di `graph_engine` SENZA `tool_call_id`, l'associazione per nome del
+tool e' accettata solo se ESATTAMENTE UNA chiamata senza risposta ha quel nome. Chiamate
+parallele dello stesso tool senza ID sono ambigue e si BLOCCANO (fail closed) invece di
+inventare una provenienza fra parametri e risultati. Gli ID di `verify_graph` si accoppiano
+esattamente.
 
-Tool result text remains untrusted; this module does NOT verify that a value,
-unit, KPI, timestamp, or causal statement in the text is correct. Truncation
-is explicit and stable. No code from a model is executed.
+Il testo del risultato di un tool resta non fidato: questo modulo NON verifica che un valore,
+un'unita', un KPI, un orario o un'affermazione causale nel testo siano corretti. Il troncamento
+e' esplicito e stabile. Nessun codice proveniente da un modello viene eseguito.
+
+Contenuto
+---------
+- costanti: limiti di dimensione, forma dei nomi dei tool, filtro dei contenuti vietati, forma
+  degli ID di evidenza ("E001", ...);
+- `EvidenceBundleError`: errore "provenienza dei tool incompleta, ambigua, troppo grande o vietata";
+- funzioni di supporto: `_json_bytes`, `_sha`, `_reject_sensitive`, `_call_id`, `_origin`,
+  `_tool_allowlist`, `_truncate`;
+- `build_evidence_bundle`: costruisce il pacchetto con gli ID E001, E002, ... deterministici;
+- `evidence_ids`: l'insieme degli ID ammessi per i validatori di C e K.
 """
 from __future__ import annotations
 
@@ -22,6 +33,8 @@ from collections import defaultdict
 from collections.abc import Collection
 
 VERSION = "rq2_evidence_bundle_v0"
+# Limiti: eventi nella traiettoria, risultati nel pacchetto, caratteri visibili in totale e per
+# risultato (massimo e minimo leggibile), dimensione degli argomenti e di un risultato grezzo.
 MAX_TRAJECTORY_EVENTS = 256
 MAX_RESULT_ITEMS = 120
 MAX_TOTAL_VISIBLE_CHARS = 24_000
@@ -29,19 +42,23 @@ MAX_VISIBLE_PER_RESULT = 2_400
 MIN_VISIBLE_PER_RESULT = 128
 MAX_ARGUMENT_CHARS = 5_000
 MAX_RAW_RESULT_CHARS = 2_000_000
+# Forma ammessa di un nome di tool: `tool_` + lettere minuscole, cifre e trattini bassi.
 TOOL_NAME = re.compile(r"tool_[a-z][a-z0-9_]{0,127}\Z")
+# Testi vietati: segnali di ground truth o punteggi (scoring_points, record.csv, query.csv, scorer).
 FORBIDDEN = re.compile(
     r"(?i)(scoring_points|ground[_ -]?truth|record\.csv|query\.csv|"
     r"(?:^|[^a-z])scorer(?:[^a-z]|$))"
 )
+# Forma di un ID di evidenza: la lettera E e da 3 a 6 cifre (E001, E002, ...).
 EVIDENCE_ID = re.compile(r"E[0-9]{3,6}\Z")
 
 
 class EvidenceBundleError(ValueError):
-    """Incomplete, ambiguous, oversized or disallowed tool provenance."""
+    """Provenienza dei tool incompleta, ambigua, troppo grande o non ammessa."""
 
 
 def _json_bytes(obj) -> bytes:
+    """Byte UTF-8 della forma canonica JSON di `obj`; errore se non e' serializzabile."""
     try:
         payload = json.dumps(
             obj, sort_keys=True, separators=(",", ":"),
@@ -53,12 +70,14 @@ def _json_bytes(obj) -> bytes:
 
 
 def _sha(data: bytes) -> str:
+    """SHA-256 (esadecimale) dei byte `data`."""
     return hashlib.sha256(data).hexdigest()
 
 
 def _reject_sensitive(text: str) -> None:
-    # Defense in depth for accidental GT inclusion. Not a complete redactor:
-    # the runner MUST retain a separate GT-free tool allowlist and data path.
+    """Blocca se `text` contiene segnali di punteggi o ground truth (`FORBIDDEN`)."""
+    # Difesa in profondita' contro l'inclusione accidentale di GT. Non e' un redattore completo:
+    # il runner DEVE mantenere a parte una allowlist di tool e un percorso dati GT-free.
     if FORBIDDEN.search(text):
         raise EvidenceBundleError(
             "Potential scoring/ground-truth content in tool trajectory"
@@ -66,6 +85,7 @@ def _reject_sensitive(text: str) -> None:
 
 
 def _call_id(value) -> str | None:
+    """`tool_call_id` valido (stringa di 1-128 caratteri) oppure `None` se assente."""
     if value is None:
         return None
     if type(value) is not str or not (1 <= len(value) <= 128):
@@ -74,6 +94,7 @@ def _call_id(value) -> str | None:
 
 
 def _origin(value) -> str | None:
+    """Origine valida della chiamata ("llm", "planner" o "unknown") oppure `None` se assente."""
     if value is None:
         return None
     if value not in ("llm", "planner", "unknown"):
@@ -82,6 +103,11 @@ def _origin(value) -> str | None:
 
 
 def _tool_allowlist(value: Collection[str]) -> set[str]:
+    """Allowlist esplicita dei tool: da 1 a 16 nomi distinti, ben formati e non vietati.
+
+    Restituisce l'insieme dei nomi; una stringa, un dizionario o un elenco con duplicati sono
+    rifiutati.
+    """
     if isinstance(value, (str, bytes, dict)) or not isinstance(
         value, Collection
     ) or not (1 <= len(value) <= 16):
@@ -97,6 +123,12 @@ def _tool_allowlist(value: Collection[str]) -> set[str]:
 
 
 def _truncate(text: str, budget: int) -> tuple[str, bool]:
+    """Tronca `text` a `budget` caratteri tenendo inizio e fine e togliendo il centro.
+
+    Restituisce `(testo, troncato)`: tre quarti dello spazio vanno all'inizio, il resto alla
+    fine, con un marcatore esplicito in mezzo. Se il budget non basta nemmeno per il marcatore
+    si blocca.
+    """
     if len(text) <= budget:
         return text, False
     marker = "\n[...TRUNCATED_MIDDLE_BY_RQ2_BUNDLE...]\n"
@@ -111,15 +143,28 @@ def build_evidence_bundle(
     tool_trajectory: list[dict], *,
     allowed_tool_names: Collection[str],
 ) -> dict:
-    """Build deterministic E001... identifiers from observed tool results.
+    """Costruisce ID deterministici E001... dai risultati dei tool osservati.
 
-    Returns only observation text, exact supplied tool arguments and provenance.
-    No inferred signal names/units, timestamps, faults or measurements.
+    Restituisce solo il testo delle osservazioni, gli argomenti esatti dei tool e la
+    provenienza. Nessun nome di segnale, unita', orario, guasto o misura e' dedotto.
+
+    Argomenti: `tool_trajectory` (lista di eventi `tool_call`/`tool_result` del runner RQ1) e
+    `allowed_tool_names` (allowlist esplicita dei tool). Restituisce un dizionario con le
+    evidenze (ID, tool, argomenti, origine, testo visibile, hash, flag di troncamento), i
+    conteggi, le avvertenze e `bundle_sha256`.
+
+    Passi: 1) allowlist e traiettoria limitata; 2) per ogni evento: chiamata (argomenti e ID) o
+    risultato (accoppiato alla sua chiamata per ID o, se manca, per nome unico); 3) nessuna
+    chiamata senza risposta; 4) il budget di testo visibile si divide in parti uguali fra i
+    risultati; 5) per ogni risultato testo troncato con hash dell'originale; 6) pacchetto
+    canonico con il suo hash.
     """
+    # 1. Allowlist esplicita e traiettoria di dimensione limitata.
     allow = _tool_allowlist(allowed_tool_names)
     if type(tool_trajectory) is not list or len(tool_trajectory) > MAX_TRAJECTORY_EVENTS:
         raise EvidenceBundleError("Trajectory must be a bounded list")
 
+    # 2. Chiamate in attesa di risposta (per ID e per nome), risultati gia' accoppiati e ID visti.
     pending_by_id: dict[str, dict] = {}
     pending_by_name: dict[str, list[dict]] = defaultdict(list)
     matched: list[dict] = []
@@ -195,16 +240,18 @@ def build_evidence_bundle(
             if len(matched) > MAX_RESULT_ITEMS:
                 raise EvidenceBundleError("Too many tool results for bundle")
 
+    # 3. Ogni chiamata deve avere la sua risposta.
     if pending_by_id or any(pending_by_name.values()):
         raise EvidenceBundleError("Unmatched tool calls; trajectory incomplete")
 
-    # Distribute the visible text budget fairly between all observed results.
+    # 4. Si divide equamente il budget di testo visibile fra tutti i risultati osservati.
     per_item = min(
         MAX_VISIBLE_PER_RESULT,
         MAX_TOTAL_VISIBLE_CHARS // len(matched) if matched else MAX_VISIBLE_PER_RESULT
     )
     if matched and per_item < MIN_VISIBLE_PER_RESULT:
         raise EvidenceBundleError("Too many results for minimum readable budget")
+    # 5. Una evidenza per risultato, con ID E001, E002, ... nell'ordine di osservazione.
     evidence = []
     for index, item in enumerate(matched, start=1):
         raw = item["raw_observation"]
@@ -222,6 +269,7 @@ def build_evidence_bundle(
             "observation_is_empty": not bool(raw.strip()),
             "units_verified": False,
         })
+    # 6. Pacchetto canonico: hash della traiettoria sorgente e, alla fine, hash del pacchetto.
     source_sha = _sha(_json_bytes(tool_trajectory))
     canonical = {
         "schema_version": VERSION,
@@ -241,7 +289,10 @@ def build_evidence_bundle(
 
 
 def evidence_ids(bundle: dict) -> set[str]:
-    """Allowlist for C/K validators, never a fault-label list."""
+    """Insieme degli ID di evidenza ammessi per i validatori di C e K (mai un elenco di etichette di guasto).
+
+    Verifica che `bundle` abbia lo schema atteso e che gli ID siano ben formati e distinti.
+    """
     if type(bundle) is not dict or bundle.get("schema_version") != VERSION:
         raise EvidenceBundleError("Unexpected bundle schema")
     evidence = bundle.get("evidence")

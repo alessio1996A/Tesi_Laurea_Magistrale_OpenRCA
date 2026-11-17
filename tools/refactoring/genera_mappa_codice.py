@@ -106,10 +106,22 @@ def _docstring_vietata(nodo: ast.AST) -> bool:
     return False
 
 
+def _doc_usata_per_intero(albero: ast.AST) -> bool:
+    """True se il modulo usa `__doc__` per intero (tipicamente `ArgumentParser(description=__doc__)`).
+
+    In quel caso la docstring di modulo e' il testo mostrato da `--help` e resta identica all'originale (regola 7 del
+    LEGGIMI): la guida in italiano sta nel blocco di commenti `#` subito sotto. Non si usa invece per intero quando
+    compare solo come `__doc__.splitlines()[0]` o `__doc__.split(...)`.
+    """
+    parziali = {id(n.value) for n in ast.walk(albero) if isinstance(n, ast.Attribute)}
+    return any(isinstance(n, ast.Name) and n.id == "__doc__" and id(n) not in parziali for n in ast.walk(albero))
+
+
 def misura(percorso: Path) -> dict:
     """Righe, scopo, blocchi inglesi/incerti e funzioni senza docstring di un modulo."""
     testo = percorso.read_text(encoding="utf-8")
     albero = ast.parse(testo)
+    doc_congelata = _doc_usata_per_intero(albero)
     blocchi: list[str] = []
     for tok in tokenize.generate_tokens(io.StringIO(testo).readline):
         if tok.type == tokenize.COMMENT:
@@ -119,7 +131,9 @@ def misura(percorso: Path) -> dict:
         if isinstance(nodo, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             doc = ast.get_docstring(nodo, clean=False)
             if doc:
-                blocchi.append(doc)
+                # La docstring di modulo usata come `--help` resta com'e': non conta nella stima della lingua.
+                if not (isinstance(nodo, ast.Module) and doc_congelata):
+                    blocchi.append(doc)
             elif not isinstance(nodo, ast.Module) and not _docstring_vietata(nodo):
                 senza_doc += 1
     conteggio = Counter(lingua(b) or "?" for b in blocchi)

@@ -21,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 57 | 16 |
+| A. Nucleo del codice finale | 98 | 25 | 65 | 8 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -159,20 +159,20 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/rq2_budget_preflight.py` | 245 | GT-free, offline and NON-AUTHORIZING RQ2 model/cost preflight. | - | da fare (EN 6, senza docstring 4) |
-| `evaluation/rq2_ck_provider_transport.py` | 296 | Actual C/K provider path, HARD-BLOCKED until scientific protocol release. | - | da fare (EN 8, senza docstring 2) |
-| `evaluation/rq2_discovery_claim_journal.py` | 252 | Offline-only durable, create-only claims against duplicate RQ2 calls. | - | da fare (EN 4, senza docstring 6) |
-| `evaluation/rq2_discovery_stage_recorder.py` | 391 | Offline-only D/C/K discovery recording from caller-supplied outputs. | - | da fare (EN 9, senza docstring 7) |
-| `evaluation/rq2_dryrun_plan.py` | 284 | RQ2 non-executable, GT-free stage-plan preview. | - | da fare (EN 6, senza docstring 4) |
-| `evaluation/rq2_evidence_bundle.py` | 256 | Read-only RQ2 bundle of tool observations already captured by RQ1 runners. | - | da fare (EN 5, senza docstring 7) |
-| `evaluation/rq2_kpi_formalizability_preflight.py` | 189 | GT-free offline-only KPI inventory and RQ2-K formalizability preflight. | - | da fare (EN 4, senza docstring 3) |
-| `evaluation/rq2_model_factory.py` | 82 | Candidate RQ2-only model factory, with explicit pinned synchronous transport. | - | da fare (EN 4, senza docstring 0) |
+| `evaluation/rq2_budget_preflight.py` | 298 | Preflight RQ2 di modelli e costi: GT-free, offline e NON AUTORIZZANTE. | - | completo |
+| `evaluation/rq2_ck_provider_transport.py` | 359 | Percorso REALE verso il provider per C/K, BLOCCATO finche' non c'e' la release del protocollo. | - | completo |
+| `evaluation/rq2_discovery_claim_journal.py` | 293 | Claim durevoli e create-only, solo offline, contro le chiamate RQ2 duplicate. | - | completo |
+| `evaluation/rq2_discovery_stage_recorder.py` | 467 | Registrazione offline degli stage D/C/K di discovery, da output forniti dal chiamante. | - | completo |
+| `evaluation/rq2_dryrun_plan.py` | 346 | RQ2 non-executable, GT-free stage-plan preview. | - | completo |
+| `evaluation/rq2_evidence_bundle.py` | 307 | Pacchetto (bundle) RQ2 in sola lettura delle osservazioni dei tool gia' catturate dai runner RQ1. | - | completo |
+| `evaluation/rq2_kpi_formalizability_preflight.py` | 229 | Inventario dei KPI e preflight di formalizzabilita' di RQ2-K: GT-free e solo offline. | - | completo |
+| `evaluation/rq2_model_factory.py` | 109 | Factory dei modelli candidata, solo per RQ2, con trasporto sincrono esplicito a versioni fissate. | - | completo |
 | `evaluation/rq2_output_contracts.py` | 240 | Strict RQ2 JSON contracts for offline validation of LLM-produced C/K output. | - | da fare (EN 4, senza docstring 10) |
 | `evaluation/rq2_probe_adapter.py` | 195 | OFFLINE-only assembly of RQ2 C (cause) and K (candidate rule) prompts. | - | da fare (EN 3, senza docstring 5) |
 | `evaluation/rq2_protocol_identity_preflight.py` | 182 | Offline RQ2 pre-freeze fingerprints with RQ1 frozen-source parity. | - | da fare (EN 8, senza docstring 4) |
-| `evaluation/rq2_provider_policy_source_audit.py` | 186 | RQ2 read-only provider retry/timeout *source* inventory, NOT network verification. | - | da fare (EN 5, senza docstring 4) |
+| `evaluation/rq2_provider_policy_source_audit.py` | 186 | RQ2 read-only provider retry/timeout *source* inventory, NOT network verification. | - | da fare (EN 4, senza docstring 4) |
 | `evaluation/rq2_rule_group_scorer.py` | 189 | RQ2-C offline-only GROUP-LEVEL rule outcome scorer (proposal V0). | SHA-256 consolidamento | bloccato |
-| `evaluation/rq2_sdk_retry_mock_probe.py` | 208 | RQ2: sandboxed SDK retry-behavior probe, no external HTTP, no model invocations. | - | da fare (EN 9, senza docstring 3) |
+| `evaluation/rq2_sdk_retry_mock_probe.py` | 208 | RQ2: sandboxed SDK retry-behavior probe, no external HTTP, no model invocations. | - | da fare (EN 8, senza docstring 3) |
 | `evaluation/rq2_stage_artifact_store.py` | 388 | RQ2 source-bound, create-only STAGE ARTIFACT storage (no execution). | - | da fare (EN 10, senza docstring 11) |
 | `evaluation/rq2_stage_binding.py` | 261 | OFFLINE-only binding of RQ2 C/K prompt packages to draft workflow stages. | - | da fare (EN 6, senza docstring 5) |
 | `evaluation/rq2_toolfree_fake_transport.py` | 231 | RQ2 C/K LangChain messages, executed ONLY against a strict fake model. | - | da fare (EN 7, senza docstring 6) |
@@ -181,8 +181,8 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/claude_development_campaign.py` | 603 | Claude V3 content-block recovery: 80 runs (40 Sonnet + 40 Haiku), GT-free. | - | da fare (EN 1, senza docstring 14) |
-| `evaluation/claude_development_freeze.py` | 98 | Freeze read-only validation of all 40 Claude runs for ONE model. | - | da fare (EN 1, senza docstring 3) |
+| `evaluation/claude_development_campaign.py` | 603 | Claude V3 content-block recovery: 80 runs (40 Sonnet + 40 Haiku), GT-free. | - | da fare (EN 0, senza docstring 14) |
+| `evaluation/claude_development_freeze.py` | 98 | Freeze read-only validation of all 40 Claude runs for ONE model. | - | da fare (EN 0, senza docstring 3) |
 | `evaluation/paired_cohort.py` | 180 | Pre-register an A1 vs A1_VERIFY development cohort without accessing GT. | - | da fare (EN 5, senza docstring 3) |
 | `evaluation/paired_runner.py` | 418 | Safe paired-run orchestration for the frozen GT-free development cohort. | - | da fare (EN 12, senza docstring 4) |
 | `evaluation/paired_st_cohort.py` | 181 | Pre-registra casi development nuovi per A1_VERIFY vs A1_VERIFY_ST. | - | da fare (EN 0, senza docstring 6) |
@@ -195,16 +195,16 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/ood_dependency_sensitivity.py` | 162 | GT-controlled, read-only sensitivity audit for possible OOD incident dependencies. | - | da fare (EN 2, senza docstring 4) |
+| `evaluation/ood_dependency_sensitivity.py` | 162 | GT-controlled, read-only sensitivity audit for possible OOD incident dependencies. | - | da fare (EN 1, senza docstring 4) |
 | `evaluation/ood_source_schema_audit.py` | 99 | Fase 2: inventario di SCHEMA delle sorgenti OpenRCA Market (solo header). | - | da fare (EN 0, senza docstring 1) |
-| `evaluation/rq2_development_kpi_audit.py` | 308 | GT-free Market KPI presence audit on DEVELOPMENT windows only. | - | da fare (EN 7, senza docstring 5) |
-| `evaluation/rq2_discovery_prereg_readiness.py` | 199 | REAL GT-free, READ-ONLY pre-registration readiness check for RQ2. | - | da fare (EN 3, senza docstring 4) |
+| `evaluation/rq2_development_kpi_audit.py` | 308 | GT-free Market KPI presence audit on DEVELOPMENT windows only. | - | da fare (EN 6, senza docstring 5) |
+| `evaluation/rq2_discovery_prereg_readiness.py` | 199 | REAL GT-free, READ-ONLY pre-registration readiness check for RQ2. | - | da fare (EN 2, senza docstring 4) |
 | `evaluation/rq2_fault_type_eval_policy.py` | 200 | RQ2-A frozen-CANDIDATE class normalization and offline-only scoring. | - | da fare (EN 5, senza docstring 3) |
-| `evaluation/rq2_historical_trajectory_audit.py` | 139 | Offline RQ2 compatibility audit for already-frozen V3 tool trajectories. | - | da fare (EN 8, senza docstring 1) |
-| `evaluation/rq2_partition_preview.py` | 159 | OFFLINE EVALUATION-ONLY RQ2 allocation preview. Never import into agent. | - | da fare (EN 3, senza docstring 2) |
-| `evaluation/rq2_partition_preview_v1.py` | 257 | RQ2 V1 DRAFT partition: group-safe, cloudbed-balanced, adjacency-aware. | - | da fare (EN 9, senza docstring 2) |
-| `evaluation/rq2_q045_development_log_audit.py` | 270 | Read-only, GT-free audit of q045-style WARNING signals on DEVELOPMENT logs. | - | da fare (EN 9, senza docstring 1) |
-| `evaluation/rq2_source_bound_d_preflight.py` | 224 | Read-only, GT-free RQ2 discovery D preflight on the ORIGINAL manifest. | - | da fare (EN 5, senza docstring 2) |
+| `evaluation/rq2_historical_trajectory_audit.py` | 139 | Offline RQ2 compatibility audit for already-frozen V3 tool trajectories. | - | da fare (EN 7, senza docstring 1) |
+| `evaluation/rq2_partition_preview.py` | 159 | OFFLINE EVALUATION-ONLY RQ2 allocation preview. Never import into agent. | - | da fare (EN 2, senza docstring 2) |
+| `evaluation/rq2_partition_preview_v1.py` | 257 | RQ2 V1 DRAFT partition: group-safe, cloudbed-balanced, adjacency-aware. | - | da fare (EN 8, senza docstring 2) |
+| `evaluation/rq2_q045_development_log_audit.py` | 270 | Read-only, GT-free audit of q045-style WARNING signals on DEVELOPMENT logs. | - | da fare (EN 8, senza docstring 1) |
+| `evaluation/rq2_source_bound_d_preflight.py` | 224 | Read-only, GT-free RQ2 discovery D preflight on the ORIGINAL manifest. | - | da fare (EN 4, senza docstring 2) |
 | `evaluation/rq2_v1_gemini_readonly_audit.py` | 207 | Audit di SOLA LETTURA degli stage Gemini discovery RQ2-V1. | - | da fare (EN 0, senza docstring 2) |
 | `evaluation/rq2_v5_fence_audit_readonly.py` | 167 | Audit OFFLINE e in SOLA LETTURA dei due D Claude V4 (Sonnet, Haiku). | - | da fare (EN 0, senza docstring 4) |
 
@@ -213,9 +213,9 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
 | `evaluation/manual_offline_real_evidence_audit.py` | 142 | Audit di integrazione su telemetria OpenRCA REALE, senza API o ground truth. | - | completo |
-| `evaluation/manual_paired_batch.py` | 74 | Preview frozen paired cohort; explicitly opt in to ONE API-funded pair. | - | da fare (EN 1, senza docstring 1) |
-| `evaluation/manual_paired_st_batch.py` | 74 | Preview frozen paired cohort; explicitly opt in to ONE API-funded pair. | - | da fare (EN 1, senza docstring 1) |
-| `evaluation/manual_preregister_dev.py` | 70 | Run-only preflight for the GT-free A1 vs A1_VERIFY development cohort. | - | da fare (EN 1, senza docstring 1) |
+| `evaluation/manual_paired_batch.py` | 74 | Preview frozen paired cohort; explicitly opt in to ONE API-funded pair. | - | da fare (EN 0, senza docstring 1) |
+| `evaluation/manual_paired_st_batch.py` | 74 | Preview frozen paired cohort; explicitly opt in to ONE API-funded pair. | - | da fare (EN 0, senza docstring 1) |
+| `evaluation/manual_preregister_dev.py` | 70 | Run-only preflight for the GT-free A1 vs A1_VERIFY development cohort. | - | da fare (EN 0, senza docstring 1) |
 | `evaluation/manual_smoke_structured_gemini.py` | 59 | Smoke test manuale: UNA chiamata Gemini per verificare lo structured output. | - | da fare (EN 0, senza docstring 1) |
 
 ## C2. RQ2 pre-V5: ledger, dispatcher, pilot, sonde, prototipi (candidati all'archivio dopo la consegna)
@@ -224,9 +224,9 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 |---|---:|---|---|---|
 | `evaluation/rq2_discovery_d_provider_transport.py` | 174 | Live-capable RQ2 discovery D wrapper around the FROZEN RQ1 runner. | - | da fare (EN 8, senza docstring 0) |
 | `evaluation/rq2_fake_discovery_driver.py` | 191 | OFFLINE fake-provider rehearsal of the *existing* RQ2 stage machinery. | - | da fare (EN 9, senza docstring 4) |
-| `evaluation/rq2_langchain_bridge_source_trace.py` | 155 | RQ2 pre-freeze: inspect exact installed LangChain/SDK bridge SOURCE only. | - | da fare (EN 5, senza docstring 1) |
-| `evaluation/rq2_langchain_fake_http_invoke.py` | 232 | RQ2 prefreeze FINAL targeted offline invoke: real LangChain+SDK, fake HTTP 503. | - | da fare (EN 6, senza docstring 7) |
-| `evaluation/rq2_langchain_parameter_mock_probe.py` | 198 | Offline RQ2 LangChain-to-SDK configuration forwarding probe. | - | da fare (EN 7, senza docstring 3) |
+| `evaluation/rq2_langchain_bridge_source_trace.py` | 155 | RQ2 pre-freeze: inspect exact installed LangChain/SDK bridge SOURCE only. | - | da fare (EN 4, senza docstring 1) |
+| `evaluation/rq2_langchain_fake_http_invoke.py` | 232 | RQ2 prefreeze FINAL targeted offline invoke: real LangChain+SDK, fake HTTP 503. | - | da fare (EN 5, senza docstring 7) |
+| `evaluation/rq2_langchain_parameter_mock_probe.py` | 198 | Offline RQ2 LangChain-to-SDK configuration forwarding probe. | - | da fare (EN 6, senza docstring 3) |
 | `evaluation/rq2_mock_journal.py` | 327 | RQ2 *mock-only* create-only journal for fail-closed workflow tests. | - | da fare (EN 7, senza docstring 9) |
 | `evaluation/rq2_mock_pipeline_integration.py` | 176 | RQ2 D->C->K offline MOCK integration using existing validated components. | - | da fare (EN 5, senza docstring 0) |
 | `evaluation/rq2_q045_warning_detector_synthetic.py` | 165 | Pure synthetic-only prototype for one *unverified* Gemini RQ2-K candidate. | - | da fare (EN 3, senza docstring 0) |

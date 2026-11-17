@@ -9,6 +9,27 @@ module.  V1 selection remains proposed, not protocol-frozen.
 The preview deliberately has no execution/dispatch functions, credentials,
 retry logic or writable paths.  It cannot approve any paid model request.
 """
+# ---------------------------------------------------------------------------
+# GUIDA ALLA LETTURA (in italiano)
+#
+# La docstring qui sopra e' il testo mostrato da `--help` e per questo resta identica
+# all'originale. In sintesi: anteprima di piano RQ2, GT-free e NON eseguibile. Legge soltanto lo
+# split congelato e il manifest degli input senza ground truth, e confronta una ripartizione
+# candidata dei casi in "discovery" (4) e "test" (11). La ripartizione e' STATICA e non viene mai
+# dedotta dalle etichette del benchmark. Non ha funzioni di esecuzione, credenziali, ritenti o
+# percorsi scrivibili: non puo' approvare nessuna richiesta a pagamento.
+#
+# Contenuto:
+# - costanti: casi di discovery e di test, harness, modelli, hash attesi di split e manifest;
+# - `RQ2PlanError`: errore "preflight del piano fallito, nessuna esecuzione ammessa";
+# - `_canonical`, `_sha`: JSON e hash canonici;
+# - `_gap`: distanza in secondi fra le finestre temporali di due casi dello stesso cloudbed;
+# - `verify_candidate_allocation`: verifica la ripartizione usando solo ID, cloudbed, finestra
+#   e task, mai etichette ne' punteggi;
+# - `make_workflow_preview`: costruisce il grafo di dipendenze D -> C -> K (K solo in discovery);
+# - `preview_market`: l'anteprima reale, che legge solo i CSV congelati GT-free;
+# - `main`: riga di comando `--data-dir`, stampa il riepilogo senza l'elenco degli stage.
+# ---------------------------------------------------------------------------
 from __future__ import annotations
 
 import argparse
@@ -21,7 +42,9 @@ from pathlib import Path
 from evaluation.ood_holdout_preflight import inventory_ood
 
 VERSION = "rq2_dryrun_workflow_preview_v0"
+# Stato dichiarato del piano: bozza, non eseguibile.
 PLAN_STATUS = "DRAFT_NOT_EXECUTABLE"
+# Casi di discovery (4) e di test (11): ripartizione candidata, fissa nel codice.
 DISCOVERY = (
     "cloudbed-1_q032", "cloudbed-1_q050",
     "cloudbed-2_q026", "cloudbed-2_q045",
@@ -32,19 +55,23 @@ TEST = (
     "cloudbed-2_q040", "cloudbed-2_q041", "cloudbed-2_q058",
     "cloudbed-2_q076", "cloudbed-2_q077",
 )
+# Harness e modelli del piano, massimo di turni di tool per D e distanza minima (un'ora) fra
+# casi di discovery e di test dello stesso cloudbed.
 HARNESSES = ("A1", "A1_8R")
 MODELS = ("gemini", "sonnet", "haiku")
 MAX_TOOL_ROUNDS = 6
 MIN_CROSS_PHASE_GAP_SECONDS = 3600
+# SHA-256 attesi dei file congelati di split e manifest degli input (senza ground truth).
 EXPECTED_SPLIT_SHA256 = "c3e99db3facbca592b13009829280b7402ed3a0b38e5bc687f2d1f8f73f2c724"
 EXPECTED_MANIFEST_SHA256 = "5fabd40123aaa8bb614bb812f2994c776967b9b04ec3bfe477f89c1dde614d13"
 
 
 class RQ2PlanError(ValueError):
-    """GT-free plan preflight failed; absolutely no run may be dispatched."""
+    """Preflight del piano GT-free fallito: nessuna esecuzione puo' essere avviata."""
 
 
 def _canonical(obj: object) -> bytes:
+    """Forma canonica di `obj` in byte UTF-8 (JSON con chiavi ordinate, senza spazi, NaN vietato)."""
     try:
         return json.dumps(
             obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -55,10 +82,15 @@ def _canonical(obj: object) -> bytes:
 
 
 def _sha(obj: object) -> str:
+    """SHA-256 (esadecimale) della forma canonica di `obj`."""
     return hashlib.sha256(_canonical(obj)).hexdigest()
 
 
 def _gap(a: dict, b: dict) -> int | None:
+    """Distanza in secondi fra le finestre dei casi `a` e `b`; `None` se sono in cloudbed diversi.
+
+    Vale 0 se le finestre si sovrappongono o si toccano.
+    """
     if a["cloudbed"] != b["cloudbed"]:
         return None
     a0, a1 = a["start_unix"], a["end_unix"]
@@ -71,9 +103,18 @@ def verify_candidate_allocation(
     *, discovery=DISCOVERY, test=TEST,
     enforce_real_size: bool = True,
 ) -> dict:
-    """Verify phase split using only ID/cloudbed/window/task metadata.
+    """Verifica la ripartizione in fasi usando solo ID, cloudbed, finestra e task.
 
-    No class label, scoring_points, record.csv or source query CSV is read.
+    Non si legge nessuna etichetta di classe, `scoring_points`, `record.csv` o CSV di query.
+
+    Argomenti: `metadata` (lista di dizionari dei casi), `groups` (gruppi di casi con finestre
+    sovrapposte), `discovery` e `test` (casi per fase) ed `enforce_real_size` (richiede 4 + 11).
+    Restituisce un riepilogo (casi e finestre per fase, distanza minima, casi per cloudbed).
+
+    Passi: 1) argomenti ben formati e fasi senza duplicati ne' casi in comune; 2) metadati
+    ben formati e senza duplicati; 3) discovery + test coprono esattamente tutta la coorte;
+    4) i gruppi di finestre sovrapposte coprono la coorte e non sono divisi fra le due fasi;
+    5) la distanza minima fra discovery e test nello stesso cloudbed supera un'ora.
     """
     if type(metadata) is not list or type(groups) is not list:
         raise RQ2PlanError("Expected metadata and groups lists")
@@ -109,9 +150,11 @@ def verify_candidate_allocation(
             raise RQ2PlanError("Malformed case window")
         by_id[cid] = item
 
+    # 3. Le due fasi insieme coprono esattamente la coorte.
     all_ids = set(by_id)
     if set(discovery) | set(test) != all_ids:
         raise RQ2PlanError("Allocation must cover exactly the OOD cohort")
+    # 4. Gruppi di finestre sovrapposte: ogni caso in un solo gruppo, e ogni gruppo in una fase.
     seen = set()
     for group in groups:
         if type(group) is not list or not group or any(
@@ -125,7 +168,7 @@ def verify_candidate_allocation(
             raise RQ2PlanError("Overlapping-window group split across phases")
     if seen != all_ids:
         raise RQ2PlanError("Temporal groups do not cover OOD cohort")
-    # Do not relax the GT-free temporal separation validated in V1.
+    # 5. Non si allenta la separazione temporale GT-free validata nella V1.
     gaps = [
         _gap(by_id[d], by_id[t]) for d in discovery for t in test
     ]
@@ -158,14 +201,25 @@ def make_workflow_preview(
     enforce_real_size: bool = True,
     _source_sha_checked: bool = False,
 ) -> dict:
-    """Build D/C/K dependency graph, never execution permissions.
+    """Costruisce il grafo di dipendenze D/C/K, mai permessi di esecuzione.
 
-    Source is considered verified ONLY by the trusted preview_market wrapper.
-    Plain callers can supply matching hash strings without file verification.
+    La sorgente e' considerata verificata SOLO dal wrapper fidato `preview_market`. Un chiamante
+    qualsiasi puo' passare stringhe di hash corrispondenti senza che i file siano verificati.
+
+    Argomenti: `metadata`, `groups`, `split_sha256` e `manifest_sha256` (devono essere quelli
+    congelati), `discovery`, `test`, `enforce_real_size` e `_source_sha_checked` (True solo dal
+    wrapper). Restituisce il piano con `entries` (un dizionario per stage) e `preview_sha256`.
+
+    Passi: 1) hash congelati; 2) ripartizione verificata; 3) per ogni fase, caso, modello e
+    harness si creano gli stage D, C e (solo in discovery) K, ciascuno con la sua dipendenza
+    (C da D, K da C) e stato "bloccato"; 4) ID distinti e dipendenze sempre precedenti;
+    5) conteggi attesi (90 D, 90 C, 24 K); 6) riepilogo senza alcuna autorizzazione.
     """
+    # 1. Hash congelati di split e manifest.
     if (split_sha256 != EXPECTED_SPLIT_SHA256
             or manifest_sha256 != EXPECTED_MANIFEST_SHA256):
         raise RQ2PlanError("Frozen GT-free data hash mismatch")
+    # 2. Ripartizione dei casi in fasi.
     audit = verify_candidate_allocation(
         metadata, groups, discovery=discovery, test=test,
         enforce_real_size=enforce_real_size,
@@ -175,6 +229,7 @@ def make_workflow_preview(
         **{cid: "discovery" for cid in discovery},
         **{cid: "test" for cid in test},
     }
+    # 3. Un elemento per ogni stage: prima la discovery, poi il test (test senza K).
     entries = []
     for phase in ("discovery", "test"):
         for cid in sorted(phase_map):
@@ -205,6 +260,7 @@ def make_workflow_preview(
                             "dependencies": dependencies,
                             "execution_status": "BLOCKED_DRAFT",
                         })
+    # 4. ID distinti e ogni dipendenza compare prima dello stage che la richiede.
     ids = {item["stage_id"] for item in entries}
     if len(ids) != len(entries):
         raise RQ2PlanError("Duplicate stage IDs")
@@ -214,10 +270,11 @@ def make_workflow_preview(
         for item in entries for dep in item["dependencies"]
     ):
         raise RQ2PlanError("Unknown or forward stage dependencies")
-    # Cross-phase gate: no test D/C before discovery K candidates frozen.
+    # 5. Cancello fra le fasi: nessun D/C di test prima del congelamento dei K di discovery.
     stage_counts = dict(sorted(Counter(item["stage"] for item in entries).items()))
     if enforce_real_size and stage_counts != {"C": 90, "D": 90, "K": 24}:
         raise RQ2PlanError("Unexpected plan stage totals")
+    # 6. Riepilogo: tutto cio' che e' "eseguibile" o "scritto" resta False o zero.
     summary = {
         "protocol": VERSION,
         "status": PLAN_STATUS,
@@ -256,7 +313,11 @@ def make_workflow_preview(
 
 
 def preview_market(data_dir: Path) -> dict:
-    """Real Market preflight: reads frozen GT-free CSVs ONLY."""
+    """Preflight reale sul Market: legge SOLO i CSV congelati GT-free.
+
+    Argomento: `data_dir`, radice dei dati. Verifica gli hash originali, controlla che non ci
+    siano sovrapposizioni fra gli split e costruisce l'anteprima con sorgente verificata.
+    """
     audit = inventory_ood(data_dir, verify_original_hashes=True)
     if audit["ood_cross_split_overlaps"]:
         raise RQ2PlanError("Cross-split OOD overlap found")
@@ -270,11 +331,12 @@ def preview_market(data_dir: Path) -> dict:
 
 
 def main():
+    """Riga di comando: stampa il riepilogo dell'anteprima per `--data-dir` (senza gli stage)."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, required=True)
     args = parser.parse_args()
     plan = preview_market(args.data_dir)
-    # Summary only, never the full work-order list or a persisted runnable plan.
+    # Solo il riepilogo, mai l'elenco completo degli ordini di lavoro ne' un piano eseguibile salvato.
     print(json.dumps({key: value for key, value in plan.items() if key != "entries"},
                      ensure_ascii=False, indent=2, allow_nan=False))
 

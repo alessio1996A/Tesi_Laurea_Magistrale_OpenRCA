@@ -1,20 +1,29 @@
-"""Actual C/K provider path, HARD-BLOCKED until scientific protocol release.
+"""Percorso REALE verso il provider per C/K, BLOCCATO finche' non c'e' la release del protocollo.
 
-Uses the RQ2-only candidate factory with explicit no-retry/timeout kwargs,
-while preserving the unchanged RQ1 agent and its original model factory.
-No provider client is created at import or in preflight.
-Only a future, separately reviewed release with an exact pinned SHA-256
-can enable a discovery request. No test stages, no auto retry, no tools,
-no budget ceiling (per supervisor), no ground truth or scorer access.
+Usa la factory candidata solo RQ2, con parametri espliciti di nessun ritento e di timeout,
+lasciando intatti l'agente RQ1 e la sua factory originale dei modelli. Nessun client del
+provider viene creato all'import ne' nel preflight. Solo una futura release, rivista a parte e
+con uno SHA-256 esatto fissato, puo' abilitare una richiesta di discovery. Niente stage di test,
+niente ritenti automatici, niente tool, nessun tetto di spesa (per scelta del supervisore),
+nessun accesso a ground truth o scorer.
 
-A live pilot MUST call run_one_claimed_ck, which source-verifies the
-discovery case, reconstructs C/K solely from saved D/C, creates a claim
-BEFORE any SDK construction, then writes raw result + usage into the
-existing create-only RQ2 stage record. Ambiguous crash => no auto retry.
+Un pilot live DEVE chiamare `run_one_claimed_ck`, che verifica il caso di discovery rispetto ai
+sorgenti, ricostruisce C/K solo da D/C gia' salvati, crea un claim PRIMA di costruire qualsiasi
+SDK e poi scrive risposta grezza e uso dei token nel record di stage RQ2 create-only esistente.
+Un arresto ambiguo => nessun ritento automatico.
 
-Scientific release SHA-256 is pinned after successful independent GitHub/Drive
-readback. Provider execution STILL requires confirm_paid_api=True for exactly
-one approved stage; no live API is authorized by the release itself.
+Lo SHA-256 della release scientifica e' fissato dopo la rilettura indipendente riuscita da
+GitHub/Drive. L'esecuzione verso il provider richiede COMUNQUE `confirm_paid_api=True` per
+esattamente uno stage approvato: la release da sola non autorizza nessuna API live.
+
+Contenuto
+---------
+- `VERSION`, `RELEASE_SHA256`, `RELEASE_FILENAME`: versione del trasporto e release fissata;
+- `RQ2LiveCKBlocked`: errore "non si puo' eseguire C/K";
+- `_sha`, `_read_release`: SHA-256 e lettura verificata dei byte esatti della release;
+- `_source_bound_binding`: ricostruisce il prompt C/K dai soli D/C salvati, senza GT;
+- `_usage`, `_one_call`: uso dei token e UNA sola richiesta al provider;
+- `run_one_claimed_ck`: il percorso live completo (release -> claim -> chiamata -> record).
 """
 from __future__ import annotations
 
@@ -42,20 +51,30 @@ from evaluation.rq2_toolfree_fake_transport import (
 )
 
 VERSION = "rq2_ck_provider_transport_v1_rq2_only_factory"
-RELEASE_SHA256 = "a35c02f830a3c5f97424e0cbf8653eda6cfa674b9c8c34d95d04627e1dba8c52"  # Signed RQ2 discovery; test OOD remains locked.
+# SHA-256 della release RQ2 di discovery firmata; il test OOD resta bloccato.
+RELEASE_SHA256 = "a35c02f830a3c5f97424e0cbf8653eda6cfa674b9c8c34d95d04627e1dba8c52"
+# Nome del file della release, dentro la cartella `data/rq2`.
 RELEASE_FILENAME = "RQ2_SCIENTIFIC_DISCOVERY_RELEASE_V1.json"
 
 
 class RQ2LiveCKBlocked(RuntimeError):
-    """Cannot run C/K without an independently frozen scientific release."""
+    """Non si puo' eseguire C/K senza una release scientifica congelata in modo indipendente."""
 
 
 def _sha(value: bytes) -> str:
+    """SHA-256 (esadecimale) dei byte `value`."""
     return hashlib.sha256(value).hexdigest()
 
 
 def _read_release(root: Path) -> dict:
-    """Verify *exact* preregistered release bytes before any provider action."""
+    """Verifica i byte ESATTI della release preregistrata, prima di qualsiasi azione sul provider.
+
+    Argomento: `root`, radice dei dati (la release sta in `data/rq2/`). Restituisce il contenuto
+    JSON della release. Passi: 1) l'hash fissato esiste ed e' ben formato; 2) il file esiste,
+    non e' un link e ha esattamente quell'hash; 3) e' JSON; 4) contiene tutte le garanzie
+    obbligatorie (test bloccato, nessun ritento automatico, modelli, harness e casi attesi, C/K
+    senza tool, hash dei prompt). Qualsiasi scostamento solleva `RQ2LiveCKBlocked`.
+    """
     if RELEASE_SHA256 is None:
         raise RQ2LiveCKBlocked("Scientific discovery release is not frozen")
     if (
@@ -102,7 +121,17 @@ def _read_release(root: Path) -> dict:
 def _source_bound_binding(
     recorder: RQ2DiscoveryStageRecorder, stage_id: str,
 ) -> tuple[dict, str]:
-    """Derive C/K prompt without caller-supplied D answer or GT."""
+    """Ricava il prompt C/K senza risposte D fornite dal chiamante e senza ground truth.
+
+    Argomenti: `recorder` (registratore degli stage di discovery) e `stage_id` (stage C o K).
+    Restituisce `(binding, model_id)`.
+
+    Passi: 1) lo stage e' nel piano verificato sui sorgenti ed e' un C/K di discovery; 2) non ha
+    ancora un output immutabile; 3) il D dello stesso braccio esiste, e' completo, usa lo stesso
+    modello, la stessa istruzione originale e il contratto "v2_enforce"; 4) si costruisce il
+    legame (binding) di C dal D; 5) per K si verifica anche il C registrato e se ne usa la
+    risposta; 6) il pacchetto costruito e' dello stage giusto.
+    """
     if type(stage_id) is not str or stage_id not in recorder.entries:
         raise RQ2LiveCKBlocked("Stage is not in source-verified RQ2 plan")
     entry = recorder.entries[stage_id]
@@ -152,6 +181,12 @@ def _source_bound_binding(
 
 
 def _usage(ai: AIMessage) -> dict:
+    """Uso dei token di un messaggio AI, in forma normalizzata.
+
+    "Completo" solo se ingresso, uscita e totale sono interi non negativi e il totale e' la
+    somma; altrimenti tutto a `None`. Dei dettagli si tengono solo le voci con valore intero
+    non negativo.
+    """
     raw = ai.usage_metadata
     fields = ("input_tokens", "output_tokens", "total_tokens")
     complete = (
@@ -183,7 +218,16 @@ def _usage(ai: AIMessage) -> dict:
 
 
 def _one_call(provider: str, model_id: str, messages: list) -> dict:
-    """Single remote attempt, no retry and no raw exception credential leaks."""
+    """UNA sola richiesta remota, senza ritenti e senza far trapelare credenziali nelle eccezioni.
+
+    Argomenti: `provider`, `model_id` e `messages`. Restituisce testo grezzo, eventuale codice
+    d'errore (mai il testo dell'eccezione), numero di tentativi (0 o 1), uso dei token, motivo
+    di arresto, modello che ha risposto e durata.
+
+    Passi: 1) costruisce il modello (se fallisce: nessuna chiamata); 2) UNA `invoke`, senza
+    mai collegare tool; 3) una risposta non AI o con tool call e' un errore di protocollo;
+    4) altrimenti registra uso, testo e metadati.
+    """
     started = time.monotonic()
     result = {
         "raw_response": None, "provider_error": None,
@@ -195,16 +239,19 @@ def _one_call(provider: str, model_id: str, messages: list) -> dict:
         "finish_reason": None, "provider_response_model": None,
     }
     try:
-        model = crea_modello(provider, model_id)  # RQ2-only pinned lazy SDK factory
+        # Factory SDK solo RQ2, a versioni fissate e con importazione ritardata.
+        model = crea_modello(provider, model_id)
     except Exception as exc:
         result["provider_error"] = "SDK_CONSTRUCTION_ERROR:" + type(exc).__name__
     else:
-        result["api_attempts"] = 1  # may be billed even if invoke raises
+        # Da qui la richiesta puo' essere fatturata anche se `invoke` solleva un'eccezione.
+        result["api_attempts"] = 1
         try:
-            answer = model.invoke(messages)  # ONE request, never bind_tools
+            # UNA richiesta, mai `bind_tools`.
+            answer = model.invoke(messages)
         except Exception as exc:
             code = getattr(exc, "status_code", None)
-            # Error type and numeric HTTP code only, never exception text
+            # Solo tipo d'errore e codice HTTP numerico, mai il testo dell'eccezione.
             result["provider_error"] = "PROVIDER_ERROR:" + type(exc).__name__
             if type(code) is int:
                 result["provider_error"] += f":HTTP_{code}"
@@ -233,16 +280,29 @@ def _one_call(provider: str, model_id: str, messages: list) -> dict:
 def run_one_claimed_ck(
     *, data_dir: Path, stage_id: str, confirm_paid_api: bool = False,
 ) -> dict:
-    """Live path: preregistered source/freeze -> claim -> invoke -> record.
+    """Percorso live: sorgenti/congelamento preregistrati -> claim -> chiamata -> record.
 
-    Requires exact SHA-pinned discovery release AND confirm_paid_api=True.
-    Never call in unit tests with real credentials or with unsaved claims.
-    Does not release test or authorize any live provider request by itself.
+    Richiede la release di discovery con SHA fissato ESATTO E `confirm_paid_api=True`.
+    Da non chiamare mai nei test unitari con credenziali reali o con claim non salvati.
+    Non sblocca il test ne' autorizza da sola nessuna richiesta live al provider.
+
+    Argomenti (per nome): `data_dir` (radice dei dati), `stage_id` (uno stage C o K di
+    discovery) e `confirm_paid_api` (conferma esplicita, di default False). Restituisce stato
+    e hash del record, tentativi e uso dei token.
+
+    Passi: 1) conferma esplicita; 2) release verificata (DEVE fallire prima di SDK e claim se
+    non e' congelata); 3) registratore e registro dei claim hanno lo stesso piano, che e' quello
+    della release (piano, manifest e split); 4) prompt ricavato dai soli D/C salvati;
+    5) claim PRIMA della chiamata; 6) UNA chiamata al provider; 7) ricevuta di trasporto e
+    scrittura del record create-only.
     """
+    # 1. Conferma esplicita di una chiamata a pagamento.
     if confirm_paid_api is not True:
         raise RQ2LiveCKBlocked("Explicit paid API invocation confirmation required")
     root = Path(data_dir)
-    release = _read_release(root)  # MUST fail before any SDK/claim until frozen
+    # 2. DEVE fallire prima di qualsiasi SDK o claim finche' la release non e' congelata.
+    release = _read_release(root)
+    # 3. Piano, manifest e split del registratore devono essere quelli della release.
     recorder = RQ2DiscoveryStageRecorder(data_dir=root)
     journal = RQ2DiscoveryClaimJournal(data_dir=root)
     if recorder.store.plan_sha != journal.plan_sha:
@@ -253,13 +313,16 @@ def run_one_claimed_ck(
         raise RQ2LiveCKBlocked("Released manifest SHA differs")
     if release.get("source_split_sha256") != recorder.plan["split_sha256"]:
         raise RQ2LiveCKBlocked("Released split SHA differs")
+    # 4. Prompt ricavato dai soli D/C salvati.
     binding, model_id = _source_bound_binding(recorder, stage_id)
     entry = recorder.entries[stage_id]
     provider = CANDIDATE_MODELS[entry["logical_model"]]["provider"]
     stage, binding_sha, messages = _check_package(binding)
-    # No automatic retry after any crash or ambiguous provider response.
+    # 5. Nessun ritento automatico dopo un arresto o una risposta ambigua: il claim e' scritto
+    # PRIMA della chiamata (6).
     journal.claim_stage(stage_id=stage_id, model_id_proposed=model_id)
     call = _one_call(provider, model_id, messages)
+    # 7. Ricevuta di trasporto: solo hash e metadati, mai credenziali.
     receipt = {
         "transport_version": VERSION, "stage_id": stage_id,
         "model_id": model_id, "provider": provider,
@@ -276,7 +339,7 @@ def run_one_claimed_ck(
         "tools_enabled": False,
         "is_synthetic": False,
     }
-    # After a provider response, recording errors must NOT trigger a retry.
+    # Dopo una risposta del provider, un errore di registrazione NON deve causare un ritento.
     fn = recorder.record_c if stage == "C" else recorder.record_k
     record = fn(
         stage_id=stage_id, model_id_proposed=model_id,

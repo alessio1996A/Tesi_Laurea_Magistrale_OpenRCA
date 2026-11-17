@@ -1,14 +1,22 @@
-"""Offline-only D/C/K discovery recording from caller-supplied outputs.
+"""Registrazione offline degli stage D/C/K di discovery, da output forniti dal chiamante.
 
-This module orchestrates provenance, JSON validation and create-only saving.
-It does NOT call the RCA agent, an LLM, an SDK, telemetry or scorers.
-Only source-bound discovery stages are supported; test is always blocked.
-A stored artifact is NOT evidence that a provider call has occurred or that
-a scientific rule freeze is valid.
+Questo modulo coordina provenienza, validazione del JSON e salvataggio create-only. NON chiama
+l'agente RCA, un LLM, un SDK, la telemetria o gli scorer. Sono supportati solo gli stage di
+discovery legati ai sorgenti; il test e' sempre bloccato. Un artefatto salvato NON e' la prova
+che una chiamata al provider sia avvenuta ne' che un congelamento scientifico delle regole sia
+valido.
 
-D completion means its tool trajectory was structurally usable. The original
-RCA answer may nevertheless have invalid JSON; C is an *independent probe*
-from tool evidence and must not see the D final answer.
+"D completo" significa che la sua traiettoria di tool era strutturalmente utilizzabile. La
+risposta RCA originale puo' comunque avere un JSON non valido; C e' una *sonda indipendente*
+dalle evidenze dei tool e non deve vedere la risposta finale di D.
+
+Contenuto
+---------
+- `RQ2RecorderError`: errore "stage o provenienza non validi";
+- `_sha_text`, `_stage_sibling`: hash di un testo e ID di uno stage "fratello" (stesso braccio);
+- `_validate_ck_receipt`: lega la ricevuta di trasporto C/K ai byte esatti salvati;
+- `RQ2DiscoveryStageRecorder`: `record_d`, `record_c` e `record_k` salvano i tre stage,
+  `_entry`, `_instruction` e `_parent` sono i controlli comuni.
 """
 from __future__ import annotations
 
@@ -41,19 +49,36 @@ RECORDER_VERSION = "rq2_discovery_stage_recorder_v0"
 
 
 class RQ2RecorderError(ValueError):
-    """The requested stage or its source-bound provenance is invalid."""
+    """Lo stage richiesto o la sua provenienza legata ai sorgenti non sono validi."""
 
 
 def _sha_text(text: str) -> str:
+    """SHA-256 (esadecimale) di un testo in UTF-8."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _stage_sibling(sid: str, suffix: str) -> str:
+    """ID dello stage "fratello" di `sid` (stesso caso, modello e harness) con tipo `suffix`.
+
+    Ad esempio da `...:C` e `"D"` si ottiene `...:D`.
+    """
     return sid.rsplit(":", 1)[0] + ":" + suffix
 
 
 def _validate_ck_receipt(receipt, *, stage_id, model_id, binding_sha, raw, error):
-    """Bind call usage to exact persisted C/K bytes; no invented token usage."""
+    """Lega l'uso della chiamata ai byte C/K esatti salvati; nessun uso di token inventato.
+
+    Argomenti: `receipt` (ricevuta di trasporto o `None`), `stage_id`, `model_id`,
+    `binding_sha` (hash del legame col prompt), `raw` (risposta grezza) ed `error` (errore del
+    provider). Restituisce la ricevuta se coerente (o `None`), altrimenti solleva
+    `RQ2RecorderError`.
+
+    Controlli: 1) campi, versione di trasporto, stage, modello, provider, hash del legame e della
+    risposta, errore, tentativi (0 o 1), nessun tool, non sintetica e durata plausibile;
+    2) chiavi dell'uso di token; 3) conteggi coerenti se completo, nessun valore inventato se
+    incompleto; 4) dettagli dell'uso validi; 5) nessun output se non c'e' stata nessuna
+    richiesta.
+    """
     if receipt is None:
         return None
     from evaluation.rq2_ck_provider_transport import VERSION
@@ -110,13 +135,20 @@ def _validate_ck_receipt(receipt, *, stage_id, model_id, binding_sha, raw, error
 
 
 class RQ2DiscoveryStageRecorder:
-    """Persist caller-provided D, C and K outputs, never invoke a provider.
+    """Salva gli output D, C e K forniti dal chiamante; non invoca mai un provider.
 
-    Requires original GT-free files. There is NO execution-mode argument,
-    LIVE switch, test-release function or budget authorization.
+    Richiede i file originali GT-free. NON esistono argomenti di modalita' di esecuzione,
+    interruttori LIVE, funzioni di sblocco del test o autorizzazioni di budget.
     """
 
     def __init__(self, *, data_dir: Path):
+        """Apre il registratore su `data_dir`.
+
+        Passi: 1) archivio degli stage; 2) piano legato ai sorgenti, verificato e senza
+        autorizzazioni (`can_execute_api` False, hash uguale a quello dell'archivio);
+        3) il manifest GT-free ha l'hash atteso e si legge. Qualsiasi errore diventa
+        `RQ2RecorderError`.
+        """
         self.store = RQ2StageArtifactStore(data_dir=Path(data_dir))
         try:
             self.plan = preview_market(Path(data_dir))
@@ -142,6 +174,7 @@ class RQ2DiscoveryStageRecorder:
             raise RQ2RecorderError("Source-bound recorder initialization refused") from exc
 
     def _entry(self, sid: str, stage: str) -> dict:
+        """Riga del piano per `sid`, che deve essere uno stage di discovery del tipo `stage`."""
         if type(sid) is not str or sid not in self.entries:
             raise RQ2RecorderError("Unknown stage")
         e = self.entries[sid]
@@ -150,6 +183,11 @@ class RQ2DiscoveryStageRecorder:
         return e
 
     def _instruction(self, entry: dict) -> str:
+        """Istruzione originale GT-free del caso di `entry`, dal manifest.
+
+        Cloudbed, task e finestra temporale del manifest devono coincidere con quelli del
+        piano; l'istruzione deve essere un testo non vuoto.
+        """
         row = self.manifest.get(entry["case_id"])
         if (
             row is None
@@ -164,6 +202,7 @@ class RQ2DiscoveryStageRecorder:
         return row["instruction"]
 
     def _parent(self, stage_id: str) -> dict:
+        """Record gia' salvato dello stage da cui si dipende; errore se non c'e'."""
         record = self.store.load_discovery_stage(stage_id=stage_id)
         if record is None:
             raise RQ2RecorderError("Required previous stage not recorded")
@@ -173,7 +212,12 @@ class RQ2DiscoveryStageRecorder:
         self, *, stage_id: str, model_id_proposed: str,
         diagnostic_run: dict,
     ) -> dict:
-        """Record D outcome and observed trajectory, not D answer correctness."""
+        """Registra l'esito di D e la traiettoria osservata, non la correttezza della risposta.
+
+        Argomenti (per nome): `stage_id`, `model_id_proposed` e `diagnostic_run` (risultato del
+        runner D). Stato: PROVIDER_ERROR se il run ha un errore; INVALID_OUTPUT se la
+        traiettoria dei tool non e' utilizzabile; altrimenti RECORDED_COMPLETE.
+        """
         e = self._entry(stage_id, "D")
         if type(diagnostic_run) is not dict:
             raise RQ2RecorderError("D must be a run dictionary")
@@ -204,9 +248,9 @@ class RQ2DiscoveryStageRecorder:
                 status = "INVALID_OUTPUT"
                 trajectory_issue = type(exc).__name__
 
-        # Preserve original json_status without pretending C uses D's answer.
-        # An invalid D task JSON can coexist with an otherwise usable
-        # tool trajectory; that is a preregistration decision to finalize.
+        # Si conserva lo `json_status` originale senza far finta che C usi la risposta di D.
+        # Un JSON di task non valido in D puo' coesistere con una traiettoria dei tool
+        # comunque utilizzabile: e' una decisione di preregistrazione da definire.
         artifact = {
             "recorder_version": RECORDER_VERSION,
             "diagnostic_run": diagnostic_run,
@@ -225,6 +269,11 @@ class RQ2DiscoveryStageRecorder:
     @staticmethod
     def _response_status(raw_response: str | None, provider_error: str | None,
                          validator, evidence_allowlist: set[str]) -> tuple[str, dict | None, str | None]:
+        """Stato di una risposta C/K: `(stato, contenuto validato, tipo d'errore del contratto)`.
+
+        Con errore del provider: PROVIDER_ERROR. Altrimenti si applica `validator` sulle evidenze
+        ammesse: contratto rispettato = RECORDED_COMPLETE, violato = INVALID_OUTPUT.
+        """
         if provider_error is not None:
             return "PROVIDER_ERROR", None, None
         try:
@@ -241,7 +290,17 @@ class RQ2DiscoveryStageRecorder:
         provider_error: str | None = None,
         transport_receipt: dict | None = None,
     ) -> dict:
-        """Record C strict JSON/transport outcome from prior D evidence only."""
+        """Registra l'esito di C (JSON rigoroso e trasporto), usando solo le evidenze del D gia' salvato.
+
+        Argomenti (per nome): `stage_id`, `model_id_proposed`, `raw_response` (testo o `None`),
+        `provider_error` (errore o `None`, mai insieme al testo) e `transport_receipt`.
+
+        Passi: 1) argomenti ben formati; 2) il D dello stesso braccio esiste e ha lo stesso
+        modello; 3) se D non e' completo, C e' BLOCKED_DEPENDENCY e non puo' avere output;
+        4) l'istruzione coincide con quella di D; 5) il prompt di C si lega al D salvato e si
+        ricavano gli ID di evidenza ammessi; 6) ricevuta di trasporto validata; 7) risposta
+        validata col contratto "sonda causale"; 8) salvataggio create-only.
+        """
         e = self._entry(stage_id, "C")
         if (
             type(model_id_proposed) is not str
@@ -251,6 +310,7 @@ class RQ2DiscoveryStageRecorder:
             or (provider_error is not None and raw_response is not None)
         ):
             raise RQ2RecorderError("Invalid C response/provider outcome")
+        # 2-3. D genitore: stesso modello; se non e' completo, C e' bloccato.
         d = self._parent(e["dependencies"][0])
         if d["model_id_proposed"] != model_id_proposed:
             raise RQ2RecorderError("C model ID differs from source D")
@@ -261,6 +321,7 @@ class RQ2DiscoveryStageRecorder:
                 stage_id=stage_id, model_id_proposed=model_id_proposed,
                 status="BLOCKED_DEPENDENCY", artifact={},
             )
+        # 4-5. Istruzione originale e legame del prompt C col D registrato.
         run = d["artifact"]["diagnostic_run"]
         instruction = self._instruction(e)
         if _sha_text(instruction) != d["artifact"]["original_instruction_sha256"]:
@@ -275,6 +336,7 @@ class RQ2DiscoveryStageRecorder:
             ))
         except (StageBindingError, EvidenceBundleError, ValueError) as exc:
             raise RQ2RecorderError("C input cannot be bound to recorded D") from exc
+        # 6-7. Ricevuta di trasporto e validazione della risposta.
         receipt = _validate_ck_receipt(
             transport_receipt, stage_id=stage_id, model_id=model_id_proposed,
             binding_sha=binding["binding_sha256"],
@@ -305,7 +367,16 @@ class RQ2DiscoveryStageRecorder:
         provider_error: str | None = None,
         transport_receipt: dict | None = None,
     ) -> dict:
-        """Record K only after a C from exactly the same D and identity."""
+        """Registra K solo dopo un C costruito esattamente dallo stesso D e dalla stessa identita'.
+
+        Argomenti come `record_c`. Passi: 1) argomenti ben formati; 2) il C genitore esiste e ha
+        lo stesso modello; 3) se C non e' completo, K e' BLOCKED_DEPENDENCY e non puo' avere
+        output; 4) il D dello stesso braccio e' completo e l'istruzione coincide; 5) i legami
+        dei prompt di C e di K si ricostruiscono dal D salvato (quello di C non deve essere
+        cambiato) e si ricavano le evidenze ammesse; 6) ricevuta di trasporto validata;
+        7) risposta validata col contratto "regola candidata"; 8) anteprima di formalizzabilita'
+        (non puo' mai autorizzare il test); 9) salvataggio create-only.
+        """
         e = self._entry(stage_id, "K")
         if (
             type(model_id_proposed) is not str
@@ -315,6 +386,7 @@ class RQ2DiscoveryStageRecorder:
             or (provider_error is not None and raw_response is not None)
         ):
             raise RQ2RecorderError("Invalid K response/provider outcome")
+        # 2-3. C genitore: stesso modello; se non e' completo, K e' bloccato.
         c = self._parent(e["dependencies"][0])
         if c["model_id_proposed"] != model_id_proposed:
             raise RQ2RecorderError("K model differs from C")
@@ -326,6 +398,7 @@ class RQ2DiscoveryStageRecorder:
                 status="BLOCKED_DEPENDENCY", artifact={},
             )
 
+        # 4. D dello stesso braccio, completo, con la stessa istruzione.
         d = self._parent(_stage_sibling(stage_id, "D"))
         if d["status"] != "RECORDED_COMPLETE":
             raise RQ2RecorderError("K cannot use a failed D")
@@ -333,6 +406,7 @@ class RQ2DiscoveryStageRecorder:
         instruction = self._instruction(e)
         if _sha_text(instruction) != d["artifact"]["original_instruction_sha256"]:
             raise RQ2RecorderError("K manifest/D instruction mismatch")
+        # 5. Legami dei prompt di C e di K ricostruiti dal D salvato.
         try:
             c_binding = prepare_bound_c(
                 plan=self.plan, c_stage_id=e["dependencies"][0],
@@ -352,6 +426,7 @@ class RQ2DiscoveryStageRecorder:
         except (StageBindingError, EvidenceBundleError, ValueError) as exc:
             raise RQ2RecorderError("K input cannot be bound to recorded C/D") from exc
 
+        # 6-7. Ricevuta di trasporto e validazione della risposta.
         receipt = _validate_ck_receipt(
             transport_receipt, stage_id=stage_id, model_id=model_id_proposed,
             binding_sha=k_binding["binding_sha256"],
@@ -360,6 +435,7 @@ class RQ2DiscoveryStageRecorder:
         status, parsed, issue = self._response_status(
             raw_response, provider_error, validate_candidate_rule, allowed,
         )
+        # 8. Anteprima di formalizzabilita' della regola: serve solo a documentare, mai a sbloccare.
         feasibility = (
             evaluate_k_formalizability(
                 raw_response, allowed_evidence_ids=tuple(sorted(allowed)),
