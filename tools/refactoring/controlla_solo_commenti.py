@@ -13,9 +13,9 @@ Cosa verifica
 4. Avviso (non errore) se un modulo usa `__doc__` e la sua docstring e' cambiata: cambierebbe il testo di `--help`.
 
 Uso (PowerShell, dalla radice del progetto)
-    python .\\tools\\refactoring\\controlla_solo_commenti.py --base feature/rq2a-offline-scoring-2026-11-17
+    python .\\tools\\refactoring\\controlla_solo_commenti.py --base origin/feature/rq2a-offline-scoring-2026-11-17
     python .\\tools\\refactoring\\controlla_solo_commenti.py --base HEAD        # modifiche non ancora committate
-Colab:  !python tools/refactoring/controlla_solo_commenti.py --base feature/rq2a-offline-scoring-2026-11-17
+Colab:  !python tools/refactoring/controlla_solo_commenti.py --base origin/feature/rq2a-offline-scoring-2026-11-17
 Codice di uscita 0 = tutto in regola; 1 = almeno un controllo fallito.
 """
 from __future__ import annotations
@@ -144,6 +144,9 @@ def main(argv=None) -> int:
         print(f"ERRORE: il riferimento git `{args.base}` non esiste in {root} (oppure git non e' installato).")
         print("  Controlla i nomi con `git branch -a` e `git tag`; per le modifiche non ancora committate usa `--base HEAD`.")
         return 2
+
+    print(f"[0] riferimento: {args.base} = {git(root, 'rev-parse', '--short', args.base + '^{commit}').strip()} "
+          f"(se e' un ramo locale, controlla che sia aggiornato: `git fetch origin`, meglio usare `origin/<ramo>`)")
 
     # 1. Hash dei file bloccati (calcolati sul contenuto del file di lavoro, byte per byte).
     def sha256_ok(path: Path, expected: str) -> bool:

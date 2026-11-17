@@ -21,7 +21,9 @@ Ramo di lavoro: `refactor/commenti-it-2026-11-17` (da `feature/rq2a-offline-scor
 ## Controlli (dalla radice del progetto)
 
     python tools/refactoring/controlla_solo_commenti.py --base HEAD      # modifiche non ancora committate
-    python tools/refactoring/controlla_solo_commenti.py --base feature/rq2a-offline-scoring-2026-11-17   # tutto il ramo rispetto al punto di partenza
+    python tools/refactoring/controlla_solo_commenti.py --base origin/feature/rq2a-offline-scoring-2026-11-17   # tutto il ramo rispetto al punto di partenza (dopo `git fetch origin`)
+
+Usare il ramo remoto `origin/...` e non quello locale, che potrebbe essere indietro: ne risulterebbero "modifiche" non dovute al refactoring.
 
 Esce con codice 0 solo se: i 25 file protetti sono identici; nessun file di `src/` e' stato cancellato o rinominato; per ogni
 file modificato l'albero sintattico (senza docstring) e' uguale a quello del riferimento.
