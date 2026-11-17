@@ -43,12 +43,16 @@ def make_zip(path, scoring=None):
                         _csv_text(["timestamp", "level", "component", "reason", "datetime"], r))
 
 
-def make_plan(data_dir, score_of):
-    """Piano con 2 casi x 3 modelli x 5 varianti = 30 run; score_of(model, case, variant)."""
+def make_plan(data_dir, score_of, scoring_override=None):
+    """Piano con 2 casi x 3 modelli x 5 varianti = 30 run, risultati e report di scoring congelato.
+
+    score_of(model, case, variant) -> float | "error" (run senza punteggio, mai riprovata).
+    """
     runs, cases = [], [{"case_id": c, "task_index": "task_2", "requested_fault_count": 1}
                        for c in CASES]
     folder = Path(data_dir) / "data/results/evaluation20" / m.PROTOCOL
     folder.mkdir(parents=True)
+    frozen = []
     for case in CASES:
         for model in m.MODELS:
             for variant in m.VARIANTS:
@@ -56,24 +60,34 @@ def make_plan(data_dir, score_of):
                 runs.append({"run_id": run_id, "case_id": case,
                              "model_key": model, "variant": variant})
                 score = score_of(model, case, variant)
-                if score == "missing":
-                    continue
-                body = {"case_id": case, "variant": variant,
-                        "prediction": None if score == "none" else str(score)}
                 out = folder / (run_id + ".json")
-                out.write_text(json.dumps(body), encoding="utf-8")
-                (folder / (run_id + ".sha256.json")).write_text(json.dumps(
-                    {"result_sha256": hashlib.sha256(out.read_bytes()).hexdigest()}),
-                    encoding="utf-8")
+                # prediction e' vuota di proposito: il punteggio congelato e' sul raw_response
+                out.write_text(json.dumps({"case_id": case, "variant": variant,
+                                           "prediction": None, "raw_response": "x"}),
+                               encoding="utf-8")
+                frozen.append({
+                    "run_id": run_id, "case_id": case, "model_key": model, "variant": variant,
+                    "status": "MODEL_ERROR_REVIEW_NO_RETRY" if score == "error" else "complete",
+                    "official_raw_score": None if score == "error" else score,
+                    "source_result_sha256": hashlib.sha256(out.read_bytes()).hexdigest()})
     plan_dir = Path(data_dir) / "data/protocols/evaluation20"
     plan_dir.mkdir(parents=True)
-    (plan_dir / (m.PROTOCOL + "_plan_v1.json")).write_text(
-        json.dumps({"runs": runs, "cases": cases}), encoding="utf-8")
+    plan_file = plan_dir / (m.PROTOCOL + "_plan_v1.json")
+    plan_file.write_text(json.dumps({"runs": runs, "cases": cases}), encoding="utf-8")
+    scoring_dir = Path(data_dir) / "data/scoring"
+    scoring_dir.mkdir(parents=True)
+    report = {"protocol": m.PROTOCOL, "prediction_field": "raw_response",
+              "official_scorer_commit": m.OFFICIAL_COMMIT,
+              "official_scorer_source_sha256": m.OFFICIAL_EVALUATE_SHA256,
+              "plan_sha256": hashlib.sha256(plan_file.read_bytes()).hexdigest(),
+              "runs": frozen}
+    report.update(scoring_override or {})
+    path = scoring_dir / (m.PROTOCOL + "_official_raw_scoring_v1.json")
+    path.write_text(json.dumps(report), encoding="utf-8")
+    (scoring_dir / (m.PROTOCOL + "_official_raw_scoring_v1.sha256.json")).write_text(
+        json.dumps({"scoring_report_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}),
+        encoding="utf-8")
     return runs
-
-
-def fake_evaluate(prediction, scoring_points):
-    return [], [], float(prediction)
 
 
 def default_score(model, case, variant):
@@ -115,13 +129,13 @@ class CaseClassTests(unittest.TestCase):
 
 
 class StrataTests(unittest.TestCase):
-    def run_strata(self, score_of=default_score, scoring=None):
+    def run_strata(self, score_of=default_score, scoring_override=None, scoring=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        make_plan(tmp.name, score_of)
+        make_plan(tmp.name, score_of, scoring_override)
         make_zip(Path(tmp.name) / "Market.zip", scoring)
-        return m.run_strata(Path(tmp.name), Path(tmp.name) / "Market.zip", None,
-                            evaluate=fake_evaluate, expected_runs=30, expected_cases=2)
+        return m.run_strata(Path(tmp.name), Path(tmp.name) / "Market.zip",
+                            expected_runs=30, expected_cases=2)
 
     def test_effect_concentrated_in_covered_stratum(self):
         report = self.run_strata()
@@ -135,50 +149,63 @@ class StrataTests(unittest.TestCase):
         self.assertAlmostEqual(evidence["haiku|tutti"]["mean_difference"], 0.25)
         self.assertEqual(report["held_out_classes_found_in_evaluation_cases"], 1)
         self.assertEqual(report["provider_calls"], 0)
+        self.assertEqual(report["source_result_hash_mismatches"], 0)
 
-    def test_missing_and_empty_runs_leave_the_pair_out(self):
+    def test_run_scored_on_raw_response_even_without_prediction(self):
+        report = self.run_strata()
+        self.assertEqual(report["runs_not_scored"], {})
+
+    def test_runs_without_score_leave_the_pair_out(self):
         def score(model, case, variant):
             if (model, case, variant) == ("gemini", COVERED_CASE, "A1"):
-                return "missing"
-            if (model, case, variant) == ("gemini", UNCOVERED_CASE, "A1_8R"):
-                return "none"
+                return "error"
             return default_score(model, case, variant)
         report = self.run_strata(score)
-        self.assertEqual(report["runs_not_scored"], {"missing": 1, "no_prediction": 1})
+        self.assertEqual(report["runs_not_scored"], {"MODEL_ERROR_REVIEW_NO_RETRY": 1})
         paired = report["paired_A1_8R_minus_A1"]
         self.assertEqual(paired["gemini|coperta"]["pairs"], 0)
-        self.assertEqual(paired["gemini|non_coperta"]["pairs"], 0)
+        self.assertEqual(paired["gemini|non_coperta"]["pairs"], 1)
         self.assertEqual(paired["sonnet|coperta"]["pairs"], 1)
 
-    def test_altered_result_stops_everything(self):
+    def test_source_result_changed_after_scoring_is_counted(self):
         with tempfile.TemporaryDirectory() as tmp:
             runs = make_plan(tmp, default_score)
             make_zip(Path(tmp) / "Market.zip")
             output, _ = m.result_paths(Path(tmp), runs[0]["run_id"])
             output.write_text(output.read_text(encoding="utf-8") + " ", encoding="utf-8")
-            with self.assertRaises(m.ScoringError):
-                m.run_strata(Path(tmp), Path(tmp) / "Market.zip", None, evaluate=fake_evaluate,
-                             expected_runs=30, expected_cases=2)
+            report = m.run_strata(Path(tmp), Path(tmp) / "Market.zip",
+                                  expected_runs=30, expected_cases=2)
+            self.assertEqual(report["source_result_hash_mismatches"], 1)
 
-    def test_result_of_another_case_is_rejected(self):
+    def test_altered_scoring_report_stops_everything(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runs = make_plan(tmp, default_score)
-            output, sidecar = m.result_paths(Path(tmp), runs[0]["run_id"])
-            body = json.loads(output.read_text(encoding="utf-8"))
-            body["case_id"] = "cloudbed-2_q099"
-            output.write_text(json.dumps(body), encoding="utf-8")
-            sidecar.write_text(json.dumps(
-                {"result_sha256": hashlib.sha256(output.read_bytes()).hexdigest()}), encoding="utf-8")
+            make_plan(tmp, default_score)
+            make_zip(Path(tmp) / "Market.zip")
+            path, _ = m.find_scoring_report(Path(tmp))
+            path.write_text(path.read_text(encoding="utf-8").replace("0.75", "0.95"), encoding="utf-8")
             with self.assertRaises(m.ScoringError):
-                m.load_result(Path(tmp), runs[0])
+                m.run_strata(Path(tmp), Path(tmp) / "Market.zip", expected_runs=30, expected_cases=2)
 
-    def test_missing_sidecar_is_rejected(self):
+    def test_scoring_on_another_plan_is_rejected(self):
+        with self.assertRaises(m.ScoringError):
+            self.run_strata(scoring_override={"plan_sha256": "0" * 64})
+
+    def test_scoring_on_prediction_field_is_rejected(self):
+        with self.assertRaises(m.ScoringError):
+            self.run_strata(scoring_override={"prediction_field": "prediction"})
+
+    def test_other_official_scorer_is_rejected(self):
+        with self.assertRaises(m.ScoringError):
+            self.run_strata(scoring_override={"official_scorer_source_sha256": "f" * 64})
+
+    def test_missing_scoring_report_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runs = make_plan(tmp, default_score)
-            _, sidecar = m.result_paths(Path(tmp), runs[0]["run_id"])
-            sidecar.unlink()
+            make_plan(tmp, default_score)
+            make_zip(Path(tmp) / "Market.zip")
+            path, _ = m.find_scoring_report(Path(tmp))
+            path.unlink()
             with self.assertRaises(m.ScoringError):
-                m.load_result(Path(tmp), runs[0])
+                m.run_strata(Path(tmp), Path(tmp) / "Market.zip", expected_runs=30, expected_cases=2)
 
     def test_task_mismatch_with_archive_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -6,9 +6,10 @@ regole? E' un'analisi POST HOC di dati gia' congelati: nessuna chiamata a modell
 nessuna modifica di record, regole o soglie; scrive solo un report create-only.
 
 Due comandi:
-  strata      ri-punteggia le run con lo scorer ufficiale (commit e hash fissati),
-              verifica di riprodurre la tabella gia' riportata (medie per modello e
-              variante), poi divide i 20 incidenti in coperti / non coperti / misti.
+  strata      legge i punteggi ufficiali GIA' CONGELATI di EVALUATION20 (scoring su
+              raw_response, hash verificati), verifica di riprodurre la tabella gia'
+              riportata (medie per modello e variante), poi divide i 20 incidenti in
+              coperti / non coperti / misti. Non ri-punteggia: nessuno scorer da installare.
   separation  controlla, in forma aggregata (nessun case_id), che le quattro classi
               tenute fuori (RQ2) non compaiano nei gruppi development, evaluation
               e mixed_quarantine dello split.
@@ -37,8 +38,7 @@ from zipfile import ZipFile
 from evaluation.ood_class_inventory import TARGETS, _normalized
 from evaluation.rq2_a_offline_scoring import (
     OFFICIAL_COMMIT, OFFICIAL_EVALUATE_SHA256, QUERY_COLUMNS, RECORD_COLUMNS,
-    ScoringError, _read_member, load_official_evaluate, write_report_create_only,
-    write_text_create_only,
+    ScoringError, _read_member, write_report_create_only,
 )
 from evaluation.v2_case_window_audit import (
     MANIFEST_COLUMNS, SPLIT_COLUMNS, _read_csv,
@@ -100,22 +100,6 @@ def load_plan(data_dir: Path, expected_runs: int = 300, expected_cases: int = 20
     if any(r["case_id"] not in case_ids for r in runs):
         raise ScoringError("Run su un caso fuori dal piano")
     return plan
-
-
-def load_result(data_dir: Path, run: dict) -> dict | None:
-    """Risultato di una run, con hash verificato. None se non e' mai stato scritto."""
-    output, sidecar = result_paths(data_dir, run["run_id"])
-    if not output.is_file():
-        return None
-    if not sidecar.is_file():
-        raise ScoringError("Manca lo sha256 del risultato: " + run["run_id"])
-    expected = json.loads(sidecar.read_text(encoding="utf-8")).get("result_sha256")
-    if expected != _file_sha(output):
-        raise ScoringError("Risultato alterato (hash diverso): " + run["run_id"])
-    result = json.loads(output.read_text(encoding="utf-8"))
-    if result.get("case_id") != run["case_id"] or result.get("variant") != run["variant"]:
-        raise ScoringError("Risultato non coerente col piano: " + run["run_id"])
-    return result
 
 
 def _row_of(case_id: str) -> tuple[str, int]:
@@ -189,24 +173,62 @@ def case_classes(reference: dict) -> dict:
 
 # ------------------------------------------------------------------ punteggi
 
-def score_runs(data_dir: Path, plan: dict, references: dict[str, dict], evaluate) -> list[dict]:
-    rows = []
+def find_scoring_report(data_dir: Path) -> tuple[Path, Path]:
+    """Report di scoring ufficiale congelato (su raw_response) e il suo sidecar."""
+    name = PROTOCOL + "_official_raw_scoring_v1.json"
+    matches = sorted((Path(data_dir) / "data").rglob(name))
+    if len(matches) != 1:
+        raise ScoringError(f"Atteso un solo {name} sotto data/, trovati {len(matches)}")
+    report = matches[0]
+    return report, report.with_name(name[:-5] + ".sha256.json")
+
+
+def load_scoring_report(data_dir: Path, plan: dict) -> dict:
+    path, sidecar = find_scoring_report(data_dir)
+    if not sidecar.is_file():
+        raise ScoringError("Manca lo sha256 del report di scoring")
+    if json.loads(sidecar.read_text(encoding="utf-8")).get("scoring_report_sha256") != _file_sha(path):
+        raise ScoringError("Report di scoring alterato (hash diverso)")
+    report = json.loads(path.read_text(encoding="utf-8"))
+    checks = {
+        "protocol": PROTOCOL,
+        "prediction_field": "raw_response",
+        "official_scorer_commit": OFFICIAL_COMMIT,
+        "official_scorer_source_sha256": OFFICIAL_EVALUATE_SHA256,
+        "plan_sha256": _file_sha(plan_path(data_dir)),
+    }
+    for key, expected in checks.items():
+        if report.get(key) != expected:
+            raise ScoringError(f"Report di scoring: {key} diverso dall'atteso")
+    if {r["run_id"] for r in report["runs"]} != {r["run_id"] for r in plan["runs"]}:
+        raise ScoringError("Le run del report di scoring non coincidono con il piano")
+    return report
+
+
+def score_runs(data_dir: Path, plan: dict, scoring: dict) -> tuple[list[dict], int]:
+    """Punteggi congelati, uno per run del piano. Ritorna anche le discordanze di hash sorgente.
+
+    Una run senza punteggio (errore del modello, mai riprovata) resta fuori dalla media,
+    come nella tabella gia' riportata; la discordanza dell'hash del risultato sorgente
+    e' solo contata e riportata, perche' i punteggi sono gia' protetti dal loro hash.
+    """
+    frozen = {r["run_id"]: r for r in scoring["runs"]}
+    rows, mismatches = [], 0
     for run in plan["runs"]:
-        result = load_result(data_dir, run)
-        row = {"run_id": run["run_id"], "case_id": run["case_id"],
-               "model": run["model_key"], "variant": run["variant"],
-               "status": "scored", "score": None}
-        if result is None:
-            row["status"] = "missing"
-        else:
-            prediction = result.get("prediction")
-            if not isinstance(prediction, str) or not prediction.strip():
-                row["status"] = "no_prediction"
-            else:
-                _, _, score = evaluate(prediction, references[run["case_id"]]["scoring_points"])
-                row["score"] = float(score)
+        src = frozen[run["run_id"]]
+        if (src["case_id"] != run["case_id"] or src["variant"] != run["variant"]
+                or src["model_key"] != run["model_key"]):
+            raise ScoringError("Run del report incoerente col piano: " + run["run_id"])
+        score = src.get("official_raw_score") if src["status"] == "complete" else None
+        row = {"run_id": run["run_id"], "case_id": run["case_id"], "model": run["model_key"],
+               "variant": run["variant"], "status": "scored" if score is not None else src["status"],
+               "score": None if score is None else float(score)}
+        if score is not None:
+            output, _ = result_paths(data_dir, run["run_id"])
+            if not output.is_file() or _file_sha(output) != src.get("source_result_sha256"):
+                mismatches += 1
         rows.append(row)
-    return rows
+    return rows, mismatches
 
 
 def _mean(values: list[float]) -> float | None:
@@ -269,15 +291,14 @@ def paired(rows: list[dict], strata: dict[str, str], base: str, other: str) -> d
     return out
 
 
-def run_strata(data_dir: Path, market_zip: Path, openrca_dir: Path, evaluate=None,
+def run_strata(data_dir: Path, market_zip: Path,
                expected_runs: int = 300, expected_cases: int = 20) -> dict:
     plan = load_plan(data_dir, expected_runs, expected_cases)
     references = load_references(market_zip, plan["cases"])
     classes = {c: case_classes(ref) for c, ref in references.items()}
     strata = {c: v["stratum"] for c, v in classes.items()}
-    if evaluate is None:
-        evaluate = load_official_evaluate(openrca_dir)
-    rows = score_runs(data_dir, plan, references, evaluate)
+    scoring = load_scoring_report(data_dir, plan)
+    rows, hash_mismatches = score_runs(data_dir, plan, scoring)
     multi = sum(1 for c in plan["cases"] if int(c.get("requested_fault_count", 1)) >= 2)
     return {
         "version": VERSION, "provider_calls": 0,
@@ -285,6 +306,8 @@ def run_strata(data_dir: Path, market_zip: Path, openrca_dir: Path, evaluate=Non
         "official_scorer_commit": OFFICIAL_COMMIT,
         "official_evaluate_sha256": OFFICIAL_EVALUATE_SHA256,
         "plan_sha256": _file_sha(plan_path(data_dir)),
+        "scoring_source": "punteggi ufficiali congelati su raw_response (nessun nuovo scoring)",
+        "source_result_hash_mismatches": hash_mismatches,
         "covered_classes": list(COVERED), "held_out_classes": list(HELD_OUT),
         "reproduction_check": reproduction_check(rows),
         "cases_per_stratum": dict(Counter(strata.values())),
@@ -357,7 +380,8 @@ def format_strata(report: dict) -> str:
     lines = ["Riproduzione della tabella gia' riportata: "
              + ("OK" if report["reproduction_check"]["all_match"] else "NON COINCIDE"),
              f"Casi per strato: {report['cases_per_stratum']}  multiguasto: {report['multi_fault_cases']}",
-             f"Run non valutate: {report['runs_not_scored']}",
+             f"Run non valutate: {report['runs_not_scored']}  "
+             f"discordanze hash risultati sorgente: {report['source_result_hash_mismatches']}",
              f"Casi con una delle 4 classi di RQ2: {report['held_out_classes_found_in_evaluation_cases']}",
              "", "Differenza media A1_8R - A1 (coppie; vittorie/pareggi/sconfitte)"]
     for stratum in STRATA + ("tutti",):
@@ -383,7 +407,6 @@ def main(argv=None) -> int:
     s1 = sub.add_parser("strata")
     s1.add_argument("--data-dir", required=True, type=Path)
     s1.add_argument("--market-zip", type=Path)
-    s1.add_argument("--openrca-dir", required=True, type=Path)
     s1.add_argument("--out", required=True, type=Path)
     s2 = sub.add_parser("separation")
     s2.add_argument("--data-dir", required=True, type=Path)
@@ -393,7 +416,7 @@ def main(argv=None) -> int:
     zip_path = args.market_zip or (args.data_dir / "Market.zip")
     try:
         if args.cmd == "strata":
-            report = run_strata(args.data_dir, zip_path, args.openrca_dir)
+            report = run_strata(args.data_dir, zip_path)
             text = format_strata(report)
         else:
             report = run_separation(args.data_dir, zip_path)
