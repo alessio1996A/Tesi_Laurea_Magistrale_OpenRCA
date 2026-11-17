@@ -1,15 +1,26 @@
-"""RQ2 V3 candidate: exact visible-text extraction for FINAL D responses.
+"""Candidato RQ2 V3: estrazione esatta del testo visibile per le risposte FINALI di D.
 
-OFFLINE DESIGN ONLY, no source-bound V3 release, ledger or live dispatcher.
+SOLO PROGETTO OFFLINE: nessuna release V3 legata ai sorgenti, nessun ledger e nessun
+dispatcher live.
 
-A small graph-stream view normalizes ONLY the final visible AIMessage before
-the frozen ReAct/verify D runners read it. It never modifies the original
-AIMessage, the graph, tool results, prompts, provider calls, or D budgets.
-It does not repair malformed JSON. No global monkeypatch of graph_engine.
+Una piccola "vista" sul flusso del grafo normalizza SOLO l'ultimo `AIMessage` visibile prima
+che i runner D congelati (ReAct e verify) lo leggano. Non modifica mai l'`AIMessage` originale,
+il grafo, i risultati dei tool, i prompt, le chiamate al provider ne' i budget di D. Non
+ripara JSON malformato. Nessun monkeypatch globale di `graph_engine`.
 
-The exact same extraction function/policy is used by the candidate C/K
-transport; all models and harnesses follow the same text-block rules.
-Do not call real providers or record this under the frozen V2 release.
+La stessa identica funzione/politica di estrazione e' usata dal trasporto C/K candidato: tutti
+i modelli e gli harness seguono le stesse regole sui blocchi di testo. Non chiamare provider
+reali e non registrare questo sotto la release V2 congelata.
+
+Contenuto
+---------
+- `VERSION`, `D_META_SCHEMA`, `ENGINES`: versione, schema dei metadati e motori ammessi
+  ("react" e "verify");
+- `DFinalStreamCandidateBlocked`: errore "forma del flusso finale troppo ambigua";
+- `ExactFinalTextStream`: la vista sul grafo, monouso, che sostituisce il testo del messaggio
+  finale con il testo visibile estratto;
+- `run_d_final_candidate`: esegue il grafo D attraverso la vista e restituisce una ricevuta
+  candidata con i metadati dell'estrazione.
 """
 from __future__ import annotations
 
@@ -24,21 +35,27 @@ from evaluation.rq2_v2_ck_text_extraction_candidate import (
 
 VERSION = "rq2_v3_d_final_stream_candidate_v0"
 D_META_SCHEMA = "rq2_v3_d_final_text_meta_v0"
+# Motori D supportati: ReAct (nodo finale "agente") e verify (nodo finale "finale").
 ENGINES = ("react", "verify")
 
 
 class DFinalStreamCandidateBlocked(RuntimeError):
-    """Final-output stream shape is too ambiguous; never guess."""
+    """La forma del flusso dell'output finale e' troppo ambigua: non si indovina mai."""
 
 
 class ExactFinalTextStream:
-    """Single-use view of an existing, already-compiled graph.
+    """Vista monouso di un grafo esistente e gia' compilato.
 
-    The graph's own state is never edited. A shallow event/message copy
-    carries the exact visible final text to the original graph runner.
+    Lo stato del grafo non viene mai modificato. Una copia superficiale dell'evento e del
+    messaggio porta il testo finale visibile ESATTO al runner originale del grafo.
     """
 
     def __init__(self, graph: object, *, engine: str):
+        """Crea la vista su `graph` per il motore `engine` ("react" o "verify").
+
+        Memorizza anche i metadati dell'estrazione, inizialmente "non osservato", che si
+        riempiono quando passa il messaggio finale.
+        """
         if engine not in ENGINES:
             raise DFinalStreamCandidateBlocked("Unknown D engine")
         self.graph = graph
@@ -54,12 +71,20 @@ class ExactFinalTextStream:
         }
 
     def stream(self, initial_state, *, config, stream_mode):
+        """Generatore con la stessa interfaccia di `graph.stream`, ma col testo finale sostituito.
+
+        Passi: 1) si puo' usare una sola volta; 2) per ogni evento del grafo si guardano solo i
+        nodi finali (nodo "agente" per ReAct, "finale" per verify); 3) i messaggi con tool call
+        sono esplorazione, non risposta finale, e si saltano; 4) il messaggio finale e' uno solo:
+        se ce ne sono di piu' si blocca; 5) se ne estrae il testo visibile e se ne registrano i
+        metadati; 6) si passa al runner una COPIA del messaggio con quel testo.
+        """
         if self._used:
             raise DFinalStreamCandidateBlocked(
                 "Graph stream view cannot be reused for a second execution"
             )
         self._used = True
-        # No graph.invoke, no SDK factory, no extra tool/provider requests.
+        # Nessun `graph.invoke`, nessuna factory SDK, nessuna richiesta extra a tool o provider.
         for event in self.graph.stream(
             initial_state, config=config, stream_mode=stream_mode
         ):
@@ -67,6 +92,7 @@ class ExactFinalTextStream:
                 raise DFinalStreamCandidateBlocked("Unexpected graph event")
             changed = None
             for node, update in event.items():
+                # Nodo candidato: quello che produce la risposta finale per il motore scelto.
                 candidate_node = (
                     node == "agente" if self.engine == "react"
                     else node == "finale"
@@ -74,7 +100,7 @@ class ExactFinalTextStream:
                 if not candidate_node or type(update) is not dict:
                     continue
                 if update.get("finalization_error"):
-                    # Keep the original error; do not invent a diagnosis.
+                    # Si tiene l'errore originale: non si inventa una diagnosi.
                     continue
                 messages = update.get("messages")
                 if type(messages) is not list:
@@ -85,10 +111,10 @@ class ExactFinalTextStream:
                 mutated = False
                 for i, msg in enumerate(messages):
                     if not isinstance(msg, AIMessage):
-                        # Never reinterpret non-AI messages as model output.
+                        # I messaggi non AI non si reinterpretano mai come output del modello.
                         continue
                     if getattr(msg, "tool_calls", None):
-                        # ReAct exploration, NOT a final answer.
+                        # Esplorazione ReAct, NON una risposta finale.
                         continue
                     if getattr(msg, "invalid_tool_calls", None):
                         raise DFinalStreamCandidateBlocked(
@@ -107,8 +133,8 @@ class ExactFinalTextStream:
                         "text_blocks": visible.text_blocks,
                         "nontext_blocks": visible.other_blocks,
                     }
-                    # Explicit copy of the complete message object. Do NOT
-                    # mutate SDK-original content or any tool trajectory.
+                    # Copia esplicita dell'intero messaggio. NON si modifica il contenuto
+                    # originale dell'SDK ne' alcuna traiettoria dei tool.
                     new_messages[i] = msg.model_copy(
                         update={"content": visible.raw_text}
                     )
@@ -117,6 +143,7 @@ class ExactFinalTextStream:
                     if changed is None:
                         changed = dict(event)
                     changed[node] = {**update, "messages": new_messages}
+            # Si restituisce l'evento modificato, oppure l'originale se non c'e' nulla da cambiare.
             yield changed if changed is not None else event
 
 
@@ -124,11 +151,20 @@ def run_d_final_candidate(
     graph: object, request: str, *, engine: str,
     recursion_limit: int = 30, verbose: bool = False,
 ) -> dict:
-    """Run the already-compiled D graph through the final-text bridge.
+    """Esegue il grafo D gia' compilato attraverso il ponte del testo finale.
 
-    Output is an offline *candidate receipt*, not a production diagnostic_run.
-    The original D result contract and token metrics are untouched. Future
-    V3 runner/ledger must explicitly bind and validate the metadata.
+    L'output e' una *ricevuta candidata* offline, non un `diagnostic_run` di produzione. Il
+    contratto di risultato di D e le metriche dei token restano intatti. Un futuro runner o
+    ledger V3 dovra' legare e validare esplicitamente i metadati.
+
+    Argomenti: `graph` (grafo compilato), `request` (richiesta al modello), `engine` ("react"
+    o "verify"), `recursion_limit` (limite di ricorsione del grafo, 30 di default) e
+    `verbose`. Restituisce un dizionario con `diagnostic_run` (risultato del runner D),
+    `d_final_text_extraction` (metadati) e le dichiarazioni "nessuna API, non legato ai sorgenti".
+
+    Passi: 1) si avvolge il grafo nella vista; 2) si usa il runner D del motore scelto;
+    3) il risultato deve essere un dizionario; 4) se c'e' una risposta grezza, l'estrazione
+    del testo finale deve risultare tracciata.
     """
     bridge = ExactFinalTextStream(graph, engine=engine)
     if engine == "react":

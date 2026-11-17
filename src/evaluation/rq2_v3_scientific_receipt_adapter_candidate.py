@@ -1,11 +1,22 @@
-"""Proposed pure V3 D/C/K scientific receipt adapter (OFFLINE ONLY).
+"""Adattatore PROPOSTO, puro, delle ricevute scientifiche V3 D/C/K (SOLO OFFLINE).
 
-NO SDK, API, file I/O, GT, claim, release or production dispatcher.
-Rows are ALWAYS resolved from the distinct V3 GT-free plan. Strict
-scientific contract logic is reused from the frozen V2 validators, NOT
-their V2 stage-ID lookup or create-only namespace. The final V3 ledger
-must independently validate source/release/commit, canonical bytes,
-dependencies, claim-first, restart and the provenance envelopes.
+NESSUN SDK, API, I/O su file, ground truth, claim, release o dispatcher di produzione.
+Le righe del piano si risolvono SEMPRE dal piano V3 GT-free, distinto da quello V2. La logica
+del contratto scientifico rigoroso e' riusata dai validatori V2 congelati, MA NON la loro
+ricerca degli ID di stage V2 ne' il loro namespace create-only. Il ledger V3 finale dovra'
+validare in modo indipendente sorgenti, release, commit, byte canonici, dipendenze, regola
+"claim prima" (il claim si scrive prima del record), ripartenza e buste di provenienza.
+
+Contenuto
+---------
+- `STATUSES`, `D_FIELDS`, `D_ERROR_CODE`: stati registrabili, campi dei metadati di D e forma
+  del codice d'errore redatto di D;
+- `V3ScientificReceiptBlocked`: errore "ricevuta ambigua, corrotta o con ID di stage V2";
+- `_row`: riga del piano V3 per uno stage;
+- `_validate_d_meta`, `_validate_d_identity`, `_validate_v3_base`: controlli parziali;
+- `validate_v3_scientific_artifact`: validatore puro dell'artefatto, pronto per la rilettura;
+- `_receipt`: busta comune della ricevuta;
+- `normalize_v3_d_capture`, `normalize_v3_ck_call`: i due punti d'ingresso, per D e per C/K.
 """
 from __future__ import annotations
 
@@ -34,17 +45,27 @@ from evaluation.rq2_v3_unified_gtfree_discovery_plan import (
 )
 
 VERSION = "rq2_v3_scientific_receipt_adapter_candidate_v0"
+# Campi (esatti) dei metadati di estrazione del testo finale di D.
 D_FIELDS = frozenset(("schema", "policy", "content_kind",
                       "text_blocks", "nontext_blocks"))
+# Stati con cui una ricevuta puo' essere registrata.
 STATUSES = frozenset(("RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR"))
+# Errore di D redatto: prefisso fisso piu' 16 caratteri esadecimali dell'hash del testo
+# originale (il testo dell'errore non si salva mai).
 D_ERROR_CODE = re.compile(r"RUNNER_EXECUTION_ERROR_SHA256_[0-9a-f]{16}\Z")
 
 
 class V3ScientificReceiptBlocked(ValueError):
-    """A receipt is ambiguous, corrupted, or uses a frozen V2 stage ID."""
+    """Una ricevuta e' ambigua, corrotta o usa un ID di stage V2 congelato."""
 
 
 def _row(stage_id: str, logical_model: str, stage: str) -> dict:
+    """Riga del piano V3 per `stage_id`, dopo aver verificato modello logico e stage.
+
+    L'ID deve cominciare col nome del protocollo V3 (cosi' un ID V2 viene rifiutato) e lo
+    stage deve essere D, C o K. Solleva `V3ScientificReceiptBlocked` se la riga non esiste o
+    se modello e stage non coincidono.
+    """
     if (
         type(stage_id) is not str or
         not stage_id.startswith(V3_PROTOCOL + ":") or
@@ -60,6 +81,15 @@ def _row(stage_id: str, logical_model: str, stage: str) -> dict:
 
 
 def _validate_d_meta(meta: object, raw: object, error: object) -> None:
+    """Controlla i metadati `meta` di estrazione del testo finale di D rispetto a `raw`.
+
+    Regole: 1) campi, schema e politica esatti; 2) conteggi dei blocchi interi e limitati da
+    `MAX_BLOCKS`; 3) il tipo di contenuto e' coerente con testo e conteggi ("not_observed" =
+    niente di osservato, "str" = al piu' un blocco, "list" = almeno un blocco di testo se c'e'
+    testo, "unsupported" = tutto vuoto); 4) il testo, se c'e', e' una stringa; 5) senza errore
+    e con testo, il tipo di contenuto deve essere "str" o "list". `error` e' l'errore del
+    runner D (o None).
+    """
     if type(meta) is not dict or set(meta) != D_FIELDS:
         raise V3ScientificReceiptBlocked("Missing/unexpected D text provenance")
     if meta["schema"] != D_META_SCHEMA or meta["policy"] != POLICY:
@@ -91,14 +121,19 @@ def _validate_d_meta(meta: object, raw: object, error: object) -> None:
         raise V3ScientificReceiptBlocked("D final response must be text")
     if error is None and raw is not None and kind not in ("str", "list"):
         raise V3ScientificReceiptBlocked("D final response provenance missing")
-    # When a graph fails AFTER observing a final message, the runner
-    # may discard raw output but observed block counts remain truthful.
-    # Such errors are never labelled RECORDED_COMPLETE.
+    # Se il grafo fallisce DOPO aver osservato un messaggio finale, il runner puo' scartare il
+    # testo grezzo, ma i conteggi dei blocchi osservati restano veritieri. Questi errori non
+    # sono mai etichettati RECORDED_COMPLETE.
 
 
 def _validate_v3_base(
     row: dict, status: str, base: dict, diagnostic_run: dict | None,
 ) -> None:
+    """Valida l'artefatto di base (senza i metadati V3) con il validatore V2 del ledger.
+
+    Per C e K il genitore D e' costruito dal `diagnostic_run` ricevuto. Un rifiuto del
+    validatore V2 diventa `V3ScientificReceiptBlocked`.
+    """
     parent = (
         {"status": "RECORDED_COMPLETE",
          "artifact": {"diagnostic_run": diagnostic_run}}
@@ -116,7 +151,17 @@ def validate_v3_scientific_artifact(
     *, stage_id: str, logical_model: str, status: str,
     artifact: dict, diagnostic_run: dict | None = None,
 ) -> None:
-    """Pure readback-ready artifact validator; not a ledger/release gate."""
+    """Validatore puro dell'artefatto, pronto per la rilettura; non e' un gate di ledger/release.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `status`, `artifact` e, per C/K,
+    `diagnostic_run` (il D genitore, immutabile). Solleva `V3ScientificReceiptBlocked`.
+
+    Per D: campi dell'artefatto esatti (piu' `d_final_text_extraction`); con errore, un codice
+    redatto e nessuna esecuzione sorgente; altrimenti identita' e metadati del run D. Per C/K:
+    D genitore con identita' e provenienza dei tool verificate, campi esatti (piu'
+    `text_extraction`), codice d'errore sicuro, metadati coerenti e testo visibile se
+    completo. In entrambi i casi l'artefatto di base supera anche il validatore V2.
+    """
     stage = stage_id.rsplit(":", 1)[-1] if type(stage_id) is str else ""
     row = _row(stage_id, logical_model, stage)
     if status not in STATUSES or type(artifact) is not dict:
@@ -139,8 +184,8 @@ def validate_v3_scientific_artifact(
                         or d_error == "SDK_CONSTRUCTION_ERROR")
             ):
                 raise V3ScientificReceiptBlocked("Unredacted/untrusted D error")
-            # A D runner error must have discarded raw output; the meta
-            # remains source-bound only under a future V3 ledger.
+            # Un errore del runner D deve aver scartato il testo grezzo; i metadati restano
+            # legati ai sorgenti solo sotto un futuro ledger V3.
             _validate_d_meta(
                 artifact["d_final_text_extraction"], raw=None,
                 error=artifact["provider_error"],
@@ -154,10 +199,12 @@ def validate_v3_scientific_artifact(
                 artifact["d_final_text_extraction"],
                 raw=d.get("raw_response"), error=d.get("error"),
             )
+        # Artefatto di base D (senza i metadati V3): validazione V2.
         base = {k: artifact[k] for k in required}
         _validate_v3_base(row, status, base, None)
         return
 
+    # Da qui in poi: C/K. Serve il D genitore, con identita' e provenienza dei tool attendibili.
     if type(diagnostic_run) is not dict:
         raise V3ScientificReceiptBlocked("Immutable parent D run required")
     _validate_d_identity(row, diagnostic_run)
@@ -193,6 +240,11 @@ def validate_v3_scientific_artifact(
 
 
 def _validate_d_identity(row: dict, run: dict) -> None:
+    """Verifica che il run D `run` appartenga alla riga `row` del piano (caso, harness, modello).
+
+    Richiede anche schema delle varianti "current", provider, contratto di output "v2_enforce"
+    e 6 turni di tool; qualsiasi scostamento solleva `V3ScientificReceiptBlocked`.
+    """
     required = {
         "case_id": row["case_id"],
         "variant": row["harness"],
@@ -209,6 +261,7 @@ def _validate_d_identity(row: dict, run: dict) -> None:
 
 
 def _receipt(stage_id: str, status: str, artifact: dict) -> dict:
+    """Busta comune della ricevuta: nessuna API, nessuna scrittura, costo sconosciuto."""
     return {
         "version": VERSION,
         "stage_id": stage_id,
@@ -224,7 +277,17 @@ def _receipt(stage_id: str, status: str, artifact: dict) -> dict:
 def normalize_v3_d_capture(
     *, stage_id: str, logical_model: str, captured: dict,
 ) -> dict:
-    """D receipt from the *already obtained* exact final-text runner output."""
+    """Ricevuta D dall'output del runner a testo finale esatto, GIA' ottenuto.
+
+    Argomenti (per nome): `stage_id`, `logical_model` e `captured` (la ricevuta della cattura
+    `rq2_v3_d_runner_capture_candidate`). Restituisce la ricevuta normalizzata.
+
+    Passi: 1) riga V3 del piano; 2) busta di cattura attendibile (versione e dichiarazioni
+    "nessuna API/scrittura"); 3) identita' del run D e rappresentazione dell'errore;
+    4) metadati e contatore dalle metriche; 5) con errore: codice redatto con hash;
+    senza errore: stato COMPLETO o OUTPUT NON VALIDO a seconda del validatore V2; 6) l'artefatto
+    finale supera il validatore V3.
+    """
     row = _row(stage_id, logical_model, "D")
     if (
         type(captured) is not dict
@@ -250,6 +313,7 @@ def normalize_v3_d_capture(
     except UnifiedProviderReceiptBlocked as exc:
         raise V3ScientificReceiptBlocked("Bad D usage") from exc
 
+    # Con errore si registra solo un'impronta (hash) del testo, mai il testo stesso.
     if error is not None:
         fingerprint = hashlib.sha256(error.encode("utf-8")).hexdigest()[:16]
         status = "PROVIDER_ERROR"
@@ -259,6 +323,8 @@ def normalize_v3_d_capture(
             "d_final_text_extraction": dict(meta),
         }
     else:
+        # Si prova prima come COMPLETO, poi come OUTPUT NON VALIDO; se nessuno dei due e'
+        # coerente, la ricevuta e' ambigua e si blocca.
         base = {"diagnostic_run": run, "stage_meter": meter}
         try:
             _validate_artifact(row, "RECORDED_COMPLETE", base, None)
@@ -284,7 +350,17 @@ def normalize_v3_ck_call(
     *, stage_id: str, logical_model: str,
     call: dict, diagnostic_run: dict,
 ) -> dict:
-    """C/K receipt using V3 identities, original evidence and strict parser."""
+    """Ricevuta C/K con identita' V3, evidenze originali e parser rigoroso.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `call` (dizionario del trasporto C/K
+    gia' ottenuto) e `diagnostic_run` (il D genitore). Restituisce la ricevuta normalizzata.
+
+    Passi: 1) lo stage deve essere C o K del piano V3; 2) il D ha identita' e provenienza dei
+    tool attendibili e il contatore e' coerente; 3) metadati di estrazione del testo dal
+    trasporto, verificati; 4) con errore: codice sicuro e nessun testo; senza errore: una sola
+    chiamata e un testo, poi classificazione dell'esito con il validatore V2; 5) l'artefatto
+    finale supera il validatore V3.
+    """
     if type(stage_id) is not str:
         raise V3ScientificReceiptBlocked("V3 stage ID required")
     stage = stage_id.rsplit(":", 1)[-1]
@@ -304,6 +380,7 @@ def normalize_v3_ck_call(
         )
     except (ValueError, TypeError, KeyError, UnifiedProviderReceiptBlocked) as exc:
         raise V3ScientificReceiptBlocked("CK evidence/usage contract mismatch") from exc
+    # Metadati di estrazione del testo, presi dal trasporto e verificati.
     error, raw = call.get("provider_error"), call.get("raw_response")
     meta = {
         "schema": META_SCHEMA,

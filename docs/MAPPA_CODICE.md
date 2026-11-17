@@ -21,7 +21,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 49 | 24 |
+| A. Nucleo del codice finale | 98 | 25 | 57 | 16 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -141,19 +141,19 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/rq2_v3_ck_provenance_receipt_candidate.py` | 165 | Proposed successor-only C/K receipt contract with auditable text provenance. | - | da fare (EN 4, senza docstring 1) |
-| `evaluation/rq2_v3_d_final_stream_candidate.py` | 163 | RQ2 V3 candidate: exact visible-text extraction for FINAL D responses. | - | da fare (EN 7, senza docstring 2) |
-| `evaluation/rq2_v3_d_runner_capture_candidate.py` | 135 | V3 D runner instrumentation candidate, OFFLINE ONLY; no paid dispatch. | - | da fare (EN 3, senza docstring 6) |
-| `evaluation/rq2_v3_scientific_receipt_adapter_candidate.py` | 346 | Proposed pure V3 D/C/K scientific receipt adapter (OFFLINE ONLY). | - | da fare (EN 5, senza docstring 5) |
-| `evaluation/rq2_v3_unified_gtfree_discovery_plan.py` | 195 | Successor RQ2 V3 GT-free discovery plan; PRE-RELEASE, NO API/CLAIM. | - | da fare (EN 2, senza docstring 3) |
+| `evaluation/rq2_v3_ck_provenance_receipt_candidate.py` | 203 | Contratto di ricevuta C/K PROPOSTO (solo successore) con provenienza verificabile del testo. | - | completo |
+| `evaluation/rq2_v3_d_final_stream_candidate.py` | 199 | Candidato RQ2 V3: estrazione esatta del testo visibile per le risposte FINALI di D. | - | completo |
+| `evaluation/rq2_v3_d_runner_capture_candidate.py` | 168 | Candidato V3 di strumentazione del runner D, SOLO OFFLINE; nessun dispatch a pagamento. | - | completo |
+| `evaluation/rq2_v3_scientific_receipt_adapter_candidate.py` | 423 | Adattatore PROPOSTO, puro, delle ricevute scientifiche V3 D/C/K (SOLO OFFLINE). | - | completo |
+| `evaluation/rq2_v3_unified_gtfree_discovery_plan.py` | 232 | Piano di discovery RQ2 V3 GT-free, successore del V2; PRE-RELEASE, NESSUNA API/CLAIM. | - | completo |
 
 **RQ2 catena V4 (piano, contratti, ricevute)**
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `evaluation/rq2_v4_d_task_aware_contract.py` | 182 | RQ2-V4: validazione D task-aware, GT-free, senza API né scritture. | - | da fare (EN 0, senza docstring 1) |
-| `evaluation/rq2_v4_scientific_receipt_adapter_candidate.py` | 235 | RQ2-V4 scientific receipt adapter: D task-aware; C/K frozen semantics. | - | da fare (EN 3, senza docstring 3) |
-| `evaluation/rq2_v4_unified_gtfree_discovery_plan.py` | 119 | Piano successore RQ2-V4 solo OFFLINE: nuova identita, nessuna API. | - | da fare (EN 0, senza docstring 2) |
+| `evaluation/rq2_v4_d_task_aware_contract.py` | 222 | RQ2-V4: validazione D task-aware, GT-free, senza API né scritture. | - | completo |
+| `evaluation/rq2_v4_scientific_receipt_adapter_candidate.py` | 286 | Adattatore RQ2-V4 delle ricevute scientifiche: D task-aware; C/K con semantica congelata. | - | completo |
+| `evaluation/rq2_v4_unified_gtfree_discovery_plan.py` | 151 | Piano successore RQ2-V4 solo OFFLINE: nuova identita, nessuna API. | - | completo |
 
 **RQ2 moduli comuni (budget, contratti, bundle, probe, store)**
 

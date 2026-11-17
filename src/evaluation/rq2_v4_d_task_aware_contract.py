@@ -11,6 +11,15 @@ del ledger V2/V3 impone erroneamente tutti e tre i campi per ogni task.
 L'esito formale non certifica accuratezza causale né trasferimento K.
 Questa versione rifiuta audit incoerenti, duplicate keys, cardinalità
 non verificata e prove di provenance mancanti. Nessun repair o retry.
+
+Contenuto
+---------
+- `AUDIT_CONTRACT`, `AUDIT_FIELDS`: nome del contratto e campi esatti del suo audit;
+- `V4DTaskAwareBlocked`: errore "output D non dimostrabilmente conforme al task";
+- `_reject_constant`: rifiuta le costanti JSON non finite (NaN, Infinity);
+- `validate_v4_d_task_aware`: convalida struttura e audit di un run D, senza ground truth;
+- `classify_v4_d`: stato formale di D (RECORDED_COMPLETE oppure INVALID_OUTPUT);
+- `require_v4_d_status`: rilettura, con lo stesso identico classificatore.
 """
 from __future__ import annotations
 
@@ -23,6 +32,7 @@ from evaluation.rq2_v2_unified_provenance_gate import (
 )
 
 VERSION = "rq2_v4_d_task_aware_contract_v0"
+# Nome del contratto registrato nell'audit del run D e campi (esatti) che l'audit deve avere.
 AUDIT_CONTRACT = "openrca_v2_task_aware_v1"
 AUDIT_FIELDS = frozenset((
     "contract", "valid", "error", "task_index", "required_fields",
@@ -36,6 +46,7 @@ class V4DTaskAwareBlocked(ValueError):
 
 
 def _reject_constant(value: str) -> None:
+    """Callback di `json.loads` per `parse_constant`: rifiuta NaN, Infinity e -Infinity."""
     raise V4DTaskAwareBlocked("JSON nonfinite constant")
 
 
@@ -45,9 +56,22 @@ def validate_v4_d_task_aware(run: dict) -> dict:
     Da invocare SOLO insieme al controllo indipendente della provenance D.
     La funzione restituisce metadati, mai testo grezzo o contenuto del guasto.
     In futuro classificatore e readback DEVONO usare la stessa funzione.
+
+    Argomento: `run`, il risultato del runner D (dizionario). Restituisce un riepilogo con
+    task, campi richiesti, numero di guasti e `task_contract_valid` True. Solleva
+    `V4DTaskAwareBlocked` al primo scostamento.
+
+    Passi: 1) il run non ha errori, usa il contratto "v2_enforce" e ha JSON valido; 2) il task
+    e' noto e se ne ricavano i campi richiesti; 3) l'audit ha i campi e i valori attesi;
+    4) il numero di guasti e' fra 1 e 4 e coincide con quello diagnosticato; 5) risposta
+    grezza e previsione canonica sono JSON senza chiavi duplicate e uguali fra loro, con
+    indici 1..N; 6) ogni guasto ha i campi richiesti dal task (testi non vuoti, orari
+    validi); 7) i campi extra dichiarati nell'audit sono quelli reali; 8) se il task richiede
+    l'orario e i guasti sono almeno due, l'ordine e' cronologico.
     """
     if type(run) is not dict:
         raise V4DTaskAwareBlocked("D run must be dict")
+    # 1. Nessun errore del runner, contratto "v2_enforce" e JSON valido.
     if (
         run.get("error") is not None
         or run.get("output_contract_mode") != "v2_enforce"
@@ -55,11 +79,13 @@ def validate_v4_d_task_aware(run: dict) -> dict:
     ):
         raise V4DTaskAwareBlocked("D runner error or invalid task status")
 
+    # 2. Task e campi richiesti: ogni task_1..task_7 richiede solo il proprio sottoinsieme.
     task = run.get("task_index")
     if type(task) is not str or task not in TASK_REQUIRED_FIELDS:
         raise V4DTaskAwareBlocked("Unknown task index")
     fields = TASK_REQUIRED_FIELDS[task]
 
+    # 3. Audit del contratto presente, completo e coerente col task.
     audit = run.get("output_contract_v2")
     if (
         type(audit) is not dict or set(audit) != AUDIT_FIELDS
@@ -71,6 +97,7 @@ def validate_v4_d_task_aware(run: dict) -> dict:
     ):
         raise V4DTaskAwareBlocked("Task-aware audit absent or inconsistent")
 
+    # 4. Numero di guasti atteso (1-4) uguale a quello diagnosticato.
     expected = audit.get("expected_faults")
     if (
         type(expected) is not int or expected < 1 or expected > 4
@@ -79,6 +106,8 @@ def validate_v4_d_task_aware(run: dict) -> dict:
     ):
         raise V4DTaskAwareBlocked("Unverified fault count")
 
+    # 5. Risposta originale e previsione canonica: JSON valido, senza chiavi duplicate ne'
+    # costanti non finite, e identici fra loro.
     raw = run.get("raw_response")
     prediction = run.get("prediction")
     if (
@@ -105,6 +134,7 @@ def validate_v4_d_task_aware(run: dict) -> dict:
     ):
         raise V4DTaskAwareBlocked("Fault indexes/count or prediction mismatch")
 
+    # 6. Campi richiesti dal task per ogni guasto; si raccolgono anche i campi extra e gli orari.
     extra = set()
     times = []
     for i in range(1, expected + 1):
@@ -122,10 +152,11 @@ def validate_v4_d_task_aware(run: dict) -> dict:
                 raise V4DTaskAwareBlocked("Empty/nontext task-required field")
         extra.update(set(item) - set(fields))
 
-    # I campi extra non rendono invalido un task: come nel contratto V2.4.
+    # 7. I campi extra non rendono invalido un task: come nel contratto V2.4.
     if audit.get("extra_fields") != sorted(extra):
         raise V4DTaskAwareBlocked("Extra-field audit mismatch")
 
+    # 8. Ordine cronologico degli indici, richiesto solo se il task include l'orario.
     if TIME in fields and expected >= 2:
         if times != sorted(times) or audit.get("chronological_order") is not True:
             raise V4DTaskAwareBlocked("Nonchronological fault indexes")
@@ -150,12 +181,17 @@ def classify_v4_d(*, row: dict, run: dict) -> str:
     L'errore runner/provider va instradato separatamente a PROVIDER_ERROR,
     mai riclassificato come INVALID_OUTPUT. I due esiti formali sono
     RECORDED_COMPLETE oppure INVALID_OUTPUT.
+
+    Argomenti (per nome): `row` (riga del piano, deve essere uno stage D) e `run` (risultato
+    del runner D, senza errori). Restituisce lo stato: COMPLETO se provenienza e contratto
+    task-aware sono entrambi dimostrati, altrimenti OUTPUT NON VALIDO.
     """
     if (
         type(row) is not dict or row.get("stage") != "D"
         or type(run) is not dict or run.get("error") is not None
     ):
         raise V4DTaskAwareBlocked("Not an attempted no-error D stage")
+    # Identita' del braccio (caso, modello, harness) necessaria per l'audit di provenienza.
     for key in ("case_id", "logical_model", "harness"):
         if type(row.get(key)) is not str or not row[key]:
             raise V4DTaskAwareBlocked("Missing D analysis arm identity")
@@ -174,7 +210,11 @@ def classify_v4_d(*, row: dict, run: dict) -> str:
 
 
 def require_v4_d_status(*, row: dict, run: dict, status: str) -> None:
-    """READBACK V4: lo stesso identico classificatore, nessuna reinterpretazione."""
+    """READBACK V4: lo stesso identico classificatore, nessuna reinterpretazione.
+
+    Verifica che lo `status` salvato (COMPLETO oppure OUTPUT NON VALIDO) coincida con quello
+    che `classify_v4_d` calcola ora per `row` e `run`; altrimenti solleva `V4DTaskAwareBlocked`.
+    """
     if status not in ("RECORDED_COMPLETE", "INVALID_OUTPUT"):
         raise V4DTaskAwareBlocked("Unsupported D status for task-aware readback")
     if classify_v4_d(row=row, run=run) != status:

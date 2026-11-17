@@ -1,12 +1,21 @@
-"""Proposed successor-only C/K receipt contract with auditable text provenance.
+"""Contratto di ricevuta C/K PROPOSTO (solo successore) con provenienza verificabile del testo.
 
-OFFLINE CONTRACT ONLY. This module does not write records, instantiate an
-LLM, read ground truth, or authorize live execution. Existing V2 source,
-release and create-only ledger must never be modified or reused as V3.
+SOLO CONTRATTO OFFLINE. Questo modulo non scrive record, non istanzia un LLM, non legge la
+ground truth e non autorizza nessuna esecuzione live. Il sorgente V2, la release e il ledger
+create-only esistenti non vanno mai modificati ne' riutilizzati come V3.
 
-The old V2 adapter provides strictly checked scientific classification and
-metering. This successor receipt adds ONLY a bounded metadata envelope,
-which a future *separate, source-bound V3 ledger* must validate and persist.
+Il vecchio adattatore V2 fornisce classificazione scientifica e contatore con controlli
+rigorosi. Questa ricevuta successore aggiunge SOLO una busta di metadati limitata, che un
+futuro *ledger V3 separato e legato ai sorgenti* dovra' validare e salvare.
+
+Contenuto
+---------
+- `META_SCHEMA`, `META_KEYS`, `RECORDABLE`: schema e campi dei metadati, stati registrabili;
+- `CKProvenanceReceiptBlocked`: errore "provenienza mancante o contraddittoria";
+- `_strict_metadata`: controlla che i metadati di estrazione del testo siano coerenti;
+- `candidate_ck_record_receipt`: normalizza C/K con il validatore V2 e AGGIUNGE i metadati;
+- `validate_candidate_ck_artifact`: rivalida l'artefatto arricchito (anche dopo la rilettura
+  da disco).
 """
 from __future__ import annotations
 
@@ -21,18 +30,29 @@ from evaluation.rq2_v2_unified_scientific_ledger import (
 )
 
 VERSION = "rq2_v3_ck_provenance_receipt_candidate_v0"
+# Nome dello schema dei metadati di estrazione del testo e campi che devono avere (esatti).
 META_SCHEMA = "rq2_v3_ck_text_extraction_meta_v0"
 META_KEYS = frozenset((
     "schema", "policy", "content_kind", "text_blocks", "nontext_blocks",
 ))
+# Stati con cui una ricevuta C/K puo' essere registrata (niente stato "bloccato" qui).
 RECORDABLE = frozenset(("RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR"))
 
 
 class CKProvenanceReceiptBlocked(ValueError):
-    """Fail closed on missing or contradictory transport provenance."""
+    """Blocco (fail closed) se la provenienza del trasporto manca o e' contraddittoria."""
 
 
 def _strict_metadata(meta: object, *, raw: object, error: bool) -> None:
+    """Controlla i metadati `meta` di estrazione del testo rispetto al testo grezzo `raw`.
+
+    `error` e' True per una ricevuta di errore del provider. Regole: 1) campi, schema e
+    politica esatti; 2) i conteggi dei blocchi sono interi limitati da `MAX_BLOCKS`; 3) con
+    errore, niente contenuto osservato e niente testo; 4) senza errore, il testo e' una
+    stringa e il tipo di contenuto e' coerente con i conteggi ("str" = un solo blocco se non
+    vuoto, "list" = almeno un blocco di testo se c'e' testo, "unsupported" = tutto vuoto).
+    Solleva `CKProvenanceReceiptBlocked` al primo scostamento.
+    """
     if type(meta) is not dict or set(meta) != META_KEYS:
         raise CKProvenanceReceiptBlocked("Missing or unexpected extraction metadata")
     if meta["schema"] != META_SCHEMA or meta["policy"] != POLICY:
@@ -72,20 +92,29 @@ def candidate_ck_record_receipt(
     *, stage_id: str, logical_model: str, call: dict,
     diagnostic_run: dict,
 ) -> dict:
-    """Normalize C/K using the old strict validator, then ADD provenance.
+    """Normalizza C/K con il vecchio validatore rigoroso, poi AGGIUNGE la provenienza.
 
-    The result is intentionally incompatible with V2's artifact field list.
-    It may only be persisted under a separately defined successor schema.
+    Il risultato e' volutamente incompatibile con l'elenco di campi dell'artefatto V2: puo'
+    essere salvato solo con uno schema successore definito a parte.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `call` (dizionario del trasporto C/K)
+    e `diagnostic_run` (il D di partenza). Restituisce la ricevuta V2 con versione cambiata e
+    l'artefatto arricchito del campo `text_extraction`.
+
+    Passi: 1) ricevuta di base dal normalizzatore V2; 2) metadati dai campi del trasporto e
+    loro verifica; 3) artefatto = quello di base + metadati, rivalidato per intero.
     """
     if type(call) is not dict:
         raise CKProvenanceReceiptBlocked("Transport receipt must be a dict")
 
+    # 1. Ricevuta di base: stessa classificazione e stesso contatore della V2.
     baseline = normalize_ck_call(
         stage_id=stage_id,
         logical_model=logical_model,
         call=call,
         diagnostic_run=diagnostic_run,
     )
+    # 2. Metadati di estrazione del testo, presi dal trasporto e controllati subito.
     meta = {
         "schema": META_SCHEMA,
         "policy": call.get("content_extraction_policy"),
@@ -99,6 +128,7 @@ def candidate_ck_record_receipt(
         error=call.get("provider_error") is not None,
     )
 
+    # 3. Artefatto arricchito, rivalidato come se fosse riletto da disco.
     artifact = {**baseline["artifact"], "text_extraction": meta}
     validate_candidate_ck_artifact(
         stage_id=stage_id, logical_model=logical_model,
@@ -117,17 +147,24 @@ def validate_candidate_ck_artifact(
     *, stage_id: str, logical_model: str,
     status: str, artifact: dict, diagnostic_run: dict,
 ) -> None:
-    """Revalidate an enriched artifact, including after disk readback.
+    """Rivalida un artefatto arricchito, anche dopo la rilettura da disco.
 
-    A future ledger must ALSO check claim, release, stage dependencies,
-    source hashes, canonical bytes, and commit pin. Those are intentionally
-    not bypassed or implemented by this standalone validator.
+    Un futuro ledger dovra' controllare ANCHE claim, release, dipendenze fra stage, hash dei
+    sorgenti, byte canonici e commit fissato: questo validatore autonomo non li sostituisce
+    ne' li implementa.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `status`, `artifact` e
+    `diagnostic_run`. Passi: 1) stato registrabile e tipi corretti; 2) i campi dell'artefatto
+    sono quelli di base piu' `text_extraction`; 3) metadati coerenti, e un C/K completo deve
+    avere testo visibile; 4) l'artefatto SENZA i metadati supera il validatore V2 del ledger.
     """
     if status not in RECORDABLE or type(artifact) is not dict:
         raise CKProvenanceReceiptBlocked("Unsupported candidate receipt/status")
     if type(diagnostic_run) is not dict:
         raise CKProvenanceReceiptBlocked("Missing diagnostic run")
 
+    # Campi dell'artefatto di base (V2): con errore contatore + codice, altrimenti contatore +
+    # risposta grezza.
     required_base = (
         {"stage_meter", "provider_error"} if status == "PROVIDER_ERROR"
         else {"stage_meter", "raw_response"}
@@ -146,6 +183,7 @@ def validate_candidate_ck_artifact(
     ):
         raise CKProvenanceReceiptBlocked("Complete C/K must have visible text")
 
+    # Validazione V2 dell'artefatto di base (senza i metadati aggiunti dal successore).
     row = _row(
         stage_id=stage_id,
         logical_model=logical_model,

@@ -1,4 +1,4 @@
-"""RQ2-V4 scientific receipt adapter: D task-aware; C/K frozen semantics.
+"""Adattatore RQ2-V4 delle ricevute scientifiche: D task-aware; C/K con semantica congelata.
 
 Solo funzioni pure. Niente SDK, API, filesystem, GT, claim o dispatcher.
 Le funzioni C/K del V3 *codice* sono riutilizzate soltanto per preservare
@@ -7,6 +7,16 @@ reimpiegare risultati V3. Stage e ricevute scientifiche sono esclusivi V4.
 
 La valutazione D è identica in classify e readback, senza il controllo
 errato dei tre campi obbligatori per ogni task del ledger V2/V3.
+
+Contenuto
+---------
+- `STATUSES`: stati con cui una ricevuta puo' essere registrata;
+- `V4ScientificReceiptBlocked`: errore "ricevuta V4 non supportata o non corrispondente";
+- `_row`: riga del piano V4 per uno stage; `_v3_id`: converte un ID V4 nell'ID V3 equivalente,
+  usato solo per riutilizzare il CODICE di C/K del V3;
+- `_receipt`: busta comune della ricevuta;
+- `validate_v4_scientific_artifact`: validatore usato identico da adattatore e rilettura;
+- `normalize_v4_d_capture`, `normalize_v4_ck_call`: i due punti d'ingresso, per D e per C/K.
 """
 from __future__ import annotations
 
@@ -35,14 +45,21 @@ from evaluation.rq2_v4_unified_gtfree_discovery_plan import (
 )
 
 VERSION = "rq2_v4_scientific_receipt_adapter_candidate_v0"
+# Stati con cui una ricevuta puo' essere registrata.
 STATUSES = frozenset(("RECORDED_COMPLETE", "INVALID_OUTPUT", "PROVIDER_ERROR"))
 
 
 class V4ScientificReceiptBlocked(ValueError):
-    """Unsupported/mismatched scientific V4 receipt."""
+    """Ricevuta scientifica V4 non supportata o non corrispondente."""
 
 
 def _row(stage_id: str, logical_model: str, stage: str) -> dict:
+    """Riga del piano V4 per `stage_id`, dopo aver verificato modello logico e stage.
+
+    L'ID deve cominciare col nome del protocollo V4 e lo stage deve essere D, C o K. Solleva
+    `V4ScientificReceiptBlocked` se la riga non esiste (ad esempio un caso OOD) o se modello
+    e stage non coincidono.
+    """
     if (
         type(stage_id) is not str or not stage_id.startswith(PROTOCOL + ":")
         or stage not in ("D", "C", "K") or type(logical_model) is not str
@@ -56,12 +73,17 @@ def _row(stage_id: str, logical_model: str, stage: str) -> dict:
 
 
 def _v3_id(v4_id: str) -> str:
+    """Converte un ID di stage V4 nel corrispondente ID V3 (cambia solo il prefisso del protocollo).
+
+    Serve soltanto per richiamare il codice di C/K del V3: nessun dato V3 viene letto.
+    """
     if type(v4_id) is not str or not v4_id.startswith(PROTOCOL + ":"):
         raise V4ScientificReceiptBlocked("V4 stage id required")
     return V3_PROTOCOL + v4_id[len(PROTOCOL):]
 
 
 def _receipt(stage_id: str, status: str, artifact: dict) -> dict:
+    """Busta comune della ricevuta: nessuna API, nessuna scrittura, costo sconosciuto."""
     return {
         "version": VERSION,
         "stage_id": stage_id,
@@ -78,7 +100,16 @@ def validate_v4_scientific_artifact(
     *, stage_id: str, logical_model: str, status: str,
     artifact: dict, diagnostic_run: dict | None = None,
 ) -> None:
-    """Validate V4 receipt; used unchanged by adapter and ledger readback."""
+    """Valida una ricevuta V4; usata senza modifiche da adattatore e rilettura del ledger.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `status`, `artifact` e, per C/K,
+    `diagnostic_run` (il D genitore, immutabile). Solleva `V4ScientificReceiptBlocked`.
+
+    Per C/K: si richiama il validatore V3 (solo il suo CODICE) con l'ID V3 equivalente; il D
+    genitore deve essere stato validato V4 dal ledger genitore. Per D (che non ha genitore):
+    campi esatti (piu' `d_final_text_extraction`), contatore valido e, con errore, un codice
+    redatto; senza errore, identita', metadati e stato coerenti con la classificazione V4.
+    """
     stage = stage_id.rsplit(":", 1)[-1] if type(stage_id) is str else ""
     row = _row(stage_id, logical_model, stage)
     if status not in STATUSES or type(artifact) is not dict:
@@ -87,8 +118,8 @@ def validate_v4_scientific_artifact(
     if stage != "D":
         if type(diagnostic_run) is not dict:
             raise V4ScientificReceiptBlocked("Immutable V4 D parent required")
-        # Reuse *pure V3 C/K code*, not V3 data or scientific stage IDs.
-        # The referenced D run must be V4-validated by the parent ledger.
+        # Si riusa il *codice puro di C/K del V3*, non dati V3 ne' ID scientifici di stage.
+        # Il run D di riferimento deve essere stato validato V4 dal ledger genitore.
         try:
             validate_v3_scientific_artifact(
                 stage_id=_v3_id(stage_id),
@@ -100,6 +131,7 @@ def validate_v4_scientific_artifact(
             raise V4ScientificReceiptBlocked("Untrusted C/K receipt") from exc
         return
 
+    # Stage D: nessun genitore; campi dell'artefatto con errore o con diagnosi.
     if diagnostic_run is not None:
         raise V4ScientificReceiptBlocked("D must not take a parent")
     required = (
@@ -109,6 +141,7 @@ def validate_v4_scientific_artifact(
     if set(artifact) != required | {"d_final_text_extraction"}:
         raise V4ScientificReceiptBlocked("Missing/foreign V4 D artifact fields")
 
+    # Contatore, errore redatto e metadati; poi (senza errore) identita' e stato V4 del run D.
     try:
         _meter(
             artifact["stage_meter"],
@@ -147,7 +180,16 @@ def validate_v4_scientific_artifact(
 def normalize_v4_d_capture(
     *, stage_id: str, logical_model: str, captured: dict,
 ) -> dict:
-    """One already-finished D run -> task-aware V4 receipt, no API."""
+    """Un run D gia' concluso -> ricevuta V4 task-aware, senza API.
+
+    Argomenti (per nome): `stage_id`, `logical_model` e `captured` (la ricevuta della cattura
+    `rq2_v3_d_runner_capture_candidate`). Restituisce la ricevuta normalizzata.
+
+    Passi: 1) riga V4 del piano; 2) busta di cattura attendibile; 3) identita' del run D e
+    rappresentazione dell'errore; 4) metadati del testo finale e contatore dalle metriche;
+    5) con errore: codice redatto con hash; senza errore: stato dal classificatore V4;
+    6) l'artefatto finale supera `validate_v4_scientific_artifact`.
+    """
     row = _row(stage_id, logical_model, "D")
     if (
         type(captured) is not dict
@@ -176,6 +218,7 @@ def normalize_v4_d_capture(
             ValueError, KeyError, TypeError) as exc:
         raise V4ScientificReceiptBlocked("Bad D text provenance or usage") from exc
 
+    # Con errore si registra solo un'impronta (hash) del testo, mai il testo stesso.
     if error is not None:
         status = "PROVIDER_ERROR"
         fingerprint = hashlib.sha256(error.encode("utf-8")).hexdigest()[:16]
@@ -202,7 +245,15 @@ def normalize_v4_ck_call(
     *, stage_id: str, logical_model: str,
     call: dict, diagnostic_run: dict,
 ) -> dict:
-    """Reuse exact V3 C/K grammar/evidence code, with exclusive V4 identities."""
+    """Riusa il codice esatto di grammatica ed evidenze di C/K del V3, con identita' V4 esclusive.
+
+    Argomenti (per nome): `stage_id`, `logical_model`, `call` (dizionario del trasporto C/K
+    gia' ottenuto) e `diagnostic_run` (il D genitore V4). Restituisce la ricevuta V4.
+
+    Passi: 1) lo stage deve essere C o K del piano V4; 2) serve il D genitore; 3) il
+    normalizzatore V3 lavora sull'ID V3 equivalente; 4) il suo risultato deve avere versione,
+    ID e stato attesi; 5) l'artefatto supera il validatore V4 e si crea la ricevuta V4.
+    """
     stage = stage_id.rsplit(":", 1)[-1] if type(stage_id) is str else ""
     _row(stage_id, logical_model, stage)
     if stage not in ("C", "K"):
