@@ -17,6 +17,9 @@ Ramo di lavoro: `refactor/commenti-it-2026-11-17` (da `feature/rq2a-offline-scor
 3. Nessuna cancellazione, spostamento o ridenominazione di file prima della consegna: i percorsi compaiono nei record e negli hash.
 4. Non si riscrive la storia dei branch (niente rebase, niente force-push). I tag `rq1-*` e `rq2-*` fissano i commit citati.
 5. Mai rieseguire L2b (o altri passi che verificano la catena dei file congelati) su questo ramo: usare i tag.
+6. **Niente docstring su classi Pydantic (`BaseModel`) e su funzioni `@tool`**: la loro docstring viene inviata al modello
+   (descrizione dello schema in `with_structured_output`, descrizione del tool). Per documentarle si usano solo commenti `#`.
+   Il controllo AST ignora le docstring, quindi lo verifica un controllo apposito (punto 5 del controllore).
 
 ## Controlli (dalla radice del progetto)
 
@@ -26,7 +29,8 @@ Ramo di lavoro: `refactor/commenti-it-2026-11-17` (da `feature/rq2a-offline-scor
 Usare il ramo remoto `origin/...` e non quello locale, che potrebbe essere indietro: ne risulterebbero "modifiche" non dovute al refactoring.
 
 Esce con codice 0 solo se: i 25 file protetti sono identici; nessun file di `src/` e' stato cancellato o rinominato; per ogni
-file modificato l'albero sintattico (senza docstring) e' uguale a quello del riferimento.
+file modificato l'albero sintattico (senza docstring) e' uguale a quello del riferimento; la docstring di nessuna classe Pydantic
+e di nessuna funzione `@tool` e' cambiata.
 
 Poi i test completi (devono dare lo stesso esito di prima della modifica):
 

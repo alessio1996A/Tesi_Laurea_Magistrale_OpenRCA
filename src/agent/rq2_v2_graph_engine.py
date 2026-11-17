@@ -8,6 +8,9 @@ tool_call e tool_result, se disponibile. Non fabbrica ID mancanti.
 Questa implementazione NON e' collegata a un dispatcher a pagamento.
 NON autorizza API, scoring, test OOD o riuso di claim e artefatti V1.
 Il codice V1 src/agent/graph_engine.py rimane inalterato.
+
+Contiene una sola funzione, `esegui_grafo_rca_v2`: esegue il grafo A0/A1/A1_8R, raccoglie metriche
+(chiamate LLM e tool, token, durata) e traiettoria dei tool, e restituisce l'esito.
 """
 from __future__ import annotations
 
@@ -29,8 +32,18 @@ def esegui_grafo_rca_v2(
     I fallimenti dell'ultimo tentativo sono riportati in ``error``;
     ``raw_response`` rimane None, non viene generata alcuna diagnosi fittizia.
     Il preprocessing e` misurato separatamente da experiment_runner.py.
+
+    Argomenti:
+      grafo            grafo compilato (`crea_grafo_rca` di `agent/graph_engine.py`).
+      richiesta        testo dell'incidente da analizzare.
+      recursion_limit  numero massimo di passi del grafo prima che LangGraph si fermi.
+      verbose          se True stampa a video i round e i risultati dei tool.
+
+    Restituisce un dizionario con `raw_response`, `metrics`, `tool_trajectory` ed `error`. A differenza
+    della versione V1, ogni evento della traiettoria riporta il `tool_call_id` originale, se disponibile.
     """
 
+    # Stato di partenza: solo la richiesta; contatori a zero.
     stato_iniziale = {
         "messages": [HumanMessage(content=richiesta)],
         "tool_rounds": 0,
@@ -48,23 +61,27 @@ def esegui_grafo_rca_v2(
         # A0/A1/A1_8R: segnala dati token mancanti senza mascherarli.
         "token_usage_complete": True,
     }
+    # `traiettoria`: elenco ordinato di chiamate e risultati dei tool.
     traiettoria = []
     risposta_finale = None
     errore = None
     inizio = time.perf_counter()
 
     try:
+        # Si segue il grafo passo per passo: ogni evento contiene gli aggiornamenti prodotti da un nodo.
         for evento in grafo.stream(
             stato_iniziale,
             config={"recursion_limit": recursion_limit},
             stream_mode="updates",
         ):
             for nodo, aggiornamento in evento.items():
+                # Nodo dell'LLM: errori di finalizzazione, round di tool, token e chiamate richieste.
                 if nodo == "agente":
                     if aggiornamento.get("finalization_error"):
                         errore = aggiornamento["finalization_error"]
                         risposta_finale = None
 
+                    # Round di tool: massimo osservato, perché ogni aggiornamento riporta il totale.
                     metriche["tool_rounds"] = max(
                         metriche["tool_rounds"],
                         int(aggiornamento.get("tool_rounds", 0)),
@@ -72,6 +89,8 @@ def esegui_grafo_rca_v2(
 
                     for msg in aggiornamento.get("messages", []):
                         metriche["llm_calls"] += 1
+                        # Token: se mancano o non sono interi non negativi, il conteggio si segna
+                        # come incompleto invece di nascondere il dato mancante.
                         original_usage = getattr(msg, "usage_metadata", None)
                         token_fields = (
                             "input_tokens", "output_tokens", "total_tokens"
@@ -89,6 +108,7 @@ def esegui_grafo_rca_v2(
                         for chiave in token_fields:
                             metriche[chiave] += int(usage.get(chiave, 0) or 0)
 
+                        # Chiamate ai tool richieste dall'LLM in questo messaggio.
                         calls = getattr(msg, "tool_calls", None) or []
                         metriche["tool_calls"] += len(calls)
                         for chiamata in calls:
@@ -110,6 +130,8 @@ def esegui_grafo_rca_v2(
                                 ", ".join(c.get("name", "?") for c in calls),
                             )
 
+                        # Un messaggio senza chiamate ai tool e senza errori è la risposta finale:
+                        # se il testo è vuoto è un errore ("EmptyFinalResponse").
                         if not calls and not aggiornamento.get("finalization_error"):
                             contenuto = testo_messaggio(
                                 getattr(msg, "content", None),
@@ -121,6 +143,7 @@ def esegui_grafo_rca_v2(
                                 errore = "EmptyFinalResponse: risposta finale vuota."
                                 risposta_finale = None
 
+                # Nodo dei tool: ogni messaggio è il risultato di una chiamata.
                 elif nodo == "tools":
                     for msg in aggiornamento.get("messages", []):
                         estratto = testo_messaggio(msg.content)
@@ -149,6 +172,7 @@ def esegui_grafo_rca_v2(
         if verbose:
             print("ERRORE ESECUZIONE:", errore)
 
+    # Durata complessiva (secondi) e risultato.
     metriche["duration_seconds"] = round(time.perf_counter() - inizio, 3)
     return {
         "raw_response": risposta_finale,

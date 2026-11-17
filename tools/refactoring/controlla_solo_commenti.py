@@ -11,6 +11,10 @@ Cosa verifica
    tolte le docstring. Quindi sono cambiati soltanto commenti `#`, docstring e spazi: nessuna istruzione, nome,
    stringa del codice, prompt, etichetta o costante.
 4. Avviso (non errore) se un modulo usa `__doc__` e la sua docstring e' cambiata: cambierebbe il testo di `--help`.
+5. ERRORE se e' cambiata la docstring di un oggetto la cui docstring VIENE INVIATA AL MODELLO: una classe Pydantic
+   (`BaseModel`, usata da `with_structured_output`) o una funzione decorata con `@tool` (LangChain ne fa la descrizione
+   del tool). Il confronto AST ignora le docstring, quindi senza questo controllo una modifica cambierebbe la richiesta
+   al provider senza che nessuno se ne accorga. Per documentare questi oggetti si usano solo commenti `#`.
 
 Uso (PowerShell, dalla radice del progetto)
     python .\\tools\\refactoring\\controlla_solo_commenti.py --base origin/feature/rq2a-offline-scoring-2026-11-17
@@ -129,6 +133,42 @@ def uses_dunder_doc(source: str) -> bool:
     return any(isinstance(n, ast.Name) and n.id == "__doc__" for n in ast.walk(ast.parse(source)))
 
 
+def _name_of(node: ast.AST) -> str:
+    """Nome semplice di un'espressione (`tool`, `pydantic.BaseModel` -> `BaseModel`, `tool("x")` -> `tool`)."""
+    if isinstance(node, ast.Call):
+        return _name_of(node.func)
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return ""
+
+
+def llm_visible_docstrings(source: str) -> dict[str, str | None]:
+    """Docstring degli oggetti la cui docstring viene inviata al modello: classi Pydantic e funzioni `@tool`.
+
+    Restituisce {percorso_del_nome: docstring}. Il percorso e' del tipo `Classe.metodo` o `funzione.interna`.
+    """
+    found: dict[str, str | None] = {}
+
+    def visit(node: ast.AST, prefix: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                path = f"{prefix}{child.name}"
+                if isinstance(child, ast.ClassDef):
+                    visible = any(_name_of(b) in ("BaseModel", "BaseSettings") for b in child.bases)
+                else:
+                    visible = any(_name_of(d) in ("tool", "StructuredTool") for d in child.decorator_list)
+                if visible:
+                    found[path] = ast.get_docstring(child)
+                visit(child, path + ".")
+            else:
+                visit(child, prefix)
+
+    visit(ast.parse(source), "")
+    return found
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Verifica che il refactoring abbia cambiato solo commenti e docstring")
     ap.add_argument("--base", required=True, help="riferimento git (tag, branch o commit) con il codice originale")
@@ -206,6 +246,14 @@ def main(argv=None) -> int:
             problems.append(f"ERRORE DI SINTASSI: {rel}: {exc}")
             continue
         if same:
+            # Punto 5: la docstring di classi Pydantic e funzioni `@tool` non deve cambiare (e' parte della richiesta al modello).
+            before, after = llm_visible_docstrings(old), llm_visible_docstrings(new)
+            visible_changes = [name for name in sorted(set(before) | set(after)) if before.get(name) != after.get(name)]
+            for name in visible_changes:
+                problems.append(f"DOCSTRING VISIBILE AL MODELLO CAMBIATA: {rel}: {name} "
+                                f"(classe Pydantic o funzione @tool: usa solo commenti `#`)")
+            if visible_changes:
+                continue
             ok_count += 1
             if uses_dunder_doc(new) and ast.get_docstring(ast.parse(old)) != ast.get_docstring(ast.parse(new)):
                 warnings.append(f"{rel}: usa __doc__ e la docstring del modulo e' cambiata (cambia il testo di --help)")

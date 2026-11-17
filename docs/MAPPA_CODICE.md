@@ -20,7 +20,7 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 
 | Gruppo | Moduli | Bloccati da hash | Commenti completi | Da fare |
 |---|---:|---:|---:|---:|
-| A. Nucleo del codice finale | 98 | 25 | 27 | 46 |
+| A. Nucleo del codice finale | 98 | 25 | 29 | 44 |
 | B1. Campagne e audit RQ1 storici | 9 | 0 | 1 | 8 |
 | B2. Audit e preflight in sola lettura | 12 | 0 | 0 | 12 |
 | C1. Script manuali una tantum | 5 | 0 | 1 | 4 |
@@ -35,19 +35,19 @@ Generata da `tools/refactoring/genera_mappa_codice.py` a partire dall'Appendice 
 | `agent/graph_engine.py` | 411 | Grafo LangGraph ReAct-style per A0 e varianti con harness senza planner. | hash git RQ1 | bloccato |
 | `agent/model_factory.py` | 70 | Factory isolata dei provider LLM per OpenRCA. | hash git RQ1 | bloccato |
 | `agent/prompts.py` | 170 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
-| `agent/rq2_v2_graph_engine.py` | 159 | Esecutore diagnostico sperimentale RQ2-V2: sola provenance dei tool. | - | completo |
+| `agent/rq2_v2_graph_engine.py` | 183 | Esecutore diagnostico sperimentale RQ2-V2: sola provenance dei tool. | - | completo |
 | `agent/tool_factory.py` | 207 | (nessuna docstring di modulo) | hash git RQ1 | bloccato |
 | `agent/tools.py` | 918 | (nessuna docstring di modulo) | SHA-256 consolidamento + hash git RQ1 | bloccato |
-| `agent/variant_names.py` | 83 | Nomenclatura delle varianti OpenRCA e lettura degli esperimenti storici. | - | completo |
-| `agent/verify_graph.py` | 466 | Variante LangGraph A1_VERIFY: esplorazione, verifiche mirate, finale. | - | da fare (EN 1, senza docstring 7) |
+| `agent/variant_names.py` | 103 | Nomenclatura delle varianti OpenRCA e lettura degli esperimenti storici. | - | completo |
+| `agent/verify_graph.py` | 560 | Variante LangGraph A1_VERIFY: esplorazione, verifiche mirate, finale. | - | completo |
 
 **Contratti di output**
 
 | Modulo | Righe | Scopo (prima riga della docstring) | Protezione | Commenti |
 |---|---:|---|---|---|
-| `output/openrca_contract.py` | 151 | Contratto canonico di diagnosi RCA, indipendente dal provider LLM. | - | da fare (EN 0, senza docstring 7) |
-| `output/structured_finalizer.py` | 233 | Finalizzazione OpenRCA strutturata, indipendente dal provider. | - | da fare (EN 0, senza docstring 5) |
-| `output/v2_contract.py` | 168 | Contratto di output OpenRCA V2 — SOLO validazione, mai riparazione. | - | completo |
+| `output/openrca_contract.py` | 193 | Contratto canonico di diagnosi RCA, indipendente dal provider LLM. | - | completo |
+| `output/structured_finalizer.py` | 287 | Finalizzazione OpenRCA strutturata, indipendente dal provider. | - | da fare (EN 0, senza docstring 2) |
+| `output/v2_contract.py` | 210 | Contratto di output OpenRCA V2 — SOLO validazione, mai riparazione. | - | completo |
 | `output/v2_task_contract.py` | 235 | Validazione OpenRCA V2.4 task-aware, SENZA lettura di etichette. | hash git RQ1 | bloccato |
 
 **Harness (evidenze, regole, planner, verificatori)**
