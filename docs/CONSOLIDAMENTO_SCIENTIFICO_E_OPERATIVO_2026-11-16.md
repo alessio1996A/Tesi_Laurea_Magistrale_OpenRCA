@@ -449,6 +449,28 @@ dei negativi, criteri di ammissione) sono **convenzioni di progetto**, non tolle
 valori derivati dai dati. La conferma col relatore di quale lettura corrisponda all'accordo resta un punto
 aperto (sez. 8).
 
+**Chi fa il trasferimento (rilettura della trascrizione, 17 novembre).** Nelle tre parti la seconda domanda è
+sempre posta *a valle* della prima: individuare errori non codificati è condizionato a richieste rese più
+precise dall'harnessing (REGIS 1, "se migliorano le richieste"), e il caso nuovo viene passato all'agente
+"con l'harnessing" una volta dimostrato che l'harnessing migliora la RCA (REGIS 3). A0 non è nominato in nessuna
+formulazione di RQ2 e nessuna lo esclude. **Scelta** (decisione di Claude; lettura da confermare col
+relatore): il trasferimento di conoscenza è attribuito all'agente con harness; A0, già eseguito con la stessa
+pipeline D→C→K e sugli stessi dati, è riportato come **condizione di riferimento**, senza cancellare né
+rieseguire nulla. Non si afferma che l'harness sia necessario per generare candidate: A0 ne produce 4 su 12
+stage K, le varianti con harness 4 su 48 (sez. 3.2). L'idea di REGIS 1 di far migliorare l'agente nel tempo con
+cicli successivi di esempi non ricompare in REGIS 3, non è stata eseguita ed è lavoro futuro.
+
+**Conclusione proposta per RQ2 (testo da confermare).** Su 8 candidate (4 di A0, 4 delle varianti con harness)
+nessuna risulta verificata: 7 non sono formalizzabili o classificabili in L1 e l'unica formalizzabile, di
+A1_8R_Planning, ha 2 falsi positivi su 7 gruppi negativi in L2 (`NON_VERIFICATA`, n = 1). L'output dell'agente
+non può quindi essere promosso in automatico a regola: servono una verifica deterministica e, per ciò che questa
+non decide, un supervisore umano, come nella pipeline descritta dal relatore (lavoro futuro, non implementata).
+Questo motiva la supervisione, **non dimostra** che serva un essere umano piuttosto che un controllo più
+ricco, e non è un risultato sull'harness. Il confronto con l'attesa del relatore ("l'agente riesce a spiegare
+anche cose che non ha visto") va riportato per quello che è: nei dati di RQ2-A la diagnosi vale 0 salvo un
+caso (orario di q026, solo modelli Claude con harness), e il testo del passo C non viene abbinato alla classe in
+60 su 60 con lo strumento, con 6 su 60 chiari nella lettura qualitativa post hoc (tutti Sonnet).
+
 ---
 
 ## 5. Proposta di indice della tesi
