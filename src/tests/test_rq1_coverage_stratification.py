@@ -237,7 +237,8 @@ class SeparationTests(unittest.TestCase):
             report = m.run_separation(Path(tmp), Path(tmp) / "Market.zip")
             self.assertEqual(report["per_split"]["ood_holdout"]["in_four_classes"], 1)
             self.assertEqual(report["per_split"]["mixed_quarantine"]["in_four_classes"], 1)
-            self.assertFalse(report["separation_holds"])
+            self.assertTrue(report["separation_holds"])      # la quarantena non conta per RQ1
+            self.assertEqual(report["four_classes_in_rq1_groups"], 0)
             self.assertEqual(report["four_classes_outside_ood_holdout"], 1)
             self.assertNotIn("cloudbed-1_q0", json.dumps(report))
 
@@ -246,6 +247,7 @@ class SeparationTests(unittest.TestCase):
             self.build(tmp, labels_in_dev=True)
             report = m.run_separation(Path(tmp), Path(tmp) / "Market.zip")
             self.assertEqual(report["per_split"]["development"]["in_four_classes"], 1)
+            self.assertEqual(report["four_classes_in_rq1_groups"], 1)
             self.assertFalse(report["separation_holds"])
 
     def test_misaligned_instruction_is_rejected(self):

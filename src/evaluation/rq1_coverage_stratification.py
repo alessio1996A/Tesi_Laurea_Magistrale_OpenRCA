@@ -336,11 +336,16 @@ def run_separation(data_dir: Path, market_zip: Path) -> dict:
             counter["in_four_classes"] += 1
             counter["class:" + label] += 1
     outside = sum(c["in_four_classes"] for s, c in per_split.items() if s != "ood_holdout")
+    # RQ1 ha usato solo development ed evaluation: e' li' che le quattro classi non devono stare.
+    # La quarantena (finestre sovrapposte all'OOD) puo' contenerle per costruzione.
+    in_rq1 = sum(per_split.get(s, Counter())["in_four_classes"]
+                 for s in ("development", "evaluation"))
     return {
         "version": VERSION + "_separation", "provider_calls": 0,
         "per_split": {s: dict(c) for s, c in sorted(per_split.items())},
+        "four_classes_in_rq1_groups": in_rq1,
         "four_classes_outside_ood_holdout": outside,
-        "separation_holds": outside == 0,
+        "separation_holds": in_rq1 == 0,
         "note": ("Solo la riga di record.csv del caso (non i guasti aggiuntivi dei multiguasto); "
                  "conteggi aggregati, nessun case_id."),
     }
