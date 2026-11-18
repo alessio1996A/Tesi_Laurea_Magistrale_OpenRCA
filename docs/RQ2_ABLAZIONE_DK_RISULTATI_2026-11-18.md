@@ -43,5 +43,5 @@ D→C→K e D→K producono lo stesso numero di candidate, ma non le stesse. Il 
 
 ## 5. Prossimi passi possibili (non eseguiti)
 
-- Leggere (L1, senza ground truth) le 8 candidate nuove: sono eseguibili o formalizzabili? Solo esplorativo, L2 non si ripete.
+- ~~Leggere (L1, senza ground truth) le 8 candidate nuove~~ **Fatto il 18 novembre** (Emendamento 1, `RQ2_ABLAZIONE_DK_L1_L2_RISULTATI_2026-11-18.md`): 1 formalizzabile, 0 ammesse a L2, L2 non applicabile. Il testo originale diceva «L2 non si ripete», superato dall'emendamento.
 - Una replica dei 60 K senza C, per stimare la variabilità tra due esecuzioni dello stesso passo: costerebbe di nuovo 60 chiamate.
