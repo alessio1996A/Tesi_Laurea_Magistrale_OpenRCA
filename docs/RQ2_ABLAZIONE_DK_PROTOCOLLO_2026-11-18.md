@@ -45,7 +45,7 @@ Solo descrittivo, per modello e per harness, affiancato al run congelato (`rq2_d
 
 - numero di K `candidate`, `insufficient_evidence`, non validi (strict), con `PROVIDER_ERROR` e `RECEIPT_REJECTED` a parte;
 - conformità strict e tollerante del formato;
-- per le candidate nuove, categoria L1 (eseguibile, formalizzabile) **solo** se L1 si può eseguire senza ground truth con il codice congelato; sarebbe un'analisi esplorativa. **L2 non si ripete**: gli incidenti sigillati sono già stati aperti e non sono più ciechi.
+- per le candidate nuove, categoria L1 (eseguibile, formalizzabile) **solo** se L1 si può eseguire senza ground truth con il codice congelato; sarebbe un'analisi esplorativa. **L2 non si ripete**: gli incidenti sigillati sono già stati aperti e non sono più ciechi. *[Superato dall'Emendamento 1, sezione 8, scritto il 18 novembre dopo aver visto i risultati dei 60 K: a richiesta di Alessio L1 e L2 si applicano anche alle candidate nuove. Il testo originale di questa sezione non è stato modificato.]*
 
 ## 5. Che cosa si può e non si può affermare
 
@@ -72,3 +72,41 @@ Se il numero di candidate fosse uguale o simile, la conclusione è «nessuna evi
 - `src/evaluation/rq2_dk_run_cli.py` — `check`, `run`, `summary`, `compare`.
 - `src/tests/test_rq2_dk_ablation_offline.py`, `src/tests/test_rq2_dk_run_cli_offline.py` — 24 test senza API.
 - Nessun file protetto da hash è stato toccato (verifica: `tools/refactoring/controlla_solo_commenti.py` non si applica, perché qui si aggiungono file nuovi; controllo con `git diff --stat` contro la base).
+
+## 8. Emendamento 1 — L1 e L2 sulle candidate D→K (18 novembre 2026, scritto DOPO i risultati dei 60 K)
+
+**Origine.** Dopo aver visto che i K senza causa hanno prodotto 8 candidate (Gemini 0, Sonnet 7, Haiku 1), Alessio ha chiesto di valutarle con gli stessi L1 e L2 del run congelato, per vedere se D→K ha prodotto risultati concreti rispetto a D→C→K. È una decisione **post hoc**: contraddice la frase «L2 non si ripete» della sezione 4, che resta com'era con un rinvio a questa sezione.
+
+### 8.1 Che cosa si fa (e che cosa non cambia)
+
+- **Stesso codice, stessi parametri.** Si riusano senza modificarli `rq2_k_l1_preflight`, `rq2_k_l1_protocol`, `rq2_k_rule_executor`, `rq2_k_l2_execute`, `rq2_k_l2_scoring` e `rq2_k_rule_evaluation`. Prima di ogni comando il nuovo modulo `src/evaluation/rq2_dk_l1_l2.py` verifica che gli hash dei sorgenti, della tabella semantica, dei parametri, dei moduli L2 e dei loader coincidano con quelli registrati nel freeze e nell'addendum del 16 novembre; se differisce anche un solo file, **nulla parte**.
+- **Stessi dati di riferimento.** Catalogo dei KPI, 4 incidenti di discovery per L1, 11 incidenti sigillati raggruppati negli stessi 10 gruppi per L2, H_pre = 60 s, H = 300 s, soglia esplorativa 2/3 sui negativi: letti dai file del run congelato, mai riscritti.
+- **Archivi nuovi, a sola creazione**, in `data/rq2_dk_l1_l2_v1`: `l1_report_dk.json`, `l2_addendum_dk.json`, `l2a_decisions_dk.json`, `l2b_evaluation_dk.json`. Il run congelato e l'archivio dei 60 K non vengono scritti.
+- **Stessa separazione dei processi.** `l1` e `l2a` non leggono la ground truth (un test lo verifica); `l2b` è un processo a parte che la legge solo dopo aver verificato la catena di hash (freeze derivato → addendum derivato → decisioni L2a).
+- Se L1 non ammette nessuna candidata, L2 **non si esegue** e il risultato è «L2: non applicabile (0 ammesse)».
+
+### 8.2 Dichiarato prima di leggere L1 e L2 delle candidate nuove
+
+1. Si riportano **tutte** le 8 candidate D→K, nessuna esclusa, con cella, regola, KPI citati ed esito L1.
+2. **Che cosa si chiama «risultato concreto»** (fissato ora, non dopo):
+   - livello 1, *intermedio*: la candidata è eseguibile e formalizzabile, cioè usa solo KPI di nodo o di container e ha una sola classe nella tabella semantica;
+   - livello 2: è **ammessa a L2** (unità, storia, condizioni, L1 passato);
+   - livello 3, *risultato concreto pieno*: verdetto L2 `VERIFICATA_OPERATIVAMENTE`. `NON_VERIFICATA` è un esito negativo da riportare, non un errore tecnico; `NON_VALUTABILE` indica una lacuna.
+3. Una regola con **lo stesso hash** di una del run congelato si riporta come tale e non conta come evidenza indipendente: il suo esito L2 deve coincidere con quello congelato (controllo di determinismo).
+4. Il **difetto di corrispondenza dei nomi** di L2b (nodo / servizio / pod) **non si corregge**: si riporta con lo stato del componente di riferimento, come nel run congelato.
+5. Nessuna soglia, regola, parametro, tabella semantica o gruppo cambia dopo aver visto i risultati. Vale il punto 5 della sezione 6 (se si ferma per cause di sistema si ripara l'ambiente, non il protocollo).
+
+### 8.3 Limiti, da riportare nella tesi
+
+- **L2 non è cieco.** Gli 11 sigillati sono già stati aperti nel run congelato e sono noti a tutti (compreso l'esito di L2 sulla regola congelata e la natura dei tre positivi). Resta cieca solo la **produzione** delle candidate: il modello di K ha visto la traiettoria dei 4 incidenti di discovery e nient'altro.
+- **Confronti multipli.** Le regole provate sono 8 in D→K e 16 contando le 8 del run congelato; non si applica nessuna correzione e il numero è riportato accanto a ogni verdetto.
+- 4 incidenti, una esecuzione per cella, una sola classe ammissibile alla volta: nessuna stima statistica, nessun confronto causale tra «con C» e «senza C».
+- Il codice dell'emendamento è scritto da Claude Sonnet 5.5, che è anche uno dei modelli valutati (conflitto già dichiarato nel registro).
+- L'esito è un'analisi aggiuntiva esplorativa e non entra nel risultato principale.
+
+### 8.4 Procedura
+
+1. `l1` (offline, senza ground truth): legge i 60 K, classifica le 8 candidate, esegue le eseguibili sui 4 incidenti di discovery, stampa il confronto L1 con il run congelato.
+2. `l2a --authorize-sealed-telemetry`: solo se L1 ammette almeno una candidata; scrive l'addendum derivato e le decisioni.
+3. `l2b --authorize-ground-truth`: verdetto con i parametri congelati.
+4. `compare`: tabella D→C→K contro D→K per L1 e L2, in sola lettura.
