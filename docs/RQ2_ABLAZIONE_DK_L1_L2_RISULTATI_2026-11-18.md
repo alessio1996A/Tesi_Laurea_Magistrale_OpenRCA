@@ -35,7 +35,7 @@ I conteggi sono identici a ogni livello tranne l'ammissione. È una coincidenza 
 |---|---|---|---|---|
 | 1 | cloudbed-2_q026 | Haiku A0 | tasso di successo di adservice-grpc sotto baseline con eccezioni nei log | non formalizzabile (log e metriche di servizio) |
 | 2 | cloudbed-1_q032 | Sonnet A0 | memoria alta, throttling CPU e span lunghi di cartservice-0 | non formalizzabile (include `span_duration`, una traccia) |
-| 3 | cloudbed-1_q050 | Sonnet A0 | throttling CFS del container diverso da zero | eseguibile, **non classificabile**; L1 passato; scatta su ~20 dei 40 container in ogni caso |
+| 3 | cloudbed-1_q050 | Sonnet A0 | throttling CFS del container diverso da zero | eseguibile, **non classificabile**; L1 passato; scatta su 15-21 dei 40 container, a seconda del caso |
 | 4 | cloudbed-2_q045 | Sonnet A0 | timeout DNS nei log di productcatalogservice e successo gRPC degradato | non formalizzabile (log, metrica di servizio) |
 | 5 | cloudbed-2_q026 | Sonnet A1 | picco di `system.io.util` e salto di `system.disk.used` sul nodo | eseguibile, **non classificabile**; L1 passato; scatta su 2 componenti in q026 e q045, su nessuno in q032 e q050 |
 | 6 | cloudbed-2_q045 | Sonnet A1 | burst di errori di connessione al DB nei log di productcatalogservice | non formalizzabile (log) |
