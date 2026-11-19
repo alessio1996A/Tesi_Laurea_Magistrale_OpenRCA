@@ -276,5 +276,72 @@ class NormalizationTests(unittest.TestCase):
             self.assertIn("STOP", err.getvalue())
 
 
+class MarkdownTablesTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+
+    def valid_report(self):
+        make_plan(self.dir, score_of)
+        reported = {(model, variant): (2, sum(SCORES[model][variant]) / 2)
+                    for model in strat.MODELS for variant in strat.VARIANTS}
+        return m.run_normalization(self.dir, expected_runs=30, expected_cases=2,
+                                   reported=reported, draws=200)
+
+    def test_tables_keep_original_means_beside_normalized_values(self):
+        text = m.render_markdown(self.valid_report())
+        for title in ("Tabella 1.", "Tabella 2.", "Tabella 3.", "Tabella 4."):
+            self.assertIn(title, text)
+        sonnet_a1 = next(line for line in text.splitlines()
+                         if line.startswith("| sonnet | A1 | 2 | 0,400 |"))
+        self.assertIn("| 2,00 |", sonnet_a1)          # multiplo
+        self.assertIn("| +0,200 |", sonnet_a1)        # differenza assoluta, con segno
+        self.assertTrue(sonnet_a1.rstrip().endswith("| si' |"))   # IC della differenza esclude 0
+        reference = next(line for line in text.splitlines() if line.startswith("| sonnet | A0 | 2 | 0,200 |"))
+        self.assertIn("| rif. | rif. |", reference)
+
+    def test_undefined_ratio_and_interval_that_includes_zero(self):
+        text = m.render_markdown(self.valid_report())
+        haiku_a1 = next(line for line in text.splitlines() if line.startswith("| haiku | A1 | 2 | 0,200 |"))
+        self.assertIn("| n.d. |", haiku_a1)             # A0 = 0: rapporto non definito
+        gemini_a1 = next(line for line in text.splitlines() if line.startswith("| gemini | A1 | 2 | 0,200 |"))
+        self.assertTrue(gemini_a1.rstrip().endswith("| no |"))   # differenza 0: l'IC non esclude 0
+
+    def test_refuses_report_that_did_not_reproduce_the_reported_means(self):
+        report = self.valid_report()
+        report["reproduction_of_reported_means"]["all_match"] = False
+        with self.assertRaises(strat.ScoringError):
+            m.render_markdown(report)
+        report["reproduction_of_reported_means"]["all_match"] = None   # controllo saltato
+        with self.assertRaises(strat.ScoringError):
+            m.render_markdown(report)
+
+    def test_refuses_other_report_versions(self):
+        report = self.valid_report()
+        report["version"] = "altro_v1"
+        with self.assertRaises(strat.ScoringError):
+            m.render_markdown(report)
+
+    def test_cli_tables_are_create_only_and_leave_the_report_untouched(self):
+        source = self.dir / "normalization.json"
+        source.write_text(json.dumps(self.valid_report()), encoding="utf-8")
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        md = self.dir / "normalization_tables.md"
+        with redirect_stdout(StringIO()):
+            self.assertEqual(m.main(["--tables-from", str(source), "--md-out", str(md)]), 0)
+        self.assertIn("Tabella 1.", md.read_text(encoding="utf-8"))
+        first = md.read_bytes()
+        err = StringIO()
+        with redirect_stdout(StringIO()), redirect_stderr(err):
+            self.assertEqual(m.main(["--tables-from", str(source), "--md-out", str(md)]), 2)
+        self.assertEqual(md.read_bytes(), first)
+        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), digest)
+
+    def test_cli_requires_either_data_dir_or_tables_from(self):
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+            m.main([])
+
+
 if __name__ == "__main__":
     unittest.main()

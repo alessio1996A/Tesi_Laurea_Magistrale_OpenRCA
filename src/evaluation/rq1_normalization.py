@@ -36,7 +36,7 @@ from evaluation.rq1_coverage_stratification import (
     MODELS, PROTOCOL, REPORTED, TOLERANCE, VARIANTS, ScoringError, _file_sha, load_plan,
     load_scoring_report, plan_path, result_paths, score_runs,
 )
-from evaluation.rq2_a_offline_scoring import write_report_create_only
+from evaluation.rq2_a_offline_scoring import write_report_create_only, write_text_create_only
 
 VERSION = "rq1_normalization_v1"
 BASE = "A0"
@@ -301,12 +301,99 @@ def format_report(report: dict) -> str:
     return "\n".join(lines)
 
 
+TABLE_SPECS = (
+    ("score", "Punteggio medio (scala 0-1)", 3, "punti"),
+    ("total_tokens", "Token totali medi per run", 0, "token"),
+    ("end_to_end_seconds", "Tempo end-to-end medio per run", 1, "secondi"),
+)
+
+
+def _bounds(pair, digits: int, sign: bool = False) -> str:
+    if pair is None:
+        return "n.d."
+    return f"[{_it(pair[0], digits, sign)}; {_it(pair[1], digits, sign)}]"
+
+
+def render_markdown(report: dict) -> str:
+    """Tabelle per la tesi, generate dal report congelato: nessun numero ricopiato a mano.
+
+    Ogni riga affianca il valore ORIGINALE (media assoluta, n) a quello normalizzato rispetto ad A0
+    dello stesso modello. Rifiuta un report che non ha riprodotto le medie gia' riportate.
+    """
+    if report.get("version") != VERSION or report.get("base") != BASE:
+        raise ScoringError("Il file non e' un report di normalizzazione rq1_normalization_v1 con base A0")
+    if report["reproduction_of_reported_means"].get("all_match") is not True:
+        raise ScoringError("Il report non ha riprodotto le medie gia' riportate: nessuna tabella")
+    boot = report["bootstrap"]
+    lines = [f"Fonte: report `{VERSION}`, protocollo `{report['protocol']}`. "
+             f"Riferimento: A0 dello stesso modello. Run con punteggio: {report['runs_scored']} su "
+             f"{report['runs_total']} ({report['cases']} incidenti). Intervalli al "
+             f"{int(boot['confidence'] * 100)}% per ricampionamento degli incidenti "
+             f"({boot['draws']} estrazioni, seme {boot['seed']}), non corretti per confronti multipli.", ""]
+    for number, (name, label, digits, unit) in enumerate(TABLE_SPECS, start=1):
+        lines += [f"**Tabella {number}. {label}**", "",
+                  f"| Modello | Variante | n | Media | x A0 | Differenza da A0 ({unit}) | "
+                  f"IC95% della differenza | IC95% di x A0 | IC della differenza esclude 0 |",
+                  "|---|---|---:|---:|---:|---:|---|---|---|"]
+        for model in MODELS:
+            for variant in VARIANTS:
+                s = report["summaries"][name][model][variant]
+                if variant == BASE:
+                    lines.append(f"| {model} | {variant} | {s['n']} | {_it(s['mean'], digits)} "
+                                 f"| rif. | rif. | n.a. | n.a. | n.a. |")
+                    continue
+                iv = report["intervals"][name][model][variant]
+                diff_ci = iv["difference_ci95"]
+                excludes = "n.d." if diff_ci is None else ("si'" if diff_ci[0] > 0 or diff_ci[1] < 0 else "no")
+                ratio = "n.d." if s["ratio_vs_A0"] is None else _it(s["ratio_vs_A0"], 2)
+                lines.append(
+                    f"| {model} | {variant} | {s['n']} | {_it(s['mean'], digits)} | {ratio} "
+                    f"| {_it(s['difference_vs_A0'], digits, True)} | {_bounds(diff_ci, digits, True)} "
+                    f"| {_bounds(iv['ratio_ci95'], 2)} | {excludes} |")
+        lines.append("")
+    undefined = {m: report["intervals"]["score"][m]["A1"]["draws_ratio_undefined"] for m in MODELS}
+    lines += ["Nota sul punteggio: nei ricampionamenti in cui la media di A0 e' zero il rapporto non e' "
+              "definito e quei ricampionamenti sono esclusi dall'intervallo del rapporto "
+              "(per A1: " + ", ".join(f"{m} {undefined[m]} su {boot['draws']}" for m in MODELS) + "). "
+              "Il rapporto con A0 basso ingigantisce le differenze piccole: l'intervallo della differenza "
+              "e' il riferimento piu' stabile.", ""]
+    entry = report["efficiency_vs_report_of_9_nov"]["mean|end_to_end_seconds"]
+    lines += ["**Tabella 4. Variazione A1_8R -> A1_8R_Planning: ricalcolo e relazione del 9 novembre "
+              "(media, tempo end-to-end)**", "",
+              "| Modello | Token ricalcolati | Token relazione | Tempo ricalcolato | Tempo relazione |",
+              "|---|---:|---:|---:|---:|"]
+    for model in ("sonnet", "haiku", "gemini"):
+        c = entry["cells"][model]
+        lines.append(f"| {model} | {_it(c['tokens_pct'], 1, True)}% | {_it(c['tokens_pct_reported'], 1, True)}% "
+                     f"| {_it(c['time_pct'], 1, True)}% | {_it(c['time_pct_reported'], 1, True)}% |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-dir", required=True, type=Path)
-    parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--tables-from", type=Path,
+                        help="report gia' scritto: ne ricava le tabelle Markdown, senza ricalcolare")
+    parser.add_argument("--md-out", type=Path, help="file Markdown (create-only) per --tables-from")
     args = parser.parse_args(argv)
+    if args.tables_from is not None:
+        try:
+            if args.md_out is None:
+                parser.error("--tables-from richiede --md-out")
+            text = render_markdown(json.loads(args.tables_from.read_text(encoding="utf-8")))
+            args.md_out.parent.mkdir(parents=True, exist_ok=True)
+            write_text_create_only(text, args.md_out)
+        except (ScoringError, FileExistsError, OSError, ValueError, KeyError) as exc:
+            print("STOP: " + str(exc), file=sys.stderr)
+            return 2
+        print(text)
+        print(f"\nTabelle scritte (create-only): {args.md_out}")
+        return 0
+    if args.data_dir is None or args.out is None:
+        parser.error("servono --data-dir e --out (oppure --tables-from e --md-out)")
     try:
         report = run_normalization(args.data_dir)
         text = format_report(report)
