@@ -124,8 +124,10 @@ modello di struttura e impaginazione: **il contenuto non si riusa**.
   grassetto a sinistra; didascalie 9 pt grassetto centrate sotto la figura («Figura 1.1 …»). Margini 3 cm
   sopra e sotto, 3,5 cm a sinistra e a destra; numero di pagina in basso al centro.
 - **Introduzione della triennale:** 356 parole in un solo paragrafo (circa 1,3 pagine) che contiene
-  contesto, obiettivo e descrizione capitolo per capitolo. Il relatore della magistrale chiede 1,5–2 pagine
-  tra introduzione e contenuti elencati nella sezione 2: a questo formato sono circa 400–540 parole.
+  contesto, obiettivo e descrizione capitolo per capitolo. Il relatore della magistrale chiede un'introduzione di
+  1,5–2 pagine con i contenuti elencati nella sezione 2: a questo formato (circa 270 parole per pagina)
+  sono circa 400–540 parole. *Interpretazione:* l'abstract è a parte, su una pagina propria come nella
+  triennale (circa 180 parole); la trascrizione non dice se il limite di pagine lo includa.
 - **Tono:** italiano espositivo, prima persona plurale impersonale («andremo a descrivere», «faremo»).
   Si propone di mantenerlo per continuità con la voce di Alessio; la decisione finale è sua.
 - **Da non replicare:** la triennale contiene alcuni refusi e una bibliografia fatta di pagine web. Per la
