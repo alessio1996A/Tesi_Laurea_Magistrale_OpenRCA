@@ -23,10 +23,11 @@ Il testo della trascrizione è parlato e in alcuni punti confuso; dove ho interp
 - Il lavoro sperimentale e l'impostazione vanno bene. Il relatore ha confermato il ragionamento di
   Alessio: gli esperimenti non si ripetono dopo aver visto i risultati, perché sarebbe come addestrare
   sui dati di test.
-- **Normalizzare i risultati di RQ1** quando si presentano: il valore più basso (A0 dello stesso
-  modello) come riferimento e gli altri come multipli, per mostrare il vantaggio. *Interpretazione:*
-  non è chiaro se il riferimento sia «zero» o «uno»; si adotta il rapporto rispetto ad A0, affiancato
-  sempre ai punteggi assoluti.
+- **Normalizzare i risultati**, in generale (non solo RQ1), quando si presentano: il valore più basso
+  come riferimento e gli altri come multipli, per mostrare il vantaggio. *Interpretazione di Alessio,
+  da lui confermata:* il riferimento è A0 dello stesso modello. Si adotta il rapporto rispetto ad A0,
+  affiancato sempre ai punteggi assoluti. Dove A0 vale zero (per esempio i punteggi di D in RQ2) il
+  rapporto non è definito: lì si riportano i valori assoluti.
 - **Prima si invia al relatore** (per mail, in settimana, anche nel weekend): **abstract e
   introduzione**, circa 1,5–2 pagine. L'introduzione contiene contesto del problema, motivazioni,
   teoria di base, che cosa si farà, e la **suddivisione in capitoli**. Dopo l'accordo si scrive il
@@ -42,8 +43,12 @@ Il testo della trascrizione è parlato e in alcuni punti confuso; dove ho interp
 
 ## 3. Tre imprecisioni dette a voce, da non portare nella tesi
 
+Le prime due sono errori di Alessio nell'esposizione orale; il relatore non le ha corrette, quindi
+vanno corrette nel testo scritto. La terza è una formulazione troppo forte.
+
 1. Le 8 regole di K sono state **proposte**, non «validate». Nessuna è verificata.
-2. Esito L2: **TP 0, FN 0, TN 5, FP 2** (5 veri negativi, 2 falsi positivi). Non «5 veri positivi».
+2. Esito L2: **TP 0, FN 0, TN 5, FP 2** (5 veri negativi, 2 falsi positivi). Non «5 veri positivi»
+   (errore di esposizione).
    Solo 1 regola su 8 è arrivata a L2.
 3. «L'agente ha sempre bisogno di un supervisore umano» è troppo forte. I dati mostrano che **generare
    non equivale a validare** e motivano una fase di supervisione; non dimostrano che serva un umano.
