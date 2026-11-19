@@ -11,33 +11,37 @@ contesto, problema, motivazioni, teoria di base, che cosa si farà, suddivisione
 <!-- ABSTRACT:INIZIO -->
 ## Abstract
 
-L'analisi delle cause radice (Root Cause Analysis, RCA) nei sistemi distribuiti richiede di ragionare su grandi quantità di metriche, log e trace. Sul benchmark OpenRCA il miglior risultato riportato è l'11,34% dei guasti risolti, ottenuto da un agente basato su modelli linguistici. Questa tesi studia, sul sistema Market di OpenRCA 1.0, se un harness deterministico renda un agente più accurato ed efficiente (RQ1) e se la conoscenza diagnostica prodotta dall'agente possa diventare, dopo verifica, una nuova regola deterministica (RQ2). L'harness raccoglie e seleziona le evidenze, rileva anomalie con regole e verifica le ipotesi ispirandosi ai principi di PAVE. In RQ1, su 20 incidenti e tre modelli, il punteggio medio di Claude Sonnet passa da 0,117 a 0,396 con le sole evidenze deterministiche (3,4 volte) e a 0,504 con la variante più ricca (4,3 volte); per Claude Haiku e Gemini l'intervallo al 95% della differenza include lo zero. Con Sonnet e Haiku i token scendono a 0,54–0,77 volte quelli della baseline. In RQ2, su quattro incidenti di classi di guasto non coperte dall'harness, l'agente propone otto pseudo-regole; l'unica sottoposta a verifica su incidenti sigillati non risulta verificata (due falsi positivi su sette gruppi negativi). Generare una regola non equivale a validarla. I risultati sono studi di fattibilità su un solo sistema, con una esecuzione per condizione.
+L'analisi delle cause radice (Root Cause Analysis, RCA) nei sistemi distribuiti richiede di ragionare su grandi quantità di metriche, log e trace. Sul benchmark OpenRCA il miglior risultato riportato è l'11,34% dei guasti risolti, ottenuto da un agente basato su modelli linguistici. Questa tesi studia, sul sistema Market di OpenRCA 1.0, se un harness deterministico renda un agente più accurato ed efficiente (RQ1) e se la conoscenza diagnostica prodotta dall'agente possa diventare, dopo verifica, una nuova regola deterministica (RQ2). L'harness raccoglie e seleziona le evidenze, rileva anomalie con regole e verifica le ipotesi ispirandosi ai principi di PAVE. In RQ1, su 20 incidenti e tre modelli, il punteggio medio di Claude Sonnet passa da 0,117 a 0,396 con le sole evidenze deterministiche (3,4 volte) e a 0,504 con la variante più ricca (4,3 volte); per Claude Haiku e Gemini l'intervallo al 95% della differenza include lo zero. Con Sonnet e Haiku i token scendono a 0,54–0,77 volte quelli della baseline. In RQ2, su quattro incidenti di classi di guasto non coperte dall'harness, l'agente propone otto pseudo-regole; l'unica sottoposta a verifica su incidenti sigillati non risulta verificata (due falsi positivi su sette gruppi negativi). Generare una regola non equivale a validarla. I risultati sono studi di fattibilità su un solo sistema, con un'esecuzione per condizione.
 <!-- ABSTRACT:FINE -->
 
 <!-- INTRO:INIZIO -->
 ## Introduzione
 
-Nei sistemi distribuiti un guasto locale si propaga lungo le dipendenze tra i servizi e può manifestarsi lontano dal componente che lo ha causato. L'analisi delle cause radice (Root Cause Analysis, RCA) consiste nel risalire a quel componente, al momento e al motivo del guasto a partire da metriche, log e trace, dati eterogenei e voluminosi. OpenRCA [1] è un benchmark pubblico nato per misurare se i modelli linguistici (Large Language Model, LLM) sanno farlo: raccoglie 335 guasti di tre sistemi software, con oltre 68 GB di telemetria, e il miglior risultato riportato dagli autori, di Claude 3.5 con un agente dedicato, è l'11,34% dei casi risolti.
+Nei sistemi distribuiti un guasto locale si propaga lungo le dipendenze tra i servizi e può manifestarsi lontano dal componente che lo ha causato. L'analisi delle cause radice (Root Cause Analysis, RCA) consiste nel risalire a quel componente, al momento e al motivo del guasto a partire da metriche, log e trace, dati eterogenei e voluminosi. OpenRCA, proposto da Xu et al. (2025), è un benchmark pubblico nato per misurare se i modelli linguistici (Large Language Model, LLM) sanno farlo: raccoglie 335 guasti di tre sistemi software, con oltre 68 GB di telemetria, e il miglior risultato riportato dagli autori, di Claude 3.5 con un agente dedicato, è l'11,34% dei casi risolti.
 
-Il limite non sembra stare soltanto nel modello: secondo una recente rassegna sugli agenti, la qualità dipende anche dal runtime che lo circonda, dalla struttura del compito e dalla valutazione [2]. Un agente RCA deve scegliere quali dati leggere, interpretarli e concludere, e può sbagliare a ognuno di questi passi. Per questo ci occupiamo dell'harness, il runtime che media l'interazione tra modello, contesto e ambiente e ne governa osservazione, contesto, ciclo di controllo, azioni, stato e verifica [2, 3]. Chiamiamo harnessing le strategie con cui, a runtime e senza modificare i parametri del modello, se ne regola il comportamento, e Harness Engineering la disciplina che le progetta, le valuta e le migliora [3]. Un secondo motivo riguarda l'affidabilità: OpenRCA 2.0 [4], che introduce il protocollo di annotazione PAVE, osserva che, in media su 11 LLM, un servizio corretto è indicato nel 76,0% dei casi ma collegato al sintomo osservato con un percorso causale valido solo nel 61,5%. Una risposta giusta non basta, se non è sostenuta da evidenze controllabili.
+Il limite non sembra stare soltanto nel modello: secondo la rassegna sugli agenti di Guo et al. (2026), la qualità dipende anche dal runtime che lo circonda, dalla struttura del compito e dalla valutazione. Un agente RCA deve scegliere quali dati leggere, interpretarli e concludere, e può sbagliare a ognuno di questi passi. Per questo la tesi si occupa dell'harness, il runtime che media l'interazione tra modello, contesto e ambiente e ne governa osservazione, contesto, ciclo di controllo, azioni, stato e verifica (Guo et al. 2026; documento di lavoro 2026). Per harnessing si intendono le strategie con cui, a runtime e senza modificare i parametri del modello, se ne regola il comportamento; per Harness Engineering, la disciplina che le progetta, le valuta e le migliora (documento di lavoro 2026). Un secondo motivo riguarda l'affidabilità: Fang et al. (2026), con OpenRCA 2.0, introducono il protocollo di annotazione PAVE e osservano che, in media su 11 LLM, un servizio corretto è indicato nel 76,0% dei casi ma collegato al sintomo osservato con un percorso causale valido solo nel 61,5%. Una risposta giusta non basta, se non è sostenuta da evidenze controllabili.
 
 Su queste basi la tesi pone due domande. RQ1: un harness deterministico, che raccoglie e seleziona le evidenze, rileva anomalie con regole e verifica le ipotesi ispirandosi ai principi di PAVE, rende un agente LLM più accurato ed efficiente nell'identificare la causa radice? RQ2: un agente può investigare guasti di classi che le regole dell'harness non coprono, e la conoscenza che ne ricava può diventare, dopo verifica, una nuova regola deterministica riutilizzabile? La seconda domanda nasce da un'osservazione: un sistema a regole può trattare soltanto i guasti che conosce, mentre un agente può provare a investigare anche quelli che non ha mai visto, ma ciò che propone va verificato prima di essere riutilizzato.
 
-Lavoriamo sul sistema Market di OpenRCA 1.0 (148 query), con tre modelli (Gemini, Claude Sonnet e Claude Haiku) e cinque configurazioni: la baseline A0 e quattro varianti che aggiungono, in sequenza, evidenze deterministiche, otto regole, pianificazione delle verifiche e un contesto strutturale e temporale ispirato a PAVE. Per RQ1 misuriamo punteggio, token e tempo su 20 incidenti non usati nello sviluppo, con lo scorer ufficiale, e presentiamo i risultati normalizzati rispetto alla baseline. Per RQ2 applichiamo una pipeline di tre passi (diagnosi, spiegazione della causa, pseudo-regola candidata) a quattro incidenti di classi non coperte e sottoponiamo le candidate a una verifica su incidenti sigillati. I risultati sono studi di fattibilità su un solo sistema, con una esecuzione per condizione, e non vanno generalizzati.
+Il lavoro è condotto sul sistema Market di OpenRCA 1.0 (148 query), con tre modelli (Gemini, Claude Sonnet e Claude Haiku) e cinque configurazioni: la baseline A0 e quattro varianti che aggiungono, in sequenza, evidenze deterministiche, otto regole, pianificazione delle verifiche e un contesto strutturale e temporale ispirato a PAVE. Per RQ1 si misurano punteggio, token e tempo su 20 incidenti non usati nello sviluppo, con lo scorer ufficiale, e i risultati sono presentati normalizzati rispetto alla baseline. Per RQ2 si applica una pipeline di tre passi (diagnosi, spiegazione della causa, pseudo-regola candidata) a quattro incidenti di classi non coperte e le candidate sono sottoposte a una verifica su incidenti sigillati. I risultati sono studi di fattibilità su un solo sistema, con un'esecuzione per condizione, e non vanno generalizzati.
 
 La tesi è organizzata come segue. Il Capitolo 1 presenta lo stato dell'arte: RCA nei sistemi a microservizi, OpenRCA, agenti LLM e Harness Engineering. Il Capitolo 2 descrive il benchmark e il protocollo sperimentale. Il Capitolo 3 illustra la progettazione dell'harness. I Capitoli 4 e 5 riportano i risultati di RQ1 e di RQ2. Il Capitolo 6 discute i risultati e le minacce alla validità, il Capitolo 7 i lavori futuri. Le conclusioni chiudono la tesi.
 <!-- INTRO:FINE -->
 
 <!-- BIBLIOGRAFIA:INIZIO -->
-## Bibliografia provvisoria
+## Bibliografia
 
-[1] J. Xu, Q. Zhang, Z. Zhong, S. He, C. Zhang, Q. Lin, D. Pei, P. He, D. Zhang, Q. Zhang. *OpenRCA: Can Large Language Models Locate the Root Cause of Software Failures?* International Conference on Learning Representations (ICLR), 2025.
+Formato del modello di tesi del dipartimento (cognome e nome, anno, titolo, sede; ordine alfabetico). Le citazioni
+nel testo sono «Cognome et al. (anno)». I nomi degli autori sono quelli stampati sui PDF/pagine arXiv letti il
+19 novembre.
 
-[2] J. Guo et al. *From Question Answering to Task Completion: A Survey on Agent System and Harness Design.* arXiv:2606.20683, 2026.
+Agent Harness, Agent Harnessing e Harness Engineering: definizioni, perimetro architetturale, tassonomia delle tecniche e analisi critica della letteratura, 2026, documento di lavoro, versione 1.0, 13 ottobre 2026. *(provenienza e citabilità da decidere, vedi «Decisioni per Alessio» n. 1)*
 
-[3] *Agent Harness, Agent Harnessing e Harness Engineering: definizioni, perimetro architetturale, tassonomia delle tecniche e analisi critica della letteratura.* Documento di lavoro, versione 1.0, 13 ottobre 2026.
+Fang Aoyang, Yang Yifan, Shang Jin'ao, Lu Qisheng, Xu Junjielong, Wang Rui, Zhang Songhan, Zhang Yuzhong, Yu Boxi, He Pinjia, 2026, *OpenRCA 2.0: From Outcome Labels to Causal Process Supervision*, arXiv:2606.27154v2, 30 giugno 2026.
 
-[4] A. Fang et al. *OpenRCA 2.0: From Outcome Labels to Causal Process Supervision.* arXiv:2606.27154v2, 30 giugno 2026.
+Guo Jianyuan, Hao Zhiwei, Wang Chengcheng, Fan Cheng, Luo Tingzhang, Li Hongguang, Gao Ying, Mei Hefei, Peng Jiankun, Xu Rongjian, Dong Minjing, Wu Han, Zheng Mengyu, Han Kai, Wang Shiqi, Xu Chang, Wang Yunhe, 2026, *From Question Answering to Task Completion: A Survey on Agent System and Harness Design*, arXiv:2606.20683v1, 14 giugno 2026.
+
+Xu Junjielong, Zhang Qinan, Zhong Zhiqing, He Shilin, Zhang Chaoyun, Lin Qingwei, Pei Dan, He Pinjia, Zhang Dongmei, Zhang Qi, 2025, *OpenRCA: Can Large Language Models Locate the Root Cause of Software Failures?*, in «International Conference on Learning Representations (ICLR)».
 <!-- BIBLIOGRAFIA:FINE -->
 
 ---
@@ -58,6 +62,9 @@ circa 180 parole togliendo la frase sull'harness o i numeri sui token.
 
 ## Numeri e affermazioni: fonte e come sono stati verificati
 
+Nella colonna «Fonte» di questa tabella, [1] = Xu et al. (2025), [2] = Guo et al. (2026), [3] = documento di
+lavoro, [4] = Fang et al. (2026).
+
 | # | Affermazione nel testo | Fonte | Verifica |
 |---|---|---|---|
 | 1 | Miglior risultato riportato in OpenRCA: 11,34% (Claude 3.5 con RCA-agent) | [1], abstract e Tabella 2 | Letto nel PDF del Project |
@@ -77,7 +84,7 @@ circa 180 parole togliendo la frase sull'harness o i numeri sui token.
 | 14 | Otto pseudo-regole su quattro incidenti di discovery (60 stadi K) | Consolidamento sez. 1.2 | Letto |
 | 15 | Una sola candidata sottoposta a verifica su sigillati; verdetto `NON_VERIFICATA`; TP 0, FN 0, TN 5, FP 2 → «due falsi positivi su sette gruppi negativi» | Consolidamento sez. 1.3; contesto 18 novembre sez. 7 | Letto |
 | 16 | «Generare non equivale a validare» | Consolidamento sez. 1.3 | Letto. **Non** si scrive che serva un umano |
-| 17 | Un solo sistema, una esecuzione per cella | Consolidamento sez. 1.1 e 1.2 (limiti) | Letto |
+| 17 | Un solo sistema, un'esecuzione per cella | Consolidamento sez. 1.1 e 1.2 (limiti) | Letto |
 
 ## Cosa è stato evitato di proposito
 
@@ -106,8 +113,11 @@ circa 180 parole togliendo la frase sull'harness o i numeri sui token.
 2. **Numerazione.** Come nella triennale, l'introduzione non è numerata e i capitoli partono da 1; l'indice
    dei capitoli qui sotto segue la proposta del consolidamento (sez. 5), con questa numerazione. Se preferisci
    l'introduzione come Capitolo 1, cambia solo la numerazione.
-3. **Registro.** Prima persona plurale impersonale («ci occupiamo», «lavoriamo»), come nella triennale.
-4. **Lingua e anno accademico per la copertina**: ancora aperti.
+3. **Registro.** Il modello di tesi del dipartimento (che Alessio ha inviato il 19 novembre) suggerisce la forma
+   impersonale («è stata condotta un'analisi») e non la prima persona («abbiamo ottenuto»): l'introduzione è stata
+   riscritta di conseguenza («la tesi si occupa», «il lavoro è condotto», «si misurano»). Anche le citazioni passano
+   da [1] a «Cognome et al. (anno)», come chiede il modello.
+4. **Lingua e anno accademico per la copertina**: decisi da Alessio il 19 novembre (italiano; 2025/2026).
 5. **Elenco dei capitoli**: è una proposta mia; se il relatore la vuole diversa, la cambiamo.
 
 ## Controlli eseguiti il 19 novembre
@@ -117,11 +127,11 @@ circa 180 parole togliendo la frase sull'harness o i numeri sui token.
   `CONTESTO_ALLINEAMENTO_GPT_2026-11-18.md`: tutti corrispondono.
 - Numeri degli articoli: riletti nei PDF del Project ([1] e [4]): 11,34%, 335 guasti, 68 GB, 11 LLM, 76,0%,
   61,5%.
-- [2]: pagina arXiv letta; titolo, primo autore, data e sei responsabilità confermati. L'elenco completo degli
-  autori è più lungo; nella bibliografia si scrive «J. Guo et al.».
+- Guo et al. (2026): pagina arXiv letta; titolo, elenco dei 17 autori, data (14 giugno 2026, v1) e sei
+  responsabilità confermati.
 - [4]: autori e data presi dal PDF del Project. La pagina arXiv non è stata aperta (accesso non consentito
   dallo strumento): il titolo è confermato da una ricerca web. Nel PDF il nome «Junjielung Xu» compare con un
-  refuso rispetto a «Junjielong Xu» di [1]; si cita «A. Fang et al.».
+  refuso rispetto a «Junjielong Xu» di Xu et al. (2025): in bibliografia si scrive «Junjielong».
 - [3]: è un documento di lavoro del Project, non un articolo. Le sue fonti primarie (Osmani, Bowne-Anderson,
   Barbaste et al. e altre) **non sono state verificate**: nessuna è citata in questa bozza.
 - Non verificato: l'ordine dei capitoli proposto (è una proposta, non un accordo col relatore).

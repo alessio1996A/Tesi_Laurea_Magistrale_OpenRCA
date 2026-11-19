@@ -128,8 +128,16 @@ modello di struttura e impaginazione: **il contenuto non si riusa**.
   1,5–2 pagine con i contenuti elencati nella sezione 2: a questo formato (circa 270 parole per pagina)
   sono circa 400–540 parole. *Interpretazione:* l'abstract è a parte, su una pagina propria come nella
   triennale (circa 180 parole); la trascrizione non dice se il limite di pagine lo includa.
-- **Tono:** italiano espositivo, prima persona plurale impersonale («andremo a descrivere», «faremo»).
-  Si propone di mantenerlo per continuità con la voce di Alessio; la decisione finale è sua.
+- **Tono:** italiano espositivo. Il modello di tesi del dipartimento (inviato da Alessio il 19 novembre)
+  suggerisce la forma impersonale («è stata condotta un'analisi», «si sono ottenute prestazioni migliori») e
+  sconsiglia la prima persona («abbiamo ottenuto»). La triennale usava «andremo a descrivere»; per la magistrale
+  si segue il modello. Citazioni nel testo «Cognome (anno)» o «Cognome et al. (anno)», con pagina dopo i due
+  punti se si cita un passo; bibliografia in ordine alfabetico «Cognome Nome, anno, Titolo, sede».
+- **Ordine delle parti nel modello:** copertina, riassunto (abstract), indice, introduzione (non numerata), capitoli
+  numerati, conclusioni, ringraziamenti, indici di figure/grafici/tabelle (se ci sono), bibliografia. Numerazione
+  delle pagine da 1 a partire dall'introduzione; copertina, abstract e indice senza numero. Figure e tabelle
+  numerate per capitolo («Figura 2.1»), con didascalia autosufficiente. L'introduzione non deve anticipare le
+  conclusioni.
 - **Da non replicare:** la triennale contiene alcuni refusi e una bibliografia fatta di pagine web. Per la
   magistrale ogni riferimento deve essere una fonte verificata (articolo, DOI, pagina ufficiale).
 - **Deciso da Alessio (19 novembre):** lingua della tesi italiano; anno accademico in copertina 2025/2026.
