@@ -132,8 +132,7 @@ modello di struttura e impaginazione: **il contenuto non si riusa**.
   Si propone di mantenerlo per continuità con la voce di Alessio; la decisione finale è sua.
 - **Da non replicare:** la triennale contiene alcuni refusi e una bibliografia fatta di pagine web. Per la
   magistrale ogni riferimento deve essere una fonte verificata (articolo, DOI, pagina ufficiale).
-- **Aperto:** lingua della tesi (se Alessio non risponde, italiano) e anno accademico da scrivere in
-  copertina.
+- **Deciso da Alessio (19 novembre):** lingua della tesi italiano; anno accademico in copertina 2025/2026.
 
 ## 10. Risultati RQ1 normalizzati rispetto ad A0 (eseguiti il 19 novembre)
 
