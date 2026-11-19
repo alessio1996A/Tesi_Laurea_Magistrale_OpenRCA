@@ -27,7 +27,7 @@ Il testo della trascrizione è parlato e in alcuni punti confuso; dove ho interp
   come riferimento e gli altri come multipli, per mostrare il vantaggio. *Interpretazione di Alessio,
   da lui confermata:* il riferimento è A0 dello stesso modello. Si adotta il rapporto rispetto ad A0,
   affiancato sempre ai punteggi assoluti. Dove A0 vale zero (per esempio i punteggi di D in RQ2) il
-  rapporto non è definito: lì si riportano i valori assoluti.
+  rapporto non è definito: lì si riportano i valori assoluti. **Eseguito per RQ1 il 19 novembre: sezione 10.**
 - **Prima si invia al relatore** (per mail, in settimana, anche nel weekend): **abstract e
   introduzione**, circa 1,5–2 pagine. L'introduzione contiene contesto del problema, motivazioni,
   teoria di base, che cosa si farà, e la **suddivisione in capitoli**. Dopo l'accordo si scrive il
@@ -106,3 +106,72 @@ correzione proposta; poi i suggerimenti; infine ciò che non ha potuto verificar
 Decide Claude, GPT affianca; nessuna email a nome di Alessio senza il suo permesso (solo bozze);
 nessuna modifica ai risultati congelati; si resta nel tema (miglioramento della RCA tramite
 harnessing).
+
+## 9. Template: tesi triennale di Alessio (solo impaginazione, struttura, tono)
+
+Alessio ha fornito il Word della triennale (Ingegneria Informatica, relatore prof. Ascia, a.a.
+2022/2023; circa 92 pagine nella conversione in PDF e circa 15.000 parole nei paragrafi). Serve come
+modello di struttura e impaginazione: **il contenuto non si riusa**.
+
+- **Ordine delle parti:** copertina, abstract (una pagina, 181 parole, in italiano), indice con numeri di
+  pagina, introduzione, capitoli numerati, conclusioni, ringraziamenti, indice delle figure, indice delle
+  tabelle, bibliografia numerata [n].
+- **Copertina:** logo dell'Università di Catania, Dipartimento di Ingegneria Elettrica Elettronica e
+  Informatica, Corso di Laurea in Ingegneria Informatica, nome, titolo in maiuscolo corsivo, relatore
+  («Chiar.mo Prof.»), anno accademico.
+- **Formato:** A4; Times New Roman 12 pt, giustificato, interlinea 1,5, spazio dopo il paragrafo 10,5 pt.
+  Titolo di capitolo 17 pt grassetto centrato (spazio prima 54 pt, dopo 30 pt); titolo di sezione 15 pt
+  grassetto a sinistra; didascalie 9 pt grassetto centrate sotto la figura («Figura 1.1 …»). Margini 3 cm
+  sopra e sotto, 3,5 cm a sinistra e a destra; numero di pagina in basso al centro.
+- **Introduzione della triennale:** 356 parole in un solo paragrafo (circa 1,3 pagine) che contiene
+  contesto, obiettivo e descrizione capitolo per capitolo. Il relatore della magistrale chiede 1,5–2 pagine
+  tra introduzione e contenuti elencati nella sezione 2: a questo formato sono circa 400–540 parole.
+- **Tono:** italiano espositivo, prima persona plurale impersonale («andremo a descrivere», «faremo»).
+  Si propone di mantenerlo per continuità con la voce di Alessio; la decisione finale è sua.
+- **Da non replicare:** la triennale contiene alcuni refusi e una bibliografia fatta di pagine web. Per la
+  magistrale ogni riferimento deve essere una fonte verificata (articolo, DOI, pagina ufficiale).
+- **Aperto:** lingua della tesi (se Alessio non risponde, italiano) e anno accademico da scrivere in
+  copertina.
+
+## 10. Risultati RQ1 normalizzati rispetto ad A0 (eseguiti il 19 novembre)
+
+Fonte: `docs/RQ1_NORMALIZZAZIONE_RISULTATI_2026-11-19.md` e riga 50 del registro delle decisioni.
+Analisi descrittiva post hoc dei 300 tentativi di EVALUATION20 (20 incidenti, 3 modelli, 5 varianti; 295
+con punteggio). Le 15 medie già riportate sono state riprodotte prima di usare qualsiasi numero. Il
+riferimento è A0 dello stesso modello. Ogni cella riporta il multiplo rispetto ad A0 e se l'intervallo
+bootstrap al 95% della **differenza** da A0 esclude o include lo zero (non corretto per confronti
+multipli). I valori assoluti originali sono nel documento sorgente e non sono stati modificati.
+
+| Misura | Modello | A0: media (n) | A1 | A1_8R | A1_8R_Planning | A1_PAVE |
+|---|---|---|---|---|---|---|
+| Punteggio medio | sonnet | 0,117 (20) | ×3,40 (IC esclude 0; n=20) | ×3,72 (IC esclude 0; n=20) | ×3,15 (IC esclude 0; n=20) | ×4,33 (IC esclude 0; n=20) |
+| Punteggio medio | haiku | 0,142 (20) | ×1,62 (IC include 0; n=20) | ×1,94 (IC include 0; n=20) | ×1,71 (IC include 0; n=20) | ×2,27 (IC include 0; n=20) |
+| Punteggio medio | gemini | 0,079 (19) | ×2,11 (IC include 0; n=19) | ×1,46 (IC include 0; n=18) | ×2,79 (IC include 0; n=20) | ×2,72 (IC include 0; n=19) |
+| Token medi | sonnet | 122215 (20) | ×0,77 (IC esclude 0; n=20) | ×0,77 (IC esclude 0; n=20) | ×0,55 (IC esclude 0; n=20) | ×0,60 (IC esclude 0; n=20) |
+| Token medi | haiku | 132416 (20) | ×0,60 (IC esclude 0; n=20) | ×0,54 (IC esclude 0; n=20) | ×0,64 (IC esclude 0; n=20) | ×0,58 (IC esclude 0; n=20) |
+| Token medi | gemini | 34864 (19) | ×1,23 (IC esclude 0; n=19) | ×1,54 (IC esclude 0; n=18) | ×1,11 (IC include 0; n=20) | ×1,07 (IC include 0; n=19) |
+| Tempo end-to-end medio (s) | sonnet | 158,6 (20) | ×0,81 (IC include 0; n=20) | ×0,79 (IC include 0; n=20) | ×0,62 (IC esclude 0; n=20) | ×0,70 (IC esclude 0; n=20) |
+| Tempo end-to-end medio (s) | haiku | 216,5 (20) | ×0,57 (IC esclude 0; n=20) | ×0,45 (IC esclude 0; n=20) | ×0,52 (IC esclude 0; n=20) | ×0,44 (IC esclude 0; n=20) |
+| Tempo end-to-end medio (s) | gemini | 83,8 (19) | ×0,93 (IC include 0; n=19) | ×1,00 (IC include 0; n=18) | ×0,82 (IC include 0; n=20) | ×0,77 (IC esclude 0; n=19) |
+
+**Letture consentite**
+- Accuratezza: il multiplo è maggiore di 1 in tutte le 12 combinazioni (da 1,46 a 4,33), ma l'intervallo
+  della differenza esclude lo zero solo per Sonnet. Per Haiku e Gemini sono stime puntuali non
+  distinguibili da un effetto nullo con 20 incidenti; la mediana del punteggio è 0 in tutte le loro
+  varianti. «3 volte» vale solo per Sonnet.
+- Token: con Sonnet e Haiku ogni variante con harness ne usa meno di A0 (0,54–0,77 volte); con Gemini ne
+  usa di più (1,07–1,54 volte).
+- Tempo: Haiku sempre più veloce; Sonnet solo con Planning e PAVE in modo distinguibile; Gemini solo con
+  PAVE.
+
+**Cautele da rispettare nel testo**
+- I multipli con A0 basso (Gemini 0,079) ingigantiscono differenze piccole: gli intervalli dei rapporti
+  arrivano fino a 19,5. Si riporta sempre anche la differenza assoluta con il suo intervallo.
+- Nessun confronto tra modelli (i token dei provider diversi non sono confrontabili).
+- Il confronto primario preregistrato A1 − A0 è **appaiato** e si cita dalla relazione del 9 novembre
+  (Sonnet +0,2795, Haiku +0,0875, Gemini +0,0928 su 18 coppie). Le tabelle normalizzate usano le medie di
+  cella sugli incidenti con punteggio (Gemini 19 e 19) e per Gemini danno +0,088: la differenza è
+  dichiarata. Anche per Gemini le variazioni A1_8R → Planning di token e tempo (−28,3% e −17,8%) differiscono
+  da quelle della relazione (−27,8% e −17,2%); la causa probabile è la popolazione appaiata, **non
+  verificata**. Per Sonnet e Haiku i valori della relazione sono riprodotti esattamente.
+- Una sola esecuzione per cella, un solo sistema (Market), analisi post hoc: nessuna generalizzazione.
