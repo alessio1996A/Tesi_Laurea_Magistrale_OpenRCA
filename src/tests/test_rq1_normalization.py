@@ -198,6 +198,29 @@ class NormalizationTests(unittest.TestCase):
         report = m.run_normalization(self.dir, expected_runs=30, expected_cases=2, reported=None, draws=50)
         self.assertEqual(report["source_result_hash_mismatches"], 1)
 
+    def snapshot(self):
+        return {str(p.relative_to(self.dir)): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in sorted(self.dir.rglob("*")) if p.is_file()}
+
+    def test_frozen_inputs_stay_byte_identical_and_only_one_new_file_appears(self):
+        make_plan(self.dir, score_of)
+        before = self.snapshot()
+        out = self.dir / "data" / "rq1_normalization_v1" / "normalization.json"
+        runner = partial(m.run_normalization, expected_runs=30, expected_cases=2, reported=None, draws=50)
+        with mock.patch.object(m, "run_normalization", runner), redirect_stdout(StringIO()):
+            self.assertEqual(m.main(["--data-dir", str(self.dir), "--out", str(out)]), 0)
+        after = self.snapshot()
+        new = set(after) - set(before)
+        self.assertEqual(new, {"data/rq1_normalization_v1/normalization.json"})
+        self.assertEqual({k: after[k] for k in before}, before)   # nulla di preesistente e' cambiato
+
+    def test_report_keeps_original_means_beside_the_normalized_values(self):
+        report = self.run_norm()
+        cell = report["summaries"]["score"]["sonnet"]["A1"]
+        self.assertAlmostEqual(cell["mean"], 0.4)          # valore assoluto originale
+        self.assertAlmostEqual(cell["ratio_vs_A0"], 2.0)   # normalizzato, nello stesso record
+        self.assertEqual(cell["n"], 2)
+
     def test_bootstrap_is_deterministic_and_contains_point_estimate(self):
         a = self.run_norm(draws=300)["intervals"]["score"]["sonnet"]["A1"]
         shutil_dir = tempfile.TemporaryDirectory()
