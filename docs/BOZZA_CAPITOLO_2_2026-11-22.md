@@ -4,7 +4,7 @@ Stato: bozza di Claude da riscrivere con parole di Alessio (flusso concordato: C
 riscrive e deve saper spiegare, Claude ricontrolla fatti, numeri e riferimenti, poi revisione indipendente GPT).
 Convenzioni del modello del dipartimento: forma impersonale, citazioni autore-anno nella bozza (convertite in numeriche nel Word,
 come nel Capitolo 1), figure e tabelle numerate per capitolo con didascalia autosufficiente e senza note sotto.
-Il capitolo non contiene risultati: quelli stanno nei Capitoli 4 (RQ1) e 5 (RQ2). Descrive il banco di prova, le coorti,
+Il capitolo non contiene risultati: quelli stanno nei Capitoli 4 (RQ1) e 5 (RQ2). Descrive il banco di prova, i casi usati negli esperimenti,
 le condizioni di esecuzione, le misure e i controlli. Le minacce alla validità specifiche dei risultati sono nei Capitoli 4 e 5;
 qui stanno solo i limiti del protocollo.
 
@@ -20,7 +20,7 @@ Punti aperti (non fanno parte del testo del capitolo):
 <!-- CAP2:INIZIO -->
 # Benchmark e protocollo sperimentale
 
-Questo capitolo descrive il banco di prova e il protocollo con cui sono condotti gli esperimenti. Si presenta anzitutto il sistema Market di OpenRCA, con le sue query e lo scorer ufficiale. Si illustra poi la ripartizione dei casi nelle coorti usate per le due domande di ricerca e si descrivono i modelli e le condizioni comuni di esecuzione dell'agente. Seguono le misure, l'analisi statistica e i controlli adottati per garantire la riproducibilità. Il capitolo si chiude con i limiti del protocollo. Le cinque configurazioni dell'harness sono descritte nel Capitolo 3, mentre i risultati e la loro discussione si trovano nei Capitoli 4 e 5.
+Questo capitolo descrive il banco di prova e il protocollo con cui sono condotti gli esperimenti. Si presenta anzitutto il sistema Market di OpenRCA, con le sue query e lo scorer ufficiale. Si illustra poi la ripartizione dei casi e gli insiemi di incidenti usati per le due domande di ricerca e si descrivono i modelli e le condizioni comuni di esecuzione dell'agente. Seguono le misure, l'analisi statistica e i controlli adottati per garantire la riproducibilità. Il capitolo si chiude con i limiti del protocollo. Le cinque configurazioni dell'harness sono descritte nel Capitolo 3, mentre i risultati e la loro discussione si trovano nei Capitoli 4 e 5.
 
 ## Il sistema Market di OpenRCA
 
@@ -44,7 +44,7 @@ Le risposte sono valutate con lo scorer rilasciato con il benchmark, cioè il fi
 
 Nel resto della tesi, per diagnosi esatta si intende una run con punteggio 1. L'accuratezza del lavoro originale è la quota di casi risolti (Xu et al., 2025), mentre il punteggio medio usato in questa tesi comprende anche i punteggi parziali; per questo le due misure sono riportate separatamente.
 
-## Le coorti
+## I casi e la loro ripartizione
 
 ### La partizione dei casi
 
@@ -56,15 +56,15 @@ I 148 casi di Market erano stati ripartiti dal progetto in quattro gruppi prima 
 
 I casi coprono 15 classi di guasto. Otto sono coperte dalle regole diagnostiche descritte nel Capitolo 3: container CPU load, container memory load, container read I/O load, node CPU load, node memory consumption, node disk read I/O consumption, node disk write I/O consumption e node disk space consumption. Quattro sono state tenute deliberatamente fuori dallo sviluppo per la RQ2: node CPU spike, container write I/O load, container process termination e container packet loss. Le restanti tre sono classi di rete, cioè container network packet retransmission, packet corruption e latency; non hanno regole affidabili e non sono state riservate. Un controllo di separazione, eseguito sulla verità di riferimento in un processo distinto dall'inferenza e in forma aggregata, ha escluso le quattro classi della RQ2 dai gruppi di sviluppo e di valutazione. Esse compaiono soltanto nel gruppo riservato, dove sono tutti i 15 casi, e in 9 dei 18 casi del gruppo di quarantena.
 
-### La coorte della RQ1
+### I casi della RQ1
 
-Per la RQ1 si distinguono due coorti. La prima è di sviluppo e comprende 8 incidenti del gruppo omonimo, sui quali l'harness e i protocolli sono stati messi a punto. Le 120 esecuzioni corrispondenti, cioè 3 modelli per 5 configurazioni per 8 incidenti, sono esplorative e sono riportate separatamente dalle altre.
+Per la RQ1 si distinguono due insiemi di incidenti. Il primo è l'insieme di sviluppo e comprende 8 incidenti del gruppo omonimo, sui quali l'harness e i protocolli sono stati messi a punto. Le 120 esecuzioni corrispondenti, cioè 3 modelli per 5 configurazioni per 8 incidenti, sono esplorative e sono riportate separatamente dalle altre.
 
-La seconda coorte, chiamata EVALUATION20, comprende 20 incidenti scelti tra i 23 del gruppo di valutazione. La scelta è avvenuta prima di qualsiasi esecuzione sui nuovi incidenti, senza leggere verità di riferimento, telemetria, risposte o punteggi. I requisiti sono quattro: nessuna sovrapposizione temporale con i casi di sviluppo, di quarantena e riservati, né tra i casi scelti; 10 casi per ciascun cloudbed; tutti i sette obiettivi rappresentati; almeno un caso con più guasti per cloudbed. Nessuno dei 23 casi si sovrappone nel tempo ai casi degli altri gruppi. La selezione è deterministica: si prende il primo insieme di 20 casi che rispetta i requisiti, scorrendo i casi in un ordine fissato dall'hash SHA-256 di un seme e dell'identificativo del caso, quindi la scelta non dipende dall'accuratezza. I 20 incidenti scelti comprendono tre casi con più guasti. La disgiunzione temporale delle finestre non prova che gli incidenti siano statisticamente indipendenti.
+Il secondo insieme, chiamato EVALUATION20, comprende 20 incidenti scelti tra i 23 del gruppo di valutazione. La scelta è avvenuta prima di qualsiasi esecuzione sui nuovi incidenti, senza leggere verità di riferimento, telemetria, risposte o punteggi. I requisiti sono quattro: nessuna sovrapposizione temporale con i casi di sviluppo, di quarantena e riservati, né tra i casi scelti; 10 casi per ciascun cloudbed; tutti i sette obiettivi rappresentati; almeno un caso con più guasti per cloudbed. Nessuno dei 23 casi si sovrappone nel tempo ai casi degli altri gruppi. La selezione è deterministica: si prende il primo insieme di 20 casi che rispetta i requisiti, scorrendo i casi in un ordine fissato dall'hash SHA-256 di un seme e dell'identificativo del caso, quindi la scelta non dipende dall'accuratezza. I 20 incidenti scelti comprendono tre casi con più guasti. La disgiunzione temporale delle finestre non prova che gli incidenti siano statisticamente indipendenti.
 
 Il disegno è 20 incidenti per 3 modelli per 5 configurazioni, con una replica per condizione, per un totale di 300 run.
 
-### Le coorti della RQ2
+### I casi della RQ2
 
 La RQ2 usa il gruppo riservato, che contiene soltanto guasti delle quattro classi. I 15 casi sono divisi in due insiemi disgiunti. Quattro sono incidenti di scoperta, uno per classe, scelti in un audit separato dall'inferenza: su di essi gli agenti investigano e la pipeline produce le pseudoregole candidate. Gli altri undici sono incidenti sigillati, riservati al secondo livello di verifica e non consultati prima del congelamento delle regole.
 
@@ -148,4 +148,4 @@ gemini-3.5-flash-lite | Google | Impostazioni predefinite del client
 claude-sonnet-5-5 | Anthropic | Al più 4096 token in uscita per richiesta, condivisi con l'eventuale ragionamento; nessun tentativo automatico; temperatura, top_p e top_k non impostati
 claude-haiku-5-5 | Anthropic | Come claude-sonnet-5-5
 
-Figura 2.1 | Ripartizione dei 148 casi di Market e coorti degli esperimenti.
+Figura 2.1 | Ripartizione dei 148 casi di Market e insiemi usati negli esperimenti.
